@@ -48,7 +48,9 @@
                       {{company_name}}
                     </h2>
                     <p style="margin: 0">Telangana</p>
-                    <p style="margin: 0">{{gstin}}</p>
+                    {% if gstin != "NA" and gstin is not None %}
+                      <p style="margin: 0">{{gstin}}</p>
+                    {% endif %}
                     <p style="margin: 0">{{email}}</p>
                     <p style="margin: 0">Invoice No. : {{invoice_number}}</p>
                     <p style="margin: 0">Invoice Date : {{invoice_date}}</p>
@@ -113,7 +115,7 @@
                     <p style="margin: 0">{{ bill_to_pincode }}</p>
                   </div>
                 </td>
-                {% if ship_to_address %}
+                {% if ship_to_address != "NA" and ship_to_address is not None %}
                 <td style="width: 50%; vertical-align: top; text-align: right">
                   <div
                     style="
@@ -186,6 +188,32 @@
                     color: #5c6ac4;
                   "
                 >
+                  HSN
+                </td>
+                <td
+                  style="
+                    border-bottom-width: 2px;
+                    border-color: #5c6ac4;
+                    padding-bottom: 0.75rem;
+                    padding-left: 0.5rem;
+                    text-align: right;
+                    font-weight: 700;
+                    color: #5c6ac4;
+                  "
+                >
+                  Units
+                </td>
+                <td
+                  style="
+                    border-bottom-width: 2px;
+                    border-color: #5c6ac4;
+                    padding-bottom: 0.75rem;
+                    padding-left: 0.5rem;
+                    text-align: right;
+                    font-weight: 700;
+                    color: #5c6ac4;
+                  "
+                >
                   Qty.
                 </td>
                 <td
@@ -238,7 +266,7 @@
                     color: #5c6ac4;
                   "
                 >
-                  TaxAmount
+                  Tax
                 </td>
                 <td
                   style="
@@ -251,7 +279,7 @@
                     color: #5c6ac4;
                   "
                 >
-                  Tax
+                  Tax Amount
                 </td>
                 <td
                   style="
@@ -265,7 +293,7 @@
                     color: #5c6ac4;
                   "
                 >
-                  TotalAmount
+                  Total Amount
                 </td>
               </tr>
             </thead>
@@ -296,6 +324,28 @@
                     text-align: center;
                   "
                 >
+                  {{ item.hsn_sac }}
+                </td>
+                <td
+                  style="
+                    border-bottom-width: 1px;
+                    padding: 0.75rem 0 0.75rem 0.5rem;
+                    text-align: center;
+                  "
+                >
+                  {% if item.units and item.units != "NA" %}
+                    {{ item.units }}
+                  {% else %}
+                      -
+                  {% endif %}
+                </td>
+                <td
+                  style="
+                    border-bottom-width: 1px;
+                    padding: 0.75rem 0 0.75rem 0.5rem;
+                    text-align: center;
+                  "
+                >
                   {{ item.quantity }}
                 </td>
                 <td
@@ -311,7 +361,7 @@
                   style="
                     border-bottom-width: 1px;
                     padding: 0.75rem 0 0.75rem 0.5rem;
-                    text-align: right;
+                    text-align: center;
                   "
                 >
                   {{ item.discount }}
@@ -320,7 +370,7 @@
                   style="
                     border-bottom-width: 1px;
                     padding: 0.75rem 0.75rem 0.75rem 0.5rem;
-                    text-align: right;
+                    text-align: center;
                   "
                 >
                   {{ item.amount }}
@@ -329,16 +379,7 @@
                   style="
                     border-bottom-width: 1px;
                     padding: 0.75rem 0.75rem 0.75rem 0.5rem;
-                    text-align: right;
-                  "
-                >
-                  {{ item.taxamount }}
-                </td>
-                <td
-                  style="
-                    border-bottom-width: 1px;
-                    padding: 0.75rem 0.75rem 0.75rem 0.5rem;
-                    text-align: right;
+                    text-align: left;
                   "
                 >
                   {{ item.tax }}
@@ -347,7 +388,16 @@
                   style="
                     border-bottom-width: 1px;
                     padding: 0.75rem 0.75rem 0.75rem 0.5rem;
-                    text-align: right;
+                    text-align: center;
+                  "
+                >
+                  {{ item.taxamount }}
+                </td>
+                <td
+                  style="
+                    border-bottom-width: 1px;
+                    padding: 0.75rem 0.75rem 0.75rem 0.5rem;
+                    text-align: center;
                   "
                 >
                   {{ item.total_amount }}
@@ -359,7 +409,7 @@
                   <h3 style="margin: 0">Total In Words :</h3>
                   <br />{{total_in_words}}
                 </td>
-                <td colspan="7">
+                <td colspan="9">
                   <table
                     style="
                       width: 100%;

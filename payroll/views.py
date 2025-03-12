@@ -15,6 +15,8 @@ from user_management.serializers import *
 from django.db import transaction, DatabaseError
 from django.core.exceptions import ObjectDoesNotExist
 import json
+from .helpers import *
+
 
 def upload_to_s3(pdf_data, bucket_name, object_key):
     try:
@@ -48,6 +50,7 @@ def upload_to_s3(pdf_data, bucket_name, object_key):
 #         return url
 #     except Exception as e:
 #         raise Exception(f"Error generating presigned URL: {str(e)}")
+
 
 class PayrollOrgList(APIView):
     """
@@ -378,8 +381,9 @@ class PayrollOrgBusinessDetailView(APIView):
                 ) if organisation_details else False,
                 "pay_schedule": payroll_org.pay_schedule or PaySchedule.objects.filter(payroll=payroll_org.id).exists()
                 if organisation_details else False,
-                "leave_and_attendance": (payroll_org.leave_management or False) and (
-                            payroll_org.holiday_management or False) if organisation_details else False,
+                "leave_and_attendance": (LeaveManagement.objects.filter(payroll=payroll_org.id).exists()) and (
+                            HolidayManagement.objects.filter(payroll=payroll_org.id).exists()) if organisation_details
+                else False,
                 "employee_master": payroll_org.employee_master or False if organisation_details else False,
                 "salary_template": payroll_org.salary_template or
                                    SalaryTemplate.objects.filter(payroll=payroll_org.id).exists()
@@ -405,7 +409,7 @@ def work_location_list(request):
             payroll_org = PayrollOrg.objects.get(id=payroll_id)
             business = payroll_org.business  # Fetch business linked to PayrollOrg
 
-            work_locations = WorkLocations.objects.filter(payroll=payroll_org).order_by('-created_at')
+            work_locations = WorkLocations.objects.filter(payroll=payroll_org)
             work_location_data = WorkLocationSerializer(work_locations, many=True).data
             return Response(work_location_data, status=status.HTTP_200_OK)
 
@@ -870,7 +874,7 @@ def pt_list(request):
             # Fetch newly created PT objects
             pt_instances = PT.objects.filter(payroll_id=payroll_id)
 
-        serializer = PTSerializer(pt_instances, many=True)
+        serializer = PTSerializerRetrieval(pt_instances, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     elif request.method == 'POST':
@@ -907,128 +911,60 @@ def pt_detail(request, pk):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-default_earnings = [
-                    {
-                        "component_name": "Basic",
-                        "component_type": "Fixed",
-                        "calculation_type": {
-                            "type": "Percentage of CTC",
-                            "value": 50
-                        },
-                        "is_active": True,
-                        "is_part_of_employee_salary_structure": True,
-                        "is_taxable": True,
-                        "is_pro_rate_basis": True,
-                        "includes_epf_contribution": True,
-                        "includes_esi_contribution": True,
-                        "is_included_in_payslip": True,
-                        "tax_deduction_preference": None,
-                        "is_scheduled_earning": True
-                    },
-                    {
-                        "component_name": "HRA",
-                        "component_type": "Fixed",
-                        "calculation_type": {
-                            "type": "Percentage of Basic",
-                            "value": 50
-                        },
-                        "is_active": True,
-                        "is_part_of_employee_salary_structure": True,
-                        "is_taxable": True,
-                        "is_pro_rate_basis": True,
-                        "includes_epf_contribution": False,
-                        "includes_esi_contribution": True,
-                        "is_included_in_payslip": True,
-                        "tax_deduction_preference": None,
-                        "is_scheduled_earning": True
-                    },
-                    {
-                        "component_name": "Special Allowance",
-                        "component_type": "Fixed",
-                        "calculation_type": {
-                            "type": "Remaining balance pf CTC",
-                            "value": 0
-                        },
-                        "is_active": True,
-                        "is_part_of_employee_salary_structure": True,
-                        "is_taxable": True,
-                        "is_pro_rate_basis": True,
-                        "includes_epf_contribution": True,
-                        "includes_esi_contribution": True,
-                        "is_included_in_payslip": True,
-                        "tax_deduction_preference": None,
-                        "is_scheduled_earning": True
-                    },
-                    {
-                        "component_name": "Conveyance Allowance",
-                        "component_type": "Fixed",
-                        "calculation_type": {
-                            "type": "Flat Amount",
-                            "value": 50000
-                        },
-                        "is_active": True,
-                        "is_part_of_employee_salary_structure": True,
-                        "is_taxable": True,
-                        "is_pro_rate_basis": False,
-                        "includes_epf_contribution": True,
-                        "includes_esi_contribution": True,
-                        "is_included_in_payslip": True,
-                        "tax_deduction_preference": None,
-                        "is_scheduled_earning": True
-                    }
-                ]
-
 @api_view(['GET', 'POST'])
 def earnings_list(request):
     """
     List all Earnings records, or create a new one.
     """
     if request.method == 'GET':
-        payroll_id = request.query_params.get('payroll_id')
-
-        if not payroll_id:
-            return Response({"error": "payroll_id is required"}, status=status.HTTP_400_BAD_REQUEST)
-
         try:
-            payroll_instance = PayrollOrg.objects.get(id=payroll_id)  # Fetch PayrollOrg instance
-        except PayrollOrg.DoesNotExist:
-            return Response({"error": "Invalid payroll_id"}, status=status.HTTP_400_BAD_REQUEST)
+            payroll_id = request.query_params.get('payroll_id')
 
-        # Filter earnings by payroll instance
-        earnings = Earnings.objects.filter(payroll=payroll_instance)
-        if not earnings.exists():
-            created_earnings = []  # Track created earnings to manually delete on error
+            if not payroll_id:
+                return Response({"error": "payroll_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
             try:
-                with transaction.atomic():  # Ensures all-or-nothing behavior
-                    for earning_data in default_earnings:
-                        earning_data['payroll'] = payroll_instance.id  # Assign ID
+                payroll_instance = PayrollOrg.objects.get(id=payroll_id)  # Fetch PayrollOrg instance
+            except PayrollOrg.DoesNotExist:
+                return Response({"error": "Invalid payroll_id"}, status=status.HTTP_400_BAD_REQUEST)
 
-                        # Validate and save using serializer
-                        serializer = EarningsSerializer(data=earning_data)
-                        if serializer.is_valid(raise_exception=True):
-                            created_earning = serializer.save()
-                            created_earnings.append(created_earning)  # Track created object
-                        else:
-                            raise DatabaseError("Earning data is invalid, transaction will be rolled back.")
-            except (ValidationError, DatabaseError) as e:
-                # Handle exceptions gracefully and rollback
-                # Manually delete created earnings if an error occurs
-                for earning in created_earnings:
-                    earning.delete()
-                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-            except Exception as e:
-                # Clean up if something unexpected happens
-                for earning in created_earnings:
-                    earning.delete()
-                return Response({"error": f"Unexpected error occurred: {str(e)}"},
-                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-            # If everything works, get the earnings
+            # Filter earnings by payroll instance
             earnings = Earnings.objects.filter(payroll=payroll_instance)
+            if not earnings.exists():
+                created_earnings = []  # Track created earnings to manually delete on error
+                try:
+                    with transaction.atomic():  # Ensures all-or-nothing behavior
+                        for earning_data in default_earnings:
+                            earning_data['payroll'] = payroll_instance.id  # Assign ID
 
-        serializer = EarningsSerializer(earnings, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+                            # Validate and save using serializer
+                            serializer = EarningsSerializer(data=earning_data)
+                            if serializer.is_valid(raise_exception=True):
+                                created_earning = serializer.save()
+                                created_earnings.append(created_earning)  # Track created object
+                            else:
+                                raise DatabaseError("Earning data is invalid, transaction will be rolled back.")
+                except (ValidationError, DatabaseError) as e:
+                    # Handle exceptions gracefully and rollback
+                    # Manually delete created earnings if an error occurs
+                    for earning in created_earnings:
+                        earning.delete()
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+                except Exception as e:
+                    # Clean up if something unexpected happens
+                    for earning in created_earnings:
+                        earning.delete()
+                    return Response({"error": f"Unexpected error occurred: {str(e)}"},
+                                    status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+                # If everything works, get the earnings
+                earnings = Earnings.objects.filter(payroll=payroll_instance)
+
+            serializer = EarningsSerializerRetrieval(earnings, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": f"Unexpected error occurred: {str(e)}"},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     elif request.method == 'POST':
         data = request.data.copy()
@@ -1440,6 +1376,31 @@ def holiday_management_list_create(request):
             return Response(serializer.data,
                             status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+def holiday_management_filtered_list(request):
+    """
+    API for retrieving Holiday Management records based on payroll_id, financial_year, and applicable_for.
+    - GET: Retrieves holidays filtered by provided query parameters.
+    """
+    filters = {}
+
+    payroll_id = request.query_params.get('payroll_id')
+    financial_year = request.query_params.get('financial_year')
+    applicable_for = request.query_params.get('applicable_for')
+
+    if payroll_id:
+        filters['payroll_id'] = payroll_id
+    if financial_year:
+        filters['financial_year'] = financial_year
+    if applicable_for:
+        filters['applicable_for'] = applicable_for
+
+    holidays = HolidayManagement.objects.filter(**filters)  # Apply filters directly
+
+    serializer = HolidayManagementSerializer(holidays, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET', 'PUT', 'DELETE'])

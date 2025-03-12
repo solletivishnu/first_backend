@@ -99,6 +99,7 @@ urlpatterns = [
 
     # Holiday Management URLs
     path('holiday-management', views.holiday_management_list_create, name='holiday-management-list-create'),
+    path('holiday-management-filter', views.holiday_management_filtered_list, name='holiday-management-filtered-list'),
     path('holiday-management/<int:holiday_id>', views.holiday_management_detail_update_delete,
          name='holiday-management-detail-update-delete'),
 

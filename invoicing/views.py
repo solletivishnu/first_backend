@@ -1488,7 +1488,8 @@ def createDocument(request, id):
         invoice_date = invoice.invoice_date
         # terms = int(invoice.terms) if invoice else 0
         # due_date = invoice_date + timedelta(days=terms)
-        due_date_str = invoice_date.strftime('%d-%m-%Y')
+        invoice_date_str = invoice_date.strftime('%d-%m-%Y')
+        due_date_str = invoice.due_date.strftime('%d-%m-%Y')
 
         if len(invoice.invoicing_profile.email) > 26:
             business_name = split_address(invoice.invoicing_profile.email)
@@ -1496,6 +1497,7 @@ def createDocument(request, id):
         else:
             business_name = invoice.invoicing_profile.business.email
             adjust_layout = False
+
 
         context = {
             'company_name': getattr(invoice.invoicing_profile.business, 'nameOfBusiness', ''),
@@ -1523,7 +1525,7 @@ def createDocument(request, id):
             'due_date': due_date_str,
             'financial_year': getattr(invoice, 'financial_year', ''),
             'invoice_number': getattr(invoice, 'invoice_number', ''),
-            'invoice_date': "12/12/2024",
+            'invoice_date': invoice_date_str,
             'place_of_supply': getattr(invoice, 'place_of_supply', ''),
 
             # Bill To address fields
@@ -1536,23 +1538,37 @@ def createDocument(request, id):
                                                                                          'billing_address') else '',
 
             # Ship To address fields
-            'ship_to_address': invoice.shipping_address.get('address_line1', '') if invoice.shipping_address else None,
-            'ship_to_state': invoice.shipping_address.get('state', '') if invoice.shipping_address else None,
-            'ship_to_country': invoice.shipping_address.get('country', '') if invoice.shipping_address else None,
-            'ship_to_pincode': invoice.shipping_address.get('postal_code', '') if invoice.shipping_address else None,
+            'ship_to_address': invoice.shipping_address.get('address_line1') if invoice.shipping_address else None,
+            'ship_to_state': invoice.shipping_address.get('state') if invoice.shipping_address else None,
+            'ship_to_country': invoice.shipping_address.get('country') if invoice.shipping_address else None,
+            'ship_to_pincode': invoice.shipping_address.get('postal_code') if invoice.shipping_address else None,
 
             # Item Details
-            'item_details': getattr(invoice, 'item_details', []),
-            'total': getattr(invoice, 'total_amount', 0),
-            'subtotal': f"{round(float(getattr(invoice, 'subtotal_amount', 0)), 2):.2f}",
+            'item_details': [
+                            {
+                                'item': item.get('item', ''),
+                                'hsn_sac': item.get('hsn_sac', ''),
+                                'units': item.get('units', '-') if item.get('units') and item['units'] != 'NA' else '-',
+                                'quantity': "{:,}".format(int(float(item.get('quantity', 0)))),
+                                'rate': "{:,}".format(float(item.get('rate', 0))) if float(item.get('rate', 0)) % 1 else "{:,}".format(int(float(item.get('rate', 0)))),
+                                'discount': "{:,}".format(float(item.get('discount', 0))) if float(item.get('discount', 0)) % 1 else "{:,}".format(int(float(item.get('discount', 0)))),
+                                'amount': "{:,}".format(float(item.get('amount', 0))) if float(item.get('amount', 0)) % 1 else "{:,}".format(int(float(item.get('amount', 0)))),
+                                'taxamount': "{:,}".format(float(item.get('taxamount', 0))) if float(item.get('taxamount', 0)) % 1 else "{:,}".format(int(float(item.get('taxamount', 0)))),
+                                'tax': "{}%".format(int(float(item.get('tax', 0)))),  # Ensures percentage format
+                                'total_amount': "{:,}".format(float(item.get('total_amount', 0))) if float(item.get('total_amount', 0)) % 1 else "{:,}".format(int(float(item.get('total_amount', 0))))
+                            }
+                            for item in getattr(invoice, 'item_details', [])
+            ],
+            'total': "{:,}".format(round(float(getattr(invoice, 'total_amount', 0)))),
+            'subtotal': "{:,}".format(round(float(getattr(invoice, 'subtotal_amount', 0)))),
             'shipping': f"{round(float(getattr(invoice, 'shipping_amount', 0)), 2):.2f}",
             'cgst_amt': f"{round(float(getattr(invoice, 'total_cgst_amount', 0)), 2):.2f}",
             'sgst_amt': f"{round(float(getattr(invoice, 'total_sgst_amount', 0)), 2):.2f}",
-            'total': total_str,
+            'total': "{:,}".format(round(float(getattr(invoice, 'total_amount', 0)))),
             'total_in_words': total_in_words,
-            'cgst': round(float(getattr(invoice, 'total_cgst_amount', 0)), 2),
-            'sgst': round(float(getattr(invoice, 'total_sgst_amount', 0)), 2),
-            'igst_amt': getattr(invoice, 'total_igst_amount', 0),
+            'cgst': "{:,}".format(round(float(getattr(invoice, 'total_cgst_amount', 0)))),
+            'sgst': "{:,}".format(round(float(getattr(invoice, 'total_sgst_amount', 0)))),
+            'igst_amt': "{:,}".format(round(float(getattr(invoice, 'total_igst_amount', 0)))),
             'payment_status': getattr(invoice, 'payment_status', ''),
             'terms_and_conditions': getattr(invoice, 'terms_and_conditions', ''),
             'note': getattr(invoice, 'notes', ''),
@@ -1998,7 +2014,8 @@ def latest_invoice_id(request, invoicing_profile_id):
         invoicing_profile = get_object_or_404(InvoicingProfile, id=invoicing_profile_id)
 
         # Fetch the InvoiceFormat using gstin from the InvoicingProfile
-        invoice_format = InvoiceFormat.objects.get(gstin=invoicing_profile.gstin)
+        invoice_format = InvoiceFormat.objects.get(gstin=invoicing_profile.gstin,
+                                                   invoicing_profile_id=invoicing_profile_id)
 
         # Get the current format version
         current_format_version = invoice_format.invoice_format.get("format_version")

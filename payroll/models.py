@@ -89,6 +89,18 @@ class WorkLocations(models.Model):
         return self.location_name
 
 
+@receiver(post_save, sender=WorkLocations)
+def create_professional_tax(sender, instance, created, **kwargs):
+    """Automatically create a Professional Tax record when a new work location is added."""
+    if created:  # Ensure it runs only when a new WorkLocation is created
+        PT.objects.create(
+            payroll=instance.payroll,  # Assign the payroll
+            work_location=instance,  # Assign the new work location
+            pt_number=None,  # Keep it null by default
+            deduction_cycle="Monthly",  # Default deduction cycle
+        )
+
+
 class Departments(models.Model):
     payroll = models.ForeignKey('PayrollOrg', on_delete=models.CASCADE, related_name='departments')
     dept_code = models.CharField(max_length=150)
@@ -204,12 +216,14 @@ class Earnings(models.Model):
     is_part_of_employee_salary_structure = models.BooleanField(default=False)  # Part of salary structure
     is_taxable = models.BooleanField(default=True)  # Taxable earning
     is_pro_rate_basis = models.BooleanField(default=False)  # Pro-rata basis
-    is_flexible_benefit_plan = models.BooleanField(default=False)  # Flexible benefit plan
+    is_fbp_component = models.BooleanField(default=False)  # Flexible benefit plan
     includes_epf_contribution = models.BooleanField(default=False)  # EPF contribution
     includes_esi_contribution = models.BooleanField(default=False)  # ESI contribution
     is_included_in_payslip = models.BooleanField(default=True)  # Included in payslip
     tax_deduction_preference = models.CharField(max_length=120, null=True, blank=True)
     is_scheduled_earning = models.BooleanField(default=True)
+    pf_wage_less_than_15k = models.BooleanField(default=False)
+    always_consider_epf_inclusion = models.BooleanField(default=False)
 
     def clean(self):
         # Ensure tax_deduction_preference is required if component_name is "Bonus"
@@ -285,10 +299,10 @@ class SalaryTemplate(models.Model):
             for item in section:
                 if not isinstance(item, dict):
                     raise ValidationError(f"Each item in {section} must be a dictionary.")
-                if ('salary_component' not in item or 'calculation_type' not in item or 'monthly'
+                if ('component_name' not in item or 'calculation_type' not in item or 'monthly'
                         not in item or 'annually' not in item):
                     raise ValidationError(f"Each item in {section} "
-                                          f"must contain 'salary_component', 'calculation_type', "
+                                          f"must contain 'component_name', 'calculation_type', "
                                           f"'monthly', and 'annually'.")
 
         # Validate structure for gross_salary, total_ctc, and net_salary
@@ -396,7 +410,7 @@ class EmployeeManagement(BaseModel):
     department = models.ForeignKey('Departments', on_delete=models.CASCADE, related_name='employee_department')
     enable_portal_access = models.BooleanField(default=False)
     statutory_components = models.JSONField()
-    employee_status = models.BooleanField()
+    employee_status = models.BooleanField(default=True)
 
     def __str__(self):
         return f"{self.employee_id} ({self.gender})"
@@ -436,7 +450,7 @@ class EmployeeSalaryDetails(models.Model):
             for item in section:
                 if not isinstance(item, dict):
                     raise ValidationError(f"Each item in {section_name} must be a dictionary.")
-                required_fields = {'salary_component', 'calculation_type', 'monthly', 'annually'}
+                required_fields = {'component_name', 'calculation_type', 'monthly', 'annually'}
                 if not required_fields.issubset(item):
                     raise ValidationError(f"Each item in {section_name} must contain {required_fields}.")
 

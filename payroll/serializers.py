@@ -196,8 +196,10 @@ class EarningsSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'payroll', 'component_name', 'component_type', 'is_active', 'calculation_type',
             'is_part_of_employee_salary_structure', 'is_taxable', 'is_pro_rate_basis',
-            'is_flexible_benefit_plan', 'includes_epf_contribution', 'includes_esi_contribution',
-            'is_included_in_payslip', 'tax_deduction_preference', 'is_scheduled_earning'
+            'is_fbp_component', 'includes_epf_contribution', 'includes_esi_contribution',
+            'is_included_in_payslip', 'tax_deduction_preference', 'is_scheduled_earning', 'pf_wage_less_than_15k',
+            'always_consider_epf_inclusion'
+
         ]
 
     def create(self, validated_data):
@@ -215,6 +217,47 @@ class EarningsSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.save()
         return instance
+
+
+class EarningsSerializerRetrieval(serializers.ModelSerializer):
+    calculation = serializers.SerializerMethodField()
+    consider_for_epf = serializers.SerializerMethodField()
+    consider_for_esi = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Earnings
+        fields = [
+            'id', 'component_name', 'calculation', 'consider_for_epf',
+            'consider_for_esi', 'is_active'
+        ]
+
+    def get_calculation(self, obj):
+        """Format the calculation field based on calculation_type"""
+        calc_type = obj.calculation_type.get("type", "")
+        value = obj.calculation_type.get("value", "")
+
+        if calc_type == "Percentage of CTC":
+            return f"{value}% of CTC"
+        elif calc_type == "Percentage of Basic":
+            return f"{value}% of Basic"
+        elif calc_type == "Flat Amount":
+            return "Flat Amount"
+        elif value and calc_type:
+            return f"{value} ({calc_type})"
+        elif calc_type:
+            return calc_type
+        else:
+            return "Unknown"
+
+    def get_consider_for_epf(self, obj):
+        """Return 'True' if EPF is included, otherwise conditionally 'True(pf wage < 16k)'"""
+        if obj.includes_epf_contribution:
+            return "Yes(pf wage < 15k)" if obj.pf_wage_less_than_15k else "Yes"
+        return "No"
+
+    def get_consider_for_esi(self, obj):
+        """Return 'Yes' if includes_esi_contribution is True, otherwise 'No'"""
+        return "Yes" if obj.includes_esi_contribution else "No"
 
 
 class BenefitsSerializer(serializers.ModelSerializer):
