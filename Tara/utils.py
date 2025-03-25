@@ -14,9 +14,15 @@ from user_management.serializers import *
 from rest_framework.fields import CharField
 from django.contrib.auth.hashers import check_password
 from django.db.models import Q
+from django.http import JsonResponse
 
 
 User = get_user_model()  # Fetch the custom user model
+
+
+def health_check(request):
+    return JsonResponse({"status": "healthy"}, status=200)
+
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     username_field = 'email_or_user_name'
