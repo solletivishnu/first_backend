@@ -1,7 +1,7 @@
 from django.core.validators import RegexValidator
 from django.db import models
 from djongo.models import ArrayField, EmbeddedField, JSONField
-from user_management.models import User, Business
+from usermanagement.models import Users, Business
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.core.exceptions import ValidationError
@@ -59,16 +59,6 @@ class PaymentDetail(models.Model):
 
 class InvoicingProfile(BaseModel):
     business = models.OneToOneField(Business, on_delete=models.CASCADE)
-    business_name = models.CharField(max_length=20, null=False, blank=False)
-    business_registration_number = models.CharField(max_length=20, null=True, blank=True)
-    business_type = models.CharField(max_length=60, null=True, blank=True)
-    state = models.CharField(max_length=80, null=True, blank=True)
-    email = models.EmailField(null=True, blank=True)
-    pinCode = models.IntegerField(null=True)
-    mobile_number = models.CharField(max_length=20, null=True, blank=True)
-    address_line1 = models.CharField(max_length=120, null=True, blank=True)
-    address_line2 = models.CharField(max_length=120, null=True, blank=True)
-    pan = models.CharField(max_length=60, null=True, blank=True)
     bank_name = models.CharField(max_length=50)
     account_number = models.BigIntegerField(validators=[validate_account_number])
     ifsc_code = models.CharField(max_length=50)
@@ -229,6 +219,8 @@ class Invoice(models.Model):
     shipping_amount_with_tax = models.FloatField(null=True)
     selected_gst_rate = models.FloatField(null=True)
     invoice_status = models.CharField(max_length=60, null=False, blank=False)
+    customer_gstin = models.CharField(max_length=100, null=True, blank=True)
+    customer_pan = models.CharField(max_length=100, null=True, blank=True)
 
     def __str__(self):
         return f"Invoice: {self.invoice_number}"

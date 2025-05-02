@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html
+  lang="en"
+  style="
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+    -moz-tab-size: 4;
+    tab-size: 4;
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+      'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif,
+      'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+      'Noto Color Emoji';
+    font-feature-settings: normal;
+    font-variation-settings: normal;
+  "
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Employee Payslip</title>
+  </head>
+
+  <body style="margin: 5px !important; line-height: inherit; width: 100%;
+            height: 277mm;
+            box-sizing: border-box;
+            border-shadow:20px">
+    <div style="margin:20px;">
+      <div style="padding-top: 1rem; padding-bottom: 1rem">
+        <!-- Header Section -->
+        <div
+          style="
+            padding-left: 1 rem;
+            padding-right: 1 rem;
+            padding-top: 1.5rem;
+            padding-bottom: 1.5rem;
+          "
+        >
+          <table
+            style="width: 100%; border-collapse: collapse; border-spacing: 0"
+          >
+            <tbody>
+              <tr>
+                <td style="width: 50%; vertical-align: top">
+                  <div style="font-size: 0.875rem; line-height: 1.25rem">
+                    <h2
+                      style="
+                        margin: 0 0 5px 0;
+                        white-space: nowrap;
+                        color: #5c6ac4;
+                      "
+                    >
+                      {{company_name}}
+                    </h2>
+                    <p style="margin: 0; color: #525252;">{{address}}</p>
+                  </div>
+                </td>
+                <td style="width: 50%; vertical-align: top">
+                  <div style="font-size: 0.875rem; line-height: 1.25rem">
+                    <p
+                      style="margin: 0; color: #525252;
+                        text-align: right"
+                    >
+                      Payslip For the Month
+                    </p>
+                    <h2 style="margin: 0 0 5px 0;white-space: nowrap; text-align: right; color: #5c6ac4;">
+                      {{pay_period}}
+                    </h2>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="border-bottom: 1px dotted #525252; margin-top: 0 px;margin-bottom: 10px">
+        </div>
+        <div style="border-bottom: 1px dotted #525252; margin-top: 0 px;margin-bottom: 10px">
+        <p style="font-weight: 700; margin: 0 0 0.75rem 0; color: #5c6ac4;">
+            EMPLOYEE DETAILS
+          </p>
+        </div>
+
+        <!-- Employee Details Section -->
+        <div
+          style="
+            background-color: #f1f5f9;
+            padding-left: 3.5rem;
+            padding-right: 3.5rem;
+            padding-top: 1.5rem;
+            padding-bottom: 1.5rem;
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+          "
+        >
+          <table
+            style="width: 100%; border-collapse: collapse; border-spacing: 0"
+          >
+            <tbody>
+              <tr>
+                <td style="width: 60%; vertical-align: top">
+                  <table
+                    style="
+                      width: 100%;
+                      border-collapse: collapse;
+                      border-spacing: 0;
+                    "
+                  >
+                    <tr>
+                      <td
+                        style="
+                          padding: 0.5rem 0;
+                          vertical-align: top;
+                          font-weight: 700;
+                          width: 40%;
+                          color: #525252;
+                        "
+                      >
+                        Employee Name
+                      </td>
+                      <td
+                        style="
+                          padding: 0.5rem 0;
+                          vertical-align: top;
+                          color: #525252;
+                        "
+                      >
+                        : {{employee_name}}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td
+                        style="
+                          padding: 0.5rem 0;
+                          vertical-align: top;
+                          font-weight: 700;
+                          width: 40%;
+                          color: #525252;
+                        "
+                      >
+                        Designation
+                      </td>
+                      <td
+                        style="
+                          padding: 0.5rem 0;
+                          vertical-align: top;
+                          color: #525252;
+                        "
+                      >
+                        : {{designation}}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td
+                        style="
+                          padding: 0.5rem 0;
+                          vertical-align: top;
+                          font-weight: 700;
+                          width: 40%;
+                          color: #525252;
+                        "
+                      >
+                        Employee ID
+                      </td>
+                      <td
+                        style="
+                          padding: 0.5rem 0;
+                          vertical-align: top;
+                          color: #525252;
+                        "
+                      >
+                        : {{employee_id}}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td
+                        style="
+                          padding: 0.5rem 0;
+                          vertical-align: top;
+                          font-weight: 700;
+                          width: 40%;
+                          color: #525252;
+                        "
+                      >
+                        Date of Joining
+                      </td>
+                      <td
+                        style="
+                          padding: 0.5rem 0;
+                          vertical-align: top;
+                          color: #525252;
+                        "
+                      >
+                        : {{doj}}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td
+                        style="
+                          padding: 0.5rem 0;
+                          vertical-align: top;
+                          font-weight: 700;
+                          width: 40%;
+                          color: #525252;
+                        "
+                      >
+                        Pay Period
+                      </td>
+                      <td
+                        style="
+                          padding: 0.5rem 0;
+                          vertical-align: top;
+                          color: #525252;
+                        "
+                      >
+                        : {{pay_period}}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td
+                        style="
+                          padding: 0.5rem 0;
+                          vertical-align: top;
+                          font-weight: 700;
+                          width: 40%;
+                          color: #525252;
+                        "
+                      >
+                        Pay Date
+                      </td>
+                      <td
+                        style="
+                          padding: 0.5rem 0;
+                          vertical-align: top;
+                          color: #525252;
+                        "
+                      >
+                        : {{pay_date}}
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+                <td style="width: 40%; vertical-align: top; text-align: right">
+                  <div
+                    style="
+                      background-color: #e6f4ea;
+                      border: 1px solid #d3d3d3;
+                      padding: 0.75rem;
+                    "
+                  >
+                    <div style="border-left: 3px solid #28a745; padding-left: 0.5rem;">
+                      <h3
+                        style="
+                          font-size: 1rem;
+                          font-weight: 700;
+                          color: #000;
+                          margin: 0;
+                        "
+                      >
+                        ₹{{net_pay}}
+                      </h3>
+                      <p
+                        style="
+                          font-size: 0.75rem;
+                          color: #666;
+                          margin: 0.25rem 0 0 0;
+                        "
+                      >
+                        Employee Net Pay
+                      </p>
+                    </div>
+                    <div
+                      style="
+                        border-top: 1px dashed #d3d3d3;
+                        padding-top: 0.5rem;
+                        margin-top: 0.5rem;
+                      "
+                    >
+                      <table
+                        style="
+                          width: 100%;
+                          border-collapse: collapse;
+                          border-spacing: 0;
+                        "
+                      >
+                        <tr>
+                          <td style="font-size: 0.75rem; color: #525252;">
+                            Paid Days:
+                          </td>
+                          <td
+                            style="
+                              font-size: 0.75rem;
+                              color: #525252;
+                              text-align: right;
+                              font-weight: 700;
+                            "
+                          >
+                            {{paid_days}}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="font-size: 0.75rem; color: #525252;">
+                            LOP Days:
+                          </td>
+                          <td
+                            style="
+                              font-size: 0.75rem;
+                              color: #525252;
+                              text-align: right;
+                              font-weight: 700;
+                            "
+                          >
+                            {{lop_days}}
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Bank Details Section -->
+        <div
+          style="
+            padding-left: 3.5rem;
+            padding-right: 3.5rem;
+            padding-top: 1.5rem;
+            padding-bottom: 1.5rem;
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+          "
+        >
+          <table
+            style="width: 100%; border-collapse: collapse; border-spacing: 0"
+          >
+            <tbody>
+              <tr>
+                <td style="width: 50%; vertical-align: top">
+                  <div
+                    style="
+                      padding: 0.75rem;
+                      background-color: #f8f9fa;
+                      color: #525252;
+                    "
+                  >
+                    <div
+                      style="
+                        font-weight: 700;
+                        margin-bottom: 0.25rem;
+                        color: #5c6ac4;
+                      "
+                    >
+                      BANK ACCOUNT NO
+                    </div>
+                    <div>{{bank_account_number}}</div>
+                  </div>
+                </td>
+                <td
+                  style="
+                    width: 50%;
+                    vertical-align: top;
+                    text-align: right;
+                    padding-left: 0.5rem;
+                  "
+                >
+                  <div
+                    style="
+                      padding: 0.75rem;
+                      background-color: #f8f9fa;
+                      color: #525252;
+                    "
+                  >
+                    <div
+                      style="
+                        font-weight: 700;
+                        margin-bottom: 0.25rem;
+                        color: #5c6ac4;
+                      "
+                    >
+                      UAN NUMBER
+                    </div>
+                    <div>{{uan_number}}</div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Earnings and Deductions Section -->
+        <div
+          style="
+            padding-left: 3.5rem;
+            padding-right: 3.5rem;
+            padding-top: 2.5rem;
+            padding-bottom: 2.5rem;
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+            color: #404040;
+            margin:2px;
+            border: 1px solid #a8a6a2;
+            border-radius: 5px;
+            padding: 8mm;
+          "
+        >
+          <table
+            style="width: 100%; border-collapse: collapse; border-spacing: 0"
+          >
+            <tbody>
+              <tr>
+                <td style="width: 50%; vertical-align: top; padding-right: 1rem">
+                  <!-- Earnings Table -->
+                  <div style="margin-bottom: 0.75rem;">
+                    <p
+                      style="
+                        font-size: 0.875rem;
+                        font-weight: 700;
+                        color: #5c6ac4;
+                        margin: 0;
+                      "
+                    >
+                      EARNINGS
+                    </p>
+                  </div>
+                  <table
+                    style="
+                      width: 100%;
+                      border-collapse: collapse;
+                      border-spacing: 0;
+                    "
+                  >
+                    <thead>
+                      <tr style="border-bottom: 2px solid #5c6ac4">
+                        <td
+                          style="
+                            border-bottom-width: 2px;
+                            border-color: #5c6ac4;
+                            padding-bottom: 0.75rem;
+                            padding-left: 0.75rem;
+                            font-weight: 700;
+                            color: #5c6ac4;
+                          "
+                        >
+                          Component
+                        </td>
+                        <td
+                          style="
+                            border-bottom-width: 2px;
+                            border-color: #5c6ac4;
+                            padding-bottom: 0.75rem;
+                            padding-right: 0.75rem;
+                            text-align: right;
+                            font-weight: 700;
+                            color: #5c6ac4;
+                          "
+                        >
+                          Amount (₹)
+                        </td>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr style="border-bottom: 1px solid #e2e2e2">
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0 0.75rem 0.75rem;
+                          "
+                        >
+                          Basic
+                        </td>
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0.75rem 0.75rem 0;
+                            text-align: right;
+                          "
+                        >
+                          {{basic}}
+                        </td>
+                      </tr>
+                      <tr style="border-bottom: 1px solid #e2e2e2">
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0 0.75rem 0.75rem;
+                          "
+                        >
+                          House Rent Allowance
+                        </td>
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0.75rem 0.75rem 0;
+                            text-align: right;
+                          "
+                        >
+                          {{hra_allowance}}
+                        </td>
+                      </tr>
+                      <tr style="border-bottom: 1px solid #e2e2e2">
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0 0.75rem 0.75rem;
+                          "
+                        >
+                          Conveyance Allowance
+                        </td>
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0.75rem 0.75rem 0;
+                            text-align: right;
+                          "
+                        >
+                          {{conveyance_allowance}}
+                        </td>
+                      </tr>
+                      <tr style="border-bottom: 1px solid #e2e2e2">
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0 0.75rem 0.75rem;
+                          "
+                        >
+                          Travelling Allowance
+                        </td>
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0.75rem 0.75rem 0;
+                            text-align: right;
+                          "
+                        >
+                          {{travelling_allowance}}
+                        </td>
+                      </tr>
+                      <tr style="border-bottom: 1px solid #e2e2e2">
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0 0.75rem 0.75rem;
+                          "
+                        >
+                          Medical Allowance
+                        </td>
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0.75rem 0.75rem 0;
+                            text-align: right;
+                          "
+                        >
+                          {{medical_allowance}}
+                        </td>
+                      </tr>
+                      <tr style="border-bottom: 1px solid #e2e2e2">
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0 0.75rem 0.75rem;
+                          "
+                        >
+                          Internet Allowance
+                        </td>
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0.75rem 0.75rem 0;
+                            text-align: right;
+                          "
+                        >
+                          {{internet_allowance}}
+                        </td>
+                      </tr>
+                      <tr style="border-bottom: 1px solid #e2e2e2">
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0 0.75rem 0.75rem;
+                          "
+                        >
+                          Special Allowance
+                        </td>
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0.75rem 0.75rem 0;
+                            text-align: right;
+                          "
+                        >
+                          {{special_allowance}}
+                        </td>
+                      </tr>
+                      <tr style="border-bottom: 1px solid #e2e2e2">
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0 0.75rem 0.75rem;
+                          "
+                        >
+                          Miscellaneous Allowance
+                        </td>
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0.75rem 0.75rem 0;
+                            text-align: right;
+                          "
+                        >
+                          {{miscellaneous_allowance}}
+                        </td>
+                      </tr>
+                      <tr style="border-bottom: 1px solid #e2e2e2">
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0 0.75rem 0.75rem;
+                            font-weight: 700;
+                            color: #5c6ac4;
+                          "
+                        >
+                          Gross Earnings
+                        </td>
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0.75rem 0.75rem 0;
+                            text-align: right;
+                            font-weight: 700;
+                            color: #5c6ac4;
+                          "
+                        >
+                          {{gross_earnings}}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </td>
+                <td style="width: 50%; vertical-align: top; padding-left: 1rem">
+                  <!-- Deductions Table -->
+                  <div style="margin-bottom: 0.75rem;">
+                    <p
+                      style="
+                        font-size: 0.875rem;
+                        font-weight: 700;
+                        color: #5c6ac4;
+                        margin: 0;
+                      "
+                    >
+                      DEDUCTIONS
+                    </p>
+                  </div>
+                  <table
+                    style="
+                      width: 100%;
+                      border-collapse: collapse;
+                      border-spacing: 0;
+                    "
+                  >
+                    <thead>
+                      <tr style="border-bottom: 2px solid #5c6ac4">
+                        <td
+                          style="
+                            border-bottom-width: 2px;
+                            border-color: #5c6ac4;
+                            padding-bottom: 0.75rem;
+                            padding-left: 0.75rem;
+                            font-weight: 700;
+                            color: #5c6ac4;
+                          "
+                        >
+                          Component
+                        </td>
+                        <td
+                          style="
+                            border-bottom-width: 2px;
+                            border-color: #5c6ac4;
+                            padding-bottom: 0.75rem;
+                            padding-right: 0.75rem;
+                            text-align: right;
+                            font-weight: 700;
+                            color: #5c6ac4;
+                          "
+                        >
+                          Amount (₹)
+                        </td>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr style="border-bottom: 1px solid #e2e2e2">
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0 0.75rem 0.75rem;
+                          "
+                        >
+                          EPF Contribution
+                        </td>
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0.75rem 0.75rem 0;
+                            text-align: right;
+                          "
+                        >
+                          {{epf_contribution}}
+                        </td>
+                      </tr>
+                      <tr style="border-bottom: 1px solid #e2e2e2">
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0 0.75rem 0.75rem;
+                          "
+                        >
+                          ESI Contribution
+                        </td>
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0.75rem 0.75rem 0;
+                            text-align: right;
+                          "
+                        >
+                          {{esi_employee_contribution}}
+                        </td>
+                      </tr>
+                      <tr style="border-bottom: 1px solid #e2e2e2">
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0 0.75rem 0.75rem;
+                          "
+                        >
+                          Professional Tax
+                        </td>
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0.75rem 0.75rem 0;
+                            text-align: right;
+                          "
+                        >
+                          {{professional_tax}}
+                        </td>
+                      </tr>
+                      <tr style="border-bottom: 1px solid #e2e2e2">
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0 0.75rem 0.75rem;
+                          "
+                        >
+                          Income Tax
+                        </td>
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0.75rem 0.75rem 0;
+                            text-align: right;
+                          "
+                        >
+                          {{income_tax}}
+                        </td>
+                      </tr>
+                      <tr style="border-bottom: 1px solid #e2e2e2">
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0 0.75rem 0.75rem;
+                            font-weight: 700;
+                            color: #5c6ac4;
+                          "
+                        >
+                          Total Deductions
+                        </td>
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0.75rem 0.75rem 0;
+                            text-align: right;
+                            font-weight: 700;
+                            color: #5c6ac4;
+                          "
+                        >
+                          {{total_deduction}}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Total Net Payable -->
+
+        <div
+          style="
+            background-color: #f1f5f9;
+            padding-left: 3.5rem;
+            padding-right: 3.5rem;
+            padding-top: 1.5rem;
+            padding-bottom: 1.5rem;
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+          "
+        >
+          <table
+            style="width: 100%; border-collapse: collapse; border-spacing: 0"
+          >
+            <tbody>
+              <tr>
+                <td style="width: 50%; vertical-align: top">
+                  <h3 style="margin: 0; font-size: 0.875rem;">
+                    Amount In Words:
+                  </h3>
+                  <p style="margin: 0; color: #525252;">
+                    {{amount_in_words}}
+                  </p>
+                </td>
+                <td style="width: 50%; vertical-align: top">
+                  <table
+                    style="
+                      width: 100%;
+                      border-collapse: collapse;
+                      border-spacing: 0;
+                    "
+                  >
+                    <tbody>
+                      <tr>
+                        <td
+                          style="
+                            background-color: #5c6ac4;
+                            padding: 0.75rem;
+                          "
+                        >
+                          <div
+                            style="
+                              white-space: nowrap;
+                              font-weight: 700;
+                              color: #fff;
+                            "
+                          >
+                            Total Net Payable:
+                          </div>
+                        </td>
+                        <td
+                          style="
+                            background-color: #5c6ac4;
+                            padding: 0.75rem;
+                            text-align: right;
+                          "
+                        >
+                          <div
+                            style="
+                              white-space: nowrap;
+                              font-weight: 700;
+                              color: #fff;
+                            "
+                          >
+                            ₹{{net_pay}}
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Footer Section -->
+        <div
+          style="
+            padding-left: 3.5rem;
+            padding-right: 3.5rem;
+            padding-top: 2.5rem;
+            padding-bottom: 2.5rem;
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+            color: #404040;
+            text-align: center;
+          "
+        >
+          <p style="margin: 0; font-style: italic; color: #525252;">
+            This is a system-generated document.
+          </p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

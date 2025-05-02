@@ -203,3 +203,64 @@ default_earnings = [
 
 ]
 
+
+default_leave_management = [
+    {
+        "name_of_leave": "Earned Leaves",
+        "code": None,
+        "leave_type": "Paid",
+        "employee_leave_period": "Monthly",
+        "number_of_leaves": 1.25,
+        "pro_rate_leave_balance_of_new_joinees_based_on_doj": True,
+        "reset_leave_balance": True,
+        "reset_leave_balance_type": "Monthly",
+        "carry_forward_unused_leaves": True,
+        "max_carry_forward_days": 2,
+        "encash_remaining_leaves": True,
+        "encashment_days": 2
+    },
+    {
+        "name_of_leave": "Casual Leaves",
+        "code": None,
+        "leave_type": "Paid",
+        "employee_leave_period": "Monthly",
+        "number_of_leaves": 1,
+        "pro_rate_leave_balance_of_new_joinees_based_on_doj": True,
+        "reset_leave_balance": True,
+        "reset_leave_balance_type": "Monthly",
+        "carry_forward_unused_leaves": True,
+        "max_carry_forward_days": 2,
+        "encash_remaining_leaves": True,
+        "encashment_days": 2
+    },
+    {
+        "name_of_leave": "Sick Leaves",
+        "code": None,
+        "leave_type": "Paid",
+        "employee_leave_period": "Monthly",
+        "number_of_leaves": 1,
+        "pro_rate_leave_balance_of_new_joinees_based_on_doj": True,
+        "reset_leave_balance": True,
+        "reset_leave_balance_type": "Monthly",
+        "carry_forward_unused_leaves": True,
+        "max_carry_forward_days": 2,
+        "encash_remaining_leaves": True,
+        "encashment_days": 2
+    },
+    {
+        "name_of_leave": "Loss of Pay",
+        "code": None,
+        "leave_type": "Unpaid",
+        "employee_leave_period": "-",
+        "number_of_leaves": 0,
+        "pro_rate_leave_balance_of_new_joinees_based_on_doj": False,
+        "reset_leave_balance": False,
+        "reset_leave_balance_type": None,
+        "carry_forward_unused_leaves": False,
+        "max_carry_forward_days": 0,
+        "encash_remaining_leaves": False,
+        "encashment_days": 0
+    },
+]
+
+

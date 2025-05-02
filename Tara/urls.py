@@ -38,8 +38,6 @@ urlpatterns = [
 
     path('openapi.json', schema_view.without_ui(cache_timeout=0), name='schema-json'),
 
-    path("health/", health_check, name="health_check"),
-
     # Token authentication URL
     path('token_auth/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

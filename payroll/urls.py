@@ -69,6 +69,8 @@ urlpatterns = [
 
     path('earnings', views.earnings_list, name='earnings_list'),
 
+    path('earnings-in-payslip', views.earnings_in_payslip, name='earnings-in-payslip'),
+
     # URL for retrieving, updating, or deleting a specific Earnings record by its ID
     path('earnings/<int:pk>', views.earnings_detail, name='earnings_detail'),
 
@@ -110,9 +112,59 @@ urlpatterns = [
     path('employee-salary/<int:pk>', views.employee_salary_detail, name='employee-salary-detail'),
 
     path('employee-personal-details', views.employee_personal_list, name='employee-personal-list'),
-    path('employee-personal-details/<int:pk>/', views.employee_personal_detail, name='employee-personal-detail'),
+    path('employee-personal-details/<int:pk>', views.employee_personal_detail, name='employee-personal-detail'),
 
     path('employee-bank-details', views.employee_bank_list, name='employee-bank-list'),
     path('employee-bank-details/<int:pk>', views.employee_bank_detail, name='employee-bank-detail'),
+
+    path('salary-benefits-details/<int:payroll_id>', views.get_payroll_details, name='payroll-details'),
+
+    path("calculate-payroll",  views.calculate_payroll, name="calculate_payroll"),
+
+    path('new-employees', views.new_employees_list, name='new-employees-list'),
+
+    path('employee-exit', views.employee_exit_list, name='employee-exit-list'),  # List or Create
+    path('employee-exit/<int:pk>', views.employee_exit_detail, name='employee-exit-detail'),
+
+    path('payroll-exit-settlement', views.payroll_exit_settlement_details, name='payroll-exit-settlement-details'),
+
+    path('advance-loans', views.advance_loan_list, name='advance-loan-list'),  # List or Create
+    path('advance-loans/<int:pk>', views.advance_loan_detail, name='advance-loan-detail'),  # Retrieve, Update, Delete
+
+    path('payroll-advance-summary', views.payroll_advance_loans, name='payroll-advance-loans'),
+
+    path('employee-attendance', views.employee_attendance_list, name='employee_attendance_list'),
+    path('employee-attendance/<int:pk>', views.employee_attendance_detail, name='employee_attendance_detail'),
+
+    path('employee_attendance_automate', views.generate_next_month_attendance, name='generate-next-month-attendance'),
+
+    path('employee_attendance_current_month_automate', views.generate_current_month_attendance,
+         name='generate-current-month-attendance'),
+
+    path('employee_attendance_filtered', views.employee_attendance_filtered, name='employee_attendance_filtered'),
+
+    # Employee Monthly Salary calculation
+    path('calculate-employee-monthly-salary', views.calculate_employee_monthly_salary,
+         name='calculate-employee-monthly-salary'),
+
+    # Employee Monthly Detail Salary calculation
+    path('detail_employee_payroll_salary', views.detail_employee_monthly_salary,
+         name='detail-employee-monthly-salary'),
+
+    path('employee-monthly-salary-template', views.employee_monthly_salary_template,
+         name='employee-monthly-salary-template'),
+
+    path('payroll-summary-view', views.payroll_summary_view, name='payroll-summary-view'),
+
+    path('payroll_financial-year-summary', views.get_financial_year_summary, name='financial_year_summary'),
+
+    path('bonus-incentives', views.bonus_incentive_list, name='bonus-incentive-list'),
+
+    path('bonus-incentives/<int:pk>', views.bonus_incentive_detail, name='bonus-incentive-detail'),
+
+    path('bonus-incentives/by-payroll-month', views.bonus_by_payroll_month_year, name='bonus-by-payroll'),
+
+    path('employee-salaries', views.active_employee_salaries, name='active-employee-salaries')
+
 
 ]
