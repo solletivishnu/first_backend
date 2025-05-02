@@ -3,13 +3,13 @@ from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from rest_framework.exceptions import AuthenticationFailed
-from user_management.models import User  # Assuming your user model is in user_management app
+from usermanagement.models import Users  # Assuming your user model is in user_management app
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth import get_user_model
 from rest_framework.permissions import AllowAny
-from user_management.models import CustomGroup, CustomPermission, UserAffiliatedRole, Business, UserAffiliationSummary
+# from user_management.models import CustomGroup, CustomPermission, UserAffiliatedRole, Business, UserAffiliationSummary
 from user_management.serializers import *
 from rest_framework.fields import CharField
 from django.contrib.auth.hashers import check_password

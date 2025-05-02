@@ -2714,7 +2714,7 @@ def businessEntityRegistration(request):
             logger.error(f"Integrity error during registration: {str(e)}")
             object_remove(created_objects)
             return Response(
-                {"error": "A user with this email already exists."},
+                {"error": "A user with this email or mobile number already exists."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         except DatabaseError as e:

@@ -67,6 +67,12 @@ INSTALLED_APPS = [
     'django_celery_beat',
     'payroll',
     'storages',
+    'usermanagement',
+    'company_incorporation',
+    'gst',
+    'labour_license',
+    'msme_registration',
+    'trade_license'
 ]
 
 MIDDLEWARE = [
@@ -119,7 +125,7 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # }
 
 # In Tara/settings/default.py
-AUTH_USER_MODEL = 'user_management.User'
+AUTH_USER_MODEL = 'usermanagement.Users'
 
 
 # Password validation
@@ -181,7 +187,7 @@ MIGRATION_MODULES = {
 }
 
 
-FRONTEND_URL = 'http://tarafirst.com/'
+FRONTEND_URL = 'https://tarafirst.com/'
 
 
 REST_FRAMEWORK = {
@@ -291,9 +297,9 @@ ZEROBOUNCE_SECRET_KEY = os.getenv('ZEROBOUNCE_SECRET_KEY')
 ################
 
 
-RAZORPAY_CLIENT_ID = os.getenv('RAZORPAY_CLIENT_ID')
+RAZORPAY_CLIENT_ID = "rzp_test_8c29UvjDlTMv65"
 
-RAZORPAY_CLIENT_SECRET = os.getenv('RAZORPAY_CLIENT_SECRET')
+RAZORPAY_CLIENT_SECRET = "AjTkDJgfZfHVGE4PMbacKnFK"
 
 SANDBOX_API_KEY = os.getenv('SANDBOX_API_KEY')
 SANDBOX_API_SECRET = os.getenv('SANDBOX_API_SECRET')
@@ -303,11 +309,13 @@ SANDBOX_API_VERSION = os.getenv('SANDBOX_API_VERSION')
 
 # Load the secret encryption key
 SECRET_ENCRYPTION_KEY = os.getenv("SECRET_ENCRYPTION_KEY", "default-fallback-key")
-
+#
 AWS_REGION = os.getenv('AWS_REGION')  # e.g., "us-east-1"
 AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
+print(EMAIL_HOST_USER)
+print("*******************")
 
 S3_BUCKET_NAME = "tarafirstdevelopment"
 
@@ -334,7 +342,7 @@ DATABASES = {
 }
 
 
-Reference_link = "http://tarafirst.com/"
+Reference_link = "https://tarafirst.com/"
 
 TEMPLATES = [
     {

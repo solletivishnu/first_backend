@@ -1,5 +1,5 @@
 from rest_framework import status, viewsets
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, parser_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import serializers
@@ -31,46 +31,14 @@ from rest_framework.permissions import AllowAny
 from django.db.models import Case, When, F, Sum, Prefetch, FloatField
 from django.utils.timezone import now
 from django.shortcuts import get_object_or_404
-
+from usermanagement.utils import *
+from usermanagement.decorators import *
+from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 
 # Create loggers for general and error logs
 logger = logging.getLogger(__name__)
 
-@swagger_auto_schema(
-    method='get',
-    operation_description="Retrieve the invoicing profile for the logged-in user.",
-    tags=["Invoicing Profiles"],
-    responses={
-        200: openapi.Response(
-            description="Invoicing profile details.",
-            examples={
-                "application/json": {
-                    "id": 1,
-                    "business": 1,
-                    "pan_number": "ABCDE1234F",
-                    "bank_name": "XYZ Bank",
-                    "account_number": 1234567890123456,
-                    "ifsc_code": "XYZ0001234",
-                    "swift_code": "XYZ1234XX",
-                    "invoice_format": {},
-                    "signature": "signatures/abc.png"
-                }
-            }
-        ),
-        403: openapi.Response("Unauthorized access."),
-        404: openapi.Response("Invoicing profile not found."),
-        500: openapi.Response("An unexpected error occurred.")
-    },
-    manual_parameters=[
-        openapi.Parameter(
-            'Authorization',
-            openapi.IN_HEADER,
-            description="Bearer <JWT Token>",
-            type=openapi.TYPE_STRING,
-            required=True
-        )
-    ]
-)
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_invoicing_profile(request):
@@ -149,72 +117,19 @@ def invoicing_profile_exists(request):
         )
 
 
-@swagger_auto_schema(
-    method='post',
-    operation_description="Create a new invoicing profile for the logged-in user.",
-    request_body=openapi.Schema(
-        type=openapi.TYPE_OBJECT,
-        properties={
-            "pan_number": openapi.Schema(type=openapi.TYPE_STRING, example="ABCDE1234F"),
-            "bank_name": openapi.Schema(type=openapi.TYPE_STRING, example="XYZ Bank"),
-            "account_number": openapi.Schema(type=openapi.TYPE_INTEGER, example=1234567890123456),
-            "ifsc_code": openapi.Schema(type=openapi.TYPE_STRING, example="XYZ0001234"),
-            "swift_code": openapi.Schema(type=openapi.TYPE_STRING, example="XYZ1234XX"),
-            "invoice_format": openapi.Schema(type=openapi.TYPE_OBJECT, example={}),
-            "signature": openapi.Schema(
-                type=openapi.TYPE_STRING,
-                format=openapi.FORMAT_BINARY,
-                description="Upload your signature here as an image file."
-            )
-        }
-    ),
-    tags=["Invoicing Profiles"],
-    responses={
-        201: openapi.Response(
-            description="Invoicing profile created successfully.",
-            examples={
-                "application/json": {
-                    "id": 1,
-                    "business": 1,
-                    "pan_number": "ABCDE1234F",
-                    "bank_name": "XYZ Bank",
-                    "account_number": 1234567890123456,
-                    "ifsc_code": "XYZ0001234",
-                    "swift_code": "XYZ1234XX",
-                    "invoice_format": {},
-                    "signature": "signatures/abc.png"
-                }
-            }
-        ),
-        400: openapi.Response("Bad request."),
-        403: openapi.Response("Unauthorized access."),
-        500: openapi.Response("An unexpected error occurred.")
-    },
-    manual_parameters=[
-        openapi.Parameter(
-            'Authorization',
-            openapi.IN_HEADER,
-            description="Bearer <JWT Token>",
-            type=openapi.TYPE_STRING,
-            required=True
-        ),
-    ]
-)
 @api_view(['POST'])
+@parser_classes([JSONParser, MultiPartParser, FormParser])
 @permission_classes([IsAuthenticated])
 def create_invoicing_profile(request):
     """
     Create a new invoicing profile for the logged-in user.
+    Patches business fields if missing.
     """
-    user = request.user
-    data = request.data.copy()
-    # data['business'] = user.id  # Assign the current user as the business owner
-
-    serializer = InvoicingProfileSerializer(data=data)
+    serializer = InvoicingProfileSerializer(data=request.data, context={'request': request})
 
     if serializer.is_valid():
         try:
-            serializer.save()
+            serializer.save()  # Business is assigned and patched in serializer
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except Exception as e:
             logger.error(f"Unexpected error in create_invoicing_profile: {e}")
@@ -225,85 +140,27 @@ def create_invoicing_profile(request):
 
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-@swagger_auto_schema(
-    method='put',
-    operation_description="Update the existing invoicing profile for the logged-in user.",
-    request_body=openapi.Schema(
-        type=openapi.TYPE_OBJECT,
-        properties={
-            "pan_number": openapi.Schema(type=openapi.TYPE_STRING, example="ABCDE1234F"),
-            "bank_name": openapi.Schema(type=openapi.TYPE_STRING, example="XYZ Bank"),
-            "account_number": openapi.Schema(type=openapi.TYPE_INTEGER, example=1234567890123456),
-            "ifsc_code": openapi.Schema(type=openapi.TYPE_STRING, example="XYZ0001234"),
-            "swift_code": openapi.Schema(type=openapi.TYPE_STRING, example="XYZ1234XX"),
-            "invoice_format": openapi.Schema(type=openapi.TYPE_OBJECT, example={}),
-            "signature": openapi.Schema(type=openapi.TYPE_FILE, format=openapi.FORMAT_BINARY)  # Added file upload field
-        },
-        required=[]  # Change this to an empty list since all fields are optional
-    ),
-    tags=["Invoicing Profiles"],
-    responses={
-        200: openapi.Response(
-            description="Invoicing profile updated successfully.",
-            examples={
-                "application/json": {
-                    "id": 1,
-                    "business": 1,
-                    "pan_number": "ABCDE1234F",
-                    "bank_name": "XYZ Bank",
-                    "account_number": 1234567890123456,
-                    "ifsc_code": "XYZ0001234",
-                    "swift_code": "XYZ1234XX",
-                    "invoice_format": {},
-                    "signature": "signatures/abc.png"
-                }
-            }
-        ),
-        400: openapi.Response("Bad request."),
-        403: openapi.Response("Unauthorized access."),
-        404: openapi.Response("Invoicing profile not found."),
-        500: openapi.Response("An unexpected error occurred.")
-    },
-    manual_parameters=[
-        openapi.Parameter(
-            'Authorization',
-            openapi.IN_HEADER,
-            description="Bearer <JWT Token>",
-            type=openapi.TYPE_STRING,
-            required=True
-        ),
-    ]
-)
+
 @api_view(['PUT'])
+@parser_classes([MultiPartParser, FormParser])
 @permission_classes([IsAuthenticated])
 def update_invoicing_profile(request, pk):
     """
     Update the existing invoicing profile for the logged-in user.
+    Patches business fields if missing.
     """
     try:
-        invoicing_profile = InvoicingProfile.objects.get(id=pk)
+        invoicing_profile = InvoicingProfile.objects.get(id=pk, business__client=request.user)
     except InvoicingProfile.DoesNotExist:
         return Response({"message": "Invoicing profile not found."}, status=status.HTTP_404_NOT_FOUND)
 
-    # Ensure data is a dictionary
-    data = request.data.dict() if isinstance(request.data, QueryDict) else dict(request.data)
-
-    # Handle file uploads
-    if 'signature' in request.FILES:
-        data['signature'] = request.FILES['signature']
-
-    # Check if data is not empty
-    if not data:
-        return Response({"message": "No data provided."}, status=status.HTTP_400_BAD_REQUEST)
-
-    # Partial update
-    serializer = InvoicingProfileSerializer(invoicing_profile, data=data, partial=True)
+    serializer = InvoicingProfileSerializer(
+        invoicing_profile, data=request.data, partial=True, context={'request': request}
+    )
 
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
-
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 @swagger_auto_schema(
@@ -1465,11 +1322,11 @@ def split_address(address):
     ]
 )
 @api_view(["GET"])
+# @require_permissions(2, required_actions=['Invoice.print'])
 def createDocument(request, id):
     try:
         # Fetch the invoice object
         invoice = Invoice.objects.get(id=id)
-
         signature_base64 = ''
         # if invoice.invoicing_profile.signature:
         #     with open(invoice.invoicing_profile.signature.path, "rb") as image_file:
@@ -1491,28 +1348,27 @@ def createDocument(request, id):
         invoice_date_str = invoice_date.strftime('%d-%m-%Y')
         due_date_str = invoice.due_date.strftime('%d-%m-%Y')
 
-        if len(invoice.invoicing_profile.email) > 26:
-            business_name = split_address(invoice.invoicing_profile.email)
+        if len(getattr(invoice.invoicing_profile.business, 'email', '')) > 26:
+            business_name = split_address(invoice.invoicing_profile.business.email)
             adjust_layout = True
         else:
             business_name = invoice.invoicing_profile.business.email
             adjust_layout = False
 
-
         context = {
             'company_name': getattr(invoice.invoicing_profile.business, 'nameOfBusiness', ''),
             'business_type': getattr(invoice.invoicing_profile.business, 'entityType', '') or
-                              getattr(invoice.invoicing_profile, 'business_type', ''),
-            'address': getattr(invoice.invoicing_profile, 'address_line1', ''),
-            'state': getattr(invoice.invoicing_profile, 'state', ''),
+                               getattr(invoice.invoicing_profile, 'business_type', ''),
+            'address': invoice.invoicing_profile.business.headOffice.get('address_line1', ''),
+            'state': invoice.invoicing_profile.business.headOffice.get('state', ''),
             'country': "India",
-            'pincode': getattr(invoice.invoicing_profile, 'pinCode', ''),
-            'registration_number': getattr(invoice.invoicing_profile, 'business_registration_number', ''),
+            'pincode': invoice.invoicing_profile.business.headOffice.get('pincode', ''),
+            'registration_number': getattr(invoice.invoicing_profile.business, 'registrationNumber', ''),
             'gst_registered': getattr(invoice.invoicing_profile, 'gst_registered', ''),
             'gstin': getattr(invoice.invoicing_profile, 'gstin', ''),
-            'email': getattr(invoice.invoicing_profile, 'email', ''),
-            'mobile': getattr(invoice.invoicing_profile, 'mobile', ''),
-            'pan': getattr(invoice.invoicing_profile, 'pan_number', ''),
+            'email': getattr(invoice.invoicing_profile.business, 'email', ''),
+            'mobile': getattr(invoice.invoicing_profile.business, 'mobile_number', ''),
+            'pan': getattr(invoice.invoicing_profile.business, 'pan', ''),
             'bank_name': getattr(invoice.invoicing_profile, 'bank_name', ''),
             'account_number': getattr(invoice.invoicing_profile, 'account_number', ''),
             'ifsc_code': getattr(invoice.invoicing_profile, 'ifsc_code', ''),
@@ -1528,12 +1384,15 @@ def createDocument(request, id):
             'invoice_date': invoice_date_str,
             'place_of_supply': getattr(invoice, 'place_of_supply', ''),
 
+
             # Bill To address fields
             'bill_to_address': invoice.billing_address.get('address_line1', '') if hasattr(invoice,
                                                                                            'billing_address') else '',
             'bill_to_state': invoice.billing_address.get('state', '') if hasattr(invoice, 'billing_address') else '',
             'bill_to_country': invoice.billing_address.get('country', '') if hasattr(invoice,
                                                                                      'billing_address') else '',
+            'customer_gstin': getattr(invoice, 'customer_gstin', ''),
+            'customer_pan': getattr(invoice, 'customer_pan', ''),
             'bill_to_pincode': invoice.billing_address.get('postal_code', '') if hasattr(invoice,
                                                                                          'billing_address') else '',
 
@@ -1559,7 +1418,6 @@ def createDocument(request, id):
                             }
                             for item in getattr(invoice, 'item_details', [])
             ],
-            'total': "{:,}".format(round(float(getattr(invoice, 'total_amount', 0)))),
             'subtotal': "{:,}".format(round(float(getattr(invoice, 'subtotal_amount', 0)))),
             'shipping': f"{round(float(getattr(invoice, 'shipping_amount', 0)), 2):.2f}",
             'cgst_amt': f"{round(float(getattr(invoice, 'total_cgst_amount', 0)), 2):.2f}",
@@ -2311,6 +2169,7 @@ def get_customer_invoice_receipts(request):
             {"error": f"An unexpected error occurred: {e}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+
 
 @swagger_auto_schema(
     method='put',

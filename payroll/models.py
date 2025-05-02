@@ -1,10 +1,11 @@
 from django.db import models
 from django.core.exceptions import ValidationError
 from djongo.models import ArrayField, EmbeddedField, JSONField
-from user_management.models import *
+from usermanagement.models import *
 from datetime import date
 from collections import OrderedDict
 from django.db.models.signals import pre_save, post_save
+from dateutil.relativedelta import relativedelta
 
 
 def validate_pincode(value):
@@ -154,6 +155,7 @@ class ESI(models.Model):
     employee_contribution = models.DecimalField(max_digits=5, decimal_places=2)  # e.g., 0.75
     employer_contribution = models.DecimalField(max_digits=5, decimal_places=2)  # e.g., 3.25
     include_employer_contribution_in_ctc = models.BooleanField()  # Include employer contribution in CTC?
+    is_disabled = models.BooleanField(default=False)
 
     def __str__(self):
         return f"ESI Details for Payroll: {self.payroll.business.nameOfBusiness} (ESI No: {self.esi_number})"
@@ -352,13 +354,13 @@ class PaySchedule(BaseModel):
 class LeaveManagement(models.Model):
     payroll = models.ForeignKey('PayrollOrg', on_delete=models.CASCADE, related_name='leave_managements')
     name_of_leave = models.CharField(max_length=120)
-    code = models.CharField(max_length=20, unique=True)  # Ensuring code uniqueness
+    code = models.CharField(max_length=20, null=True, blank=True, default=None)  # Ensuring code uniqueness
     leave_type = models.CharField(max_length=60)  # Renamed from `type` to `leave_type`
-    employee_leave_period = models.CharField(max_length=80)
-    number_of_leaves = models.IntegerField(default=0)
+    employee_leave_period = models.CharField(max_length=80, default='-')
+    number_of_leaves = models.FloatField(null=True, blank=True, default=None)
     pro_rate_leave_balance_of_new_joinees_based_on_doj = models.BooleanField(default=False)
     reset_leave_balance = models.BooleanField(default=False)
-    reset_leave_balance_type = models.CharField(max_length=20)
+    reset_leave_balance_type = models.CharField(max_length=20, default=None, null=True)
     carry_forward_unused_leaves = models.BooleanField(default=False)
     max_carry_forward_days = models.IntegerField(default=None, null=True)
     encash_remaining_leaves = models.BooleanField(default=False)
@@ -416,6 +418,69 @@ class EmployeeManagement(BaseModel):
         return f"{self.employee_id} ({self.gender})"
 
 
+@receiver(post_save, sender=EmployeeManagement)
+def allocate_pro_rated_leave(sender, instance, created, **kwargs):
+    """Automatically allocate leave balance based on the financial year when a new employee is created."""
+    if created:
+        leave_policies = LeaveManagement.objects.filter(payroll=instance.payroll)
+
+        # Automatically calculate financial year based on the current date
+        today = date.today()
+        if today.month >= 4:
+            start_year = today.year
+            end_year = today.year + 1
+        else:
+            start_year = today.year - 1
+            end_year = today.year
+
+        leave_period_start = date(start_year, 4, 1)
+        leave_period_end = date(end_year, 3, 31)
+
+        for leave in leave_policies:
+            total_leaves = leave.number_of_leaves
+            pro_rated_leave = total_leaves  # Default full allocation
+
+            # Calculate remaining months in the financial year
+            if instance.doj > leave_period_start:
+                remaining_months = max(1, (leave_period_end.year - instance.doj.year) * 12 +
+                                       (leave_period_end.month - instance.doj.month))
+
+                if leave.employee_leave_period == "Monthly":
+                    # If leave is allocated monthly, multiply remaining months by number_of_leaves
+                    pro_rated_leave = total_leaves * remaining_months
+
+                elif leave.employee_leave_period == "Annually":
+                    # If leave is allocated annually, divide annual leave by remaining months
+                    pro_rated_leave = round((total_leaves / 12) * remaining_months)
+
+            # Create Leave Balance Entry
+            EmployeeLeaveBalance.objects.create(
+                employee=instance,
+                leave_type=leave,
+                leave_entitled=pro_rated_leave,
+                leave_remaining=pro_rated_leave,
+                financial_year=f"{start_year}-{end_year}"
+            )
+
+
+class EmployeeLeaveBalance(models.Model):
+    """Leave Balance Model"""
+    employee = models.ForeignKey(EmployeeManagement, on_delete=models.CASCADE, related_name='leave_balances')
+    leave_type = models.ForeignKey(LeaveManagement, on_delete=models.CASCADE, related_name='leave_balances')
+    leave_entitled = models.FloatField()  # Total entitled leave
+    leave_used = models.FloatField(default=0)  # Leaves taken
+    leave_remaining = models.FloatField()  # Auto-calculated
+    financial_year = models.CharField(max_length=10, null=False, blank=False)
+
+    def save(self, *args, **kwargs):
+        """Auto-calculate remaining leaves before saving."""
+        self.leave_remaining = self.leave_entitled - self.leave_used
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.employee.name} - {self.leave_type.name_of_leave}: {self.leave_remaining} remaining"
+
+
 class EmployeeSalaryDetails(models.Model):
     employee = models.ForeignKey(
         'EmployeeManagement', on_delete=models.CASCADE, related_name='employee_salary'
@@ -432,6 +497,9 @@ class EmployeeSalaryDetails(models.Model):
 
     valid_from = models.DateField(auto_now_add=True)  # Salary start date
     valid_to = models.DateField(null=True, blank=True)  # Salary end date (null = current salary)
+    created_on = models.DateField(auto_now_add=True)
+    created_month = models.IntegerField(editable=False)
+    created_year = models.IntegerField(editable=False)
 
     def clean(self):
         """Ensure no open salary record exists before adding a new one."""
@@ -473,6 +541,12 @@ class EmployeeSalaryDetails(models.Model):
             active_salary.save()
 
         self.clean()  # Validate the model before saving
+
+        # Auto-set created_month and created_year based on created_on (if new object)
+        if not self.pk:
+            today = self.created_on or date.today()
+            self.created_month = today.month
+            self.created_year = today.year
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -495,7 +569,7 @@ class EmployeePersonalDetails(BaseModel):
         ('O-', 'O Negative (O-)'),
     ]
 
-    employee = models.ForeignKey('EmployeeManagement', on_delete=models.CASCADE,
+    employee = models.OneToOneField('EmployeeManagement', on_delete=models.CASCADE,
                                  related_name='employee_personal_details')
     dob = models.DateField()
     age = models.IntegerField()
@@ -512,17 +586,213 @@ class EmployeePersonalDetails(BaseModel):
 
 
 class EmployeeBankDetails(BaseModel):
-    employee = models.ForeignKey('EmployeeManagement', on_delete=models.CASCADE, related_name='employee_bank_details')
+    employee = models.OneToOneField('EmployeeManagement', on_delete=models.CASCADE, related_name='employee_bank_details')
     account_holder_name = models.CharField(max_length=150, null=False, blank=False)
     bank_name = models.CharField(max_length=150, null=False, blank=False)
     account_number = models.CharField(max_length=20, unique=True, null=False, blank=False)
     ifsc_code = models.CharField(max_length=20, null=False, blank=False)
     branch_name = models.CharField(max_length=150, null=True, blank=True)
-    upi_id = models.CharField(max_length=50, null=True, blank=True, default=None)  # Default is None
     is_active = models.BooleanField(default=True)  # To mark active/inactive bank details
 
     def __str__(self):
         return f"{self.employee.associate_id} - {self.bank_name} ({self.account_number})"
+
+
+class EmployeeExit(models.Model):
+    employee = models.OneToOneField(
+        'EmployeeManagement', on_delete=models.CASCADE, related_name='employee_exit_details'
+    )
+    doe = models.DateField()
+    exit_month = models.IntegerField(editable=False, null=True)  # auto-filled
+    exit_year = models.IntegerField(editable=False, null=True)   # auto-filled
+    exit_reason = models.CharField(max_length=256, null=True, blank=True, default=None)
+    regular_pay_schedule = models.BooleanField()
+    specify_date = models.DateField(null=True, blank=True)
+    notes = models.TextField(null=True, blank=True, default='')
+
+    def clean(self):
+        if self.regular_pay_schedule and self.specify_date is not None:
+            raise ValidationError(
+                "If 'regular_pay_schedule' is True, 'specify_date' must be None."
+            )
+        if not self.regular_pay_schedule and self.specify_date is None:
+            raise ValidationError(
+                "If 'regular_pay_schedule' is False, 'specify_date' must be provided."
+            )
+
+    def save(self, *args, **kwargs):
+        self.clean()
+
+        # Auto-assign month and year from `doe`
+        if self.doe:
+            self.exit_month = self.doe.month
+            self.exit_year = self.doe.year
+
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Exit: {self.employee.first_name} {self.employee.last_name} ({self.doe})"
+
+
+class AdvanceLoan(models.Model):
+    employee = models.ForeignKey(
+        'EmployeeManagement', on_delete=models.CASCADE, related_name='employee_advance_loan'
+    )
+    loan_type = models.CharField(max_length=120, null=False, blank=False)  # Renamed 'type' to 'loan_type' (reserved keyword)
+    amount = models.IntegerField()
+    no_of_months = models.IntegerField()
+    emi_amount = models.IntegerField(editable=False)  # Auto-calculated
+    start_month = models.DateField()
+    end_month = models.DateField(editable=False)  # Auto-calculated
+
+    def clean(self):
+        """Validation: Ensure amount and months are positive."""
+        if self.amount <= 0:
+            raise ValidationError("Loan amount must be greater than zero.")
+        if self.no_of_months <= 0:
+            raise ValidationError("Number of months must be greater than zero.")
+
+    def save(self, *args, **kwargs):
+        """Auto-calculate EMI and End Month before saving."""
+        self.clean()
+        self.emi_amount = self.amount // self.no_of_months  # Equal installment
+        self.end_month = self.start_month + relativedelta(months=self.no_of_months)  # Auto-calculate end month
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.employee.first_name} - {self.loan_type} Loan ({self.amount})"
+
+
+class BonusIncentive(models.Model):
+    employee = models.ForeignKey(
+        'EmployeeManagement', on_delete=models.CASCADE, related_name='employee_bonus_incentive'
+    )
+    bonus_type = models.CharField(max_length=120, null=False, blank=False)
+    amount = models.IntegerField()
+    month = models.IntegerField(null=False)
+    year = models.IntegerField(null=False, editable=False)
+    financial_year = models.CharField(max_length=10, null=False, blank=False)
+
+    def save(self, *args, **kwargs):
+        try:
+            start_year, end_year = map(int, self.financial_year.split('-'))
+            # Determine year based on financial year and month
+            if self.month >= 4:
+                self.year = start_year
+            else:
+                self.year = end_year
+        except (ValueError, IndexError):
+            raise ValueError("Invalid financial_year format. It should be like '2024-2025'")
+
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.employee.first_name} - {self.bonus_type} Bonus ({self.amount})"
+
+
+class EmployeeAttendance(models.Model):
+    """Employee Attendance Tracking Model."""
+    employee = models.ForeignKey(EmployeeManagement, on_delete=models.CASCADE, related_name='employee_attendance')
+    financial_year = models.CharField(max_length=10, null=False, blank=False)
+    month = models.IntegerField(null=False)
+    total_days_of_month = models.IntegerField(null=False)
+    holidays = models.FloatField(null=False)
+    week_offs = models.IntegerField(null=False)
+    present_days = models.FloatField(null=False)
+    balance_days = models.FloatField(null=False)
+    casual_leaves = models.FloatField(null=False)
+    sick_leaves = models.FloatField(null=False)
+    earned_leaves = models.FloatField(null=False)
+    loss_of_pay = models.FloatField(null=False)
+
+    def save(self, *args, **kwargs):
+        """Automatically calculate present_days before saving."""
+        self.present_days = self.total_days_of_month - (self.holidays + self.week_offs + self.loss_of_pay)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return (f"{self.employee.name} - {self.month}/{self.financial_year}: Present {self.present_days},"
+                f" Casual Leaves {self.casual_leaves}, Sick Leaves {self.sick_leaves}, "
+                f"Earned Leaves {self.earned_leaves}")
+
+
+@receiver(pre_save, sender=EmployeeAttendance)
+def update_leave_balance(sender, instance, **kwargs):
+    """Validate and update Employee Leave Balance before saving attendance."""
+
+    if instance.pk:  # Only validate updates, not new records
+        previous = EmployeeAttendance.objects.get(pk=instance.pk)
+
+        # Define all leave types including Loss of Pay
+        leave_types = {
+            'casual_leaves': 'Casual Leaves',
+            'sick_leaves': 'Sick Leaves',
+            'earned_leaves': 'Earned Leaves',
+            'loss_of_pay': 'Loss of Pay'
+        }
+
+        for field, leave_name in leave_types.items():
+            prev_value = getattr(previous, field)
+            new_value = getattr(instance, field)
+            leave_diff = new_value - prev_value  # Change in leave usage
+
+            if leave_diff != 0:  # Only process if there is a change
+                leave_balance = EmployeeLeaveBalance.objects.filter(
+                    employee=instance.employee,
+                    leave_type__name_of_leave=leave_name,
+                    financial_year=instance.financial_year  # Ensure financial year is considered
+                ).first()
+
+                if not leave_balance:
+                    raise ValidationError(f"Leave balance for {leave_name} not found for the financial year {instance.financial_year}.")
+
+                # If the leave type is NOT LOP, enforce balance limits
+                if leave_name != "Loss of Pay" and leave_diff > 0:
+                    if leave_balance.leave_remaining < leave_diff:
+                        raise ValidationError(f"Insufficient {leave_name}. You have only {leave_balance.leave_remaining} left.")
+
+                    # Deduct leave from balance
+                    leave_balance.leave_remaining -= leave_diff
+
+                # Update leave used count
+                leave_balance.leave_used += leave_diff
+                leave_balance.save()
+
+
+class EmployeeSalaryHistory(models.Model):
+    employee = models.ForeignKey(
+        'EmployeeManagement', on_delete=models.CASCADE, related_name='employee_salary_history'
+    )
+    payroll = models.ForeignKey('PayrollOrg', on_delete=models.CASCADE, related_name='payroll_employee_dashboard')
+    month = models.IntegerField(null=False)  # Month of the change
+    financial_year = models.CharField(max_length=10, null=False, blank=False)  # Format: "2024-2025"
+    total_days_of_month = models.IntegerField(null=False)  # Total days in the month
+    lop = models.FloatField(null=False)  # Loss of Pay
+    paid_days = models.FloatField(null=False)  # Paid days
+    ctc = models.IntegerField(null=False)  # Total CTC
+    gross_salary = models.IntegerField(null=False)  # Gross Salary
+    earned_salary = models.IntegerField(null=False)  # Earned Salary
+    basic_salary = models.IntegerField(null=False)  # Basic Salary
+    hra = models.IntegerField(null=False)  # House Rent Allowance
+    special_allowance = models.IntegerField(null=False)  # Special Allowance
+    bonus = models.IntegerField(null=False)  # Bonus
+    other_earnings = models.IntegerField(null=False)  # Other Earnings
+    benefits_total = models.IntegerField(null=False)  # Total Benefits
+    epf = models.FloatField(null=False)  # EPF Contribution
+    esi = models.FloatField(null=False)  # ESI Contribution
+    pt = models.FloatField(null=False)  # Professional Tax
+    tds = models.FloatField(null=False)  # Tax Deducted at Source
+    loan_emi = models.FloatField(null=False)  # Loan EMI
+    other_deductions = models.FloatField(null=False)  # Other Deductions
+    total_deductions = models.FloatField(null=False)  # Total Deductions
+    net_salary = models.IntegerField(null=False)  # Net Salary
+    is_active = models.BooleanField(default=True)  # Whether the record is active
+    change_date = models.DateField(auto_now_add=True)  # Date of the change
+    notes = models.TextField(null=True, blank=True)  # Optional notes about the change
+
+    def __str__(self):
+        return f"{self.employee.associate_id} - {self.change_date}"
+
 
 
 
