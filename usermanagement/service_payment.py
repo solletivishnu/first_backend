@@ -172,6 +172,7 @@ def create_razorpay_order_for_services(request):
 @permission_classes([AllowAny])
 def unified_razorpay_webhook(request):
     try:
+        print("[Webhook] Received Razorpay webhook")
         webhook_secret = "servicetesting"
         received_sig = request.headers.get('X-Razorpay-Signature')
 
@@ -181,11 +182,18 @@ def unified_razorpay_webhook(request):
             hashlib.sha256
         ).hexdigest()
 
+        print(f"[Webhook] Received Signature: {received_sig}")
+        print(f"[Webhook] Generated Signature: {generated_sig}")
+
         if not hmac.compare_digest(received_sig, generated_sig):
+            print("[Webhook] Signature mismatch")
             return JsonResponse({'error': 'Signature mismatch'}, status=400)
 
         data = json.loads(request.body)
+        print(f"[Webhook] Payload: {json.dumps(data, indent=2)}")
+
         if data.get('event') != 'payment.captured':
+            print(f"[Webhook] Ignored event: {data.get('event')}")
             return JsonResponse({'status': 'ignored'}, status=200)
 
         entity = data['payload']['payment']['entity']
@@ -194,6 +202,8 @@ def unified_razorpay_webhook(request):
         order_id = entity['order_id']
         method = entity['method']
 
+        print(f"[Webhook] Processing payment_id={payment_id}, order_id={order_id}, method={method}, notes={notes}")
+
         payment_type = notes.get('type')
 
         if payment_type == 'service':
@@ -201,6 +211,7 @@ def unified_razorpay_webhook(request):
         elif payment_type == 'module':
             return handle_module_payment(notes, order_id, payment_id, method)
         else:
+            print(f"[Webhook] Unknown payment type: {payment_type}")
             return JsonResponse({'error': 'Unknown payment type'}, status=400)
 
     except Exception as e:
@@ -211,10 +222,14 @@ def unified_razorpay_webhook(request):
 
 def handle_service_payment(order_id, payment_id, method):
     try:
+        print(f"[ServicePayment] Fetching payment for order_id={order_id}")
         payment = ServicePaymentInfo.objects.get(razorpay_order_id=order_id)
+
         if payment.status == 'captured':
+            print(f"[ServicePayment] Already captured for order_id={order_id}")
             return JsonResponse({'status': 'already processed'}, status=200)
 
+        print("[ServicePayment] Marking payment as captured...")
         payment.razorpay_payment_id = payment_id
         payment.method = method
         payment.status = 'captured'
@@ -222,13 +237,14 @@ def handle_service_payment(order_id, payment_id, method):
         payment.paid_at = timezone.now()
         payment.save()
 
-        # Optional: mark service request as paid
         if payment.service_request:
             payment.service_request.status = 'paid'
             payment.service_request.save()
+            print(f"[ServicePayment] Updated ServiceRequest #{payment.service_request.id} to paid")
 
         return JsonResponse({'status': 'service payment processed'})
     except ServicePaymentInfo.DoesNotExist:
+        print(f"[ServicePayment][ERROR] ServicePaymentInfo not found for order_id={order_id}")
         return JsonResponse({'error': 'ServicePaymentInfo not found'}, status=404)
 
 
@@ -237,11 +253,14 @@ def handle_module_payment(notes, order_id, payment_id, method):
         subscription_id = notes.get('subscription_id')
         context_id = notes.get('context_id')
 
+        print(f"[ModulePayment] Looking for ModuleSubscription id={subscription_id}, context_id={context_id}")
         subscription = ModuleSubscription.objects.get(id=subscription_id, context_id=context_id)
 
         if subscription.status == 'active':
+            print(f"[ModulePayment] Subscription already active for id={subscription_id}")
             return JsonResponse({'status': 'already active'}, status=200)
 
+        print(f"[ModulePayment] Activating subscription...")
         subscription.status = 'active'
         subscription.payment_status = 'captured'
         subscription.payment_method = method
@@ -249,22 +268,17 @@ def handle_module_payment(notes, order_id, payment_id, method):
         subscription.paid_at = timezone.now()
         subscription.save()
 
-        # Create initial subscription cycle
         create_subscription_cycle(subscription)
 
         return JsonResponse({'status': 'module subscription processed'})
     except ModuleSubscription.DoesNotExist:
+        print(f"[ModulePayment][ERROR] ModuleSubscription not found for id={subscription_id}, context={context_id}")
         return JsonResponse({'error': 'ModuleSubscription not found'}, status=404)
 
 
 def create_subscription_cycle(subscription):
-    """
-    Creates a subscription cycle and initializes usage limits.
-    """
-    from decimal import Decimal
-    from django.db import transaction
-
     try:
+        print(f"[SubscriptionCycle] Creating cycle for subscription id={subscription.id}")
         with transaction.atomic():
             initial_feature_usage = {}
             if subscription.plan.features_enabled:
@@ -280,5 +294,6 @@ def create_subscription_cycle(subscription):
                 is_paid='yes',
                 feature_usage=initial_feature_usage
             )
+            print("[SubscriptionCycle] Created successfully")
     except Exception as e:
-        print(f"[SubscriptionCycle][ERROR]: Failed to create cycle: {str(e)}")
+        print(f"[SubscriptionCycle][ERROR] Failed to create cycle: {str(e)}")
