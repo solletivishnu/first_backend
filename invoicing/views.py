@@ -1406,6 +1406,7 @@ def createDocument(request, id):
             'item_details': [
                             {
                                 'item': item.get('item', ''),
+                                'note': item.get('note',''),
                                 'hsn_sac': item.get('hsn_sac', ''),
                                 'units': item.get('units', '-') if item.get('units') and item['units'] != 'NA' else '-',
                                 'quantity': "{:,}".format(int(float(item.get('quantity', 0)))),

@@ -68,7 +68,11 @@ def create_razorpay_order_for_services(request):
         razorpay_order = client.order.create({
             "amount": amount,
             "currency": "INR",
-            "payment_capture": 1
+            "payment_capture": 1,
+            "notes": {
+                "type": "service",
+                "service_payment_id": str(service_request.id)
+            }
         })
 
         # ✅ Step 3: Save new payment info
@@ -109,14 +113,67 @@ def create_razorpay_order_for_services(request):
         return Response({"error": f"Failed to create Razorpay order: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# @csrf_exempt
+# @api_view(['POST'])
+# @permission_classes([AllowAny])
+# def service_razorpay_webhook(request):
+#     try:
+#         webhook_secret = "servicetesting"
+#         received_sig = request.headers.get('X-Razorpay-Signature')
+#         print("[Webhook] Received Signature:", received_sig)
+#
+#         generated_sig = hmac.new(
+#             webhook_secret.encode(),
+#             request.body,
+#             hashlib.sha256
+#         ).hexdigest()
+#
+#         print("[Webhook] Generated Signature:", generated_sig)
+#
+#         if not hmac.compare_digest(received_sig, generated_sig):
+#             print("[Webhook] Signature mismatch.")
+#             return JsonResponse({'error': 'Signature mismatch'}, status=400)
+#
+#         data = json.loads(request.body)
+#         print("[Webhook] Payload received:\n", json.dumps(data, indent=2))
+#
+#         if data.get('event') == 'payment.captured':
+#             entity = data['payload']['payment']['entity']
+#             payment_id = entity['id']
+#             order_id = entity['order_id']
+#             method = entity['method']
+#
+#             print(f"[Webhook] Payment Captured: payment_id={payment_id}, order_id={order_id}, method={method}")
+#
+#             payment = ServicePaymentInfo.objects.get(razorpay_order_id=order_id)
+#             payment = ServicePaymentInfo.objects.get(razorpay_order_id=order_id)
+#
+#             payment.razorpay_payment_id = payment_id
+#             payment.method = method
+#             payment.status = 'captured'
+#             payment.captured = 'yes'
+#             payment.paid_at = timezone.now()
+#             payment.save()
+#
+#         return JsonResponse({'status': 'ok'})
+#
+#     except ServicePaymentInfo.DoesNotExist:
+#         print(f"[Webhook][ERROR] No payment found for Razorpay order_id: {order_id}")
+#         return JsonResponse({'error': 'Payment record not found'}, status=404)
+#
+#     except Exception as e:
+#         import traceback
+#         print("[Webhook][ERROR] Exception occurred:", str(e))
+#         print(traceback.format_exc())
+#         return JsonResponse({'error': str(e)}, status=500)
+
 @csrf_exempt
 @api_view(['POST'])
 @permission_classes([AllowAny])
-def service_razorpay_webhook(request):
+def unified_razorpay_webhook(request):
     try:
         webhook_secret = "servicetesting"
         received_sig = request.headers.get('X-Razorpay-Signature')
-        print("[Webhook] Received Signature:", received_sig)
 
         generated_sig = hmac.new(
             webhook_secret.encode(),
@@ -124,42 +181,104 @@ def service_razorpay_webhook(request):
             hashlib.sha256
         ).hexdigest()
 
-        print("[Webhook] Generated Signature:", generated_sig)
-
         if not hmac.compare_digest(received_sig, generated_sig):
-            print("[Webhook] Signature mismatch.")
             return JsonResponse({'error': 'Signature mismatch'}, status=400)
 
         data = json.loads(request.body)
-        print("[Webhook] Payload received:\n", json.dumps(data, indent=2))
+        if data.get('event') != 'payment.captured':
+            return JsonResponse({'status': 'ignored'}, status=200)
 
-        if data.get('event') == 'payment.captured':
-            entity = data['payload']['payment']['entity']
-            payment_id = entity['id']
-            order_id = entity['order_id']
-            method = entity['method']
+        entity = data['payload']['payment']['entity']
+        notes = entity.get('notes', {})
+        payment_id = entity['id']
+        order_id = entity['order_id']
+        method = entity['method']
 
-            print(f"[Webhook] Payment Captured: payment_id={payment_id}, order_id={order_id}, method={method}")
+        payment_type = notes.get('type')
 
-            payment = ServicePaymentInfo.objects.get(razorpay_order_id=order_id)
-            payment = ServicePaymentInfo.objects.get(razorpay_order_id=order_id)
-
-            payment.razorpay_payment_id = payment_id
-            payment.method = method
-            payment.status = 'captured'
-            payment.captured = 'yes'
-            payment.paid_at = timezone.now()
-            payment.save()
-
-        return JsonResponse({'status': 'ok'})
-
-    except ServicePaymentInfo.DoesNotExist:
-        print(f"[Webhook][ERROR] No payment found for Razorpay order_id: {order_id}")
-        return JsonResponse({'error': 'Payment record not found'}, status=404)
+        if payment_type == 'service':
+            return handle_service_payment(order_id, payment_id, method)
+        elif payment_type == 'module':
+            return handle_module_payment(notes, order_id, payment_id, method)
+        else:
+            return JsonResponse({'error': 'Unknown payment type'}, status=400)
 
     except Exception as e:
         import traceback
-        print("[Webhook][ERROR] Exception occurred:", str(e))
-        print(traceback.format_exc())
+        print("[Webhook][ERROR]:", traceback.format_exc())
         return JsonResponse({'error': str(e)}, status=500)
 
+
+def handle_service_payment(order_id, payment_id, method):
+    try:
+        payment = ServicePaymentInfo.objects.get(razorpay_order_id=order_id)
+        if payment.status == 'captured':
+            return JsonResponse({'status': 'already processed'}, status=200)
+
+        payment.razorpay_payment_id = payment_id
+        payment.method = method
+        payment.status = 'captured'
+        payment.captured = 'yes'
+        payment.paid_at = timezone.now()
+        payment.save()
+
+        # Optional: mark service request as paid
+        if payment.service_request:
+            payment.service_request.status = 'paid'
+            payment.service_request.save()
+
+        return JsonResponse({'status': 'service payment processed'})
+    except ServicePaymentInfo.DoesNotExist:
+        return JsonResponse({'error': 'ServicePaymentInfo not found'}, status=404)
+
+
+def handle_module_payment(notes, order_id, payment_id, method):
+    try:
+        subscription_id = notes.get('subscription_id')
+        context_id = notes.get('context_id')
+
+        subscription = ModuleSubscription.objects.get(id=subscription_id, context_id=context_id)
+
+        if subscription.status == 'active':
+            return JsonResponse({'status': 'already active'}, status=200)
+
+        subscription.status = 'active'
+        subscription.payment_status = 'captured'
+        subscription.payment_method = method
+        subscription.razorpay_payment_id = payment_id
+        subscription.paid_at = timezone.now()
+        subscription.save()
+
+        # Create initial subscription cycle
+        create_subscription_cycle(subscription)
+
+        return JsonResponse({'status': 'module subscription processed'})
+    except ModuleSubscription.DoesNotExist:
+        return JsonResponse({'error': 'ModuleSubscription not found'}, status=404)
+
+
+def create_subscription_cycle(subscription):
+    """
+    Creates a subscription cycle and initializes usage limits.
+    """
+    from decimal import Decimal
+    from django.db import transaction
+
+    try:
+        with transaction.atomic():
+            initial_feature_usage = {}
+            if subscription.plan.features_enabled:
+                for feature, details in subscription.plan.features_enabled.items():
+                    if isinstance(details, dict) and 'limit' in details:
+                        initial_feature_usage[feature] = 0
+
+            SubscriptionCycle.objects.create(
+                subscription=subscription,
+                start_date=subscription.start_date,
+                end_date=subscription.end_date,
+                amount=Decimal(str(subscription.plan.base_price)),
+                is_paid='yes',
+                feature_usage=initial_feature_usage
+            )
+    except Exception as e:
+        print(f"[SubscriptionCycle][ERROR]: Failed to create cycle: {str(e)}")

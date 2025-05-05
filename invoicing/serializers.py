@@ -100,8 +100,8 @@ class GoodsAndServicesSerializer(serializers.Serializer):
         """
         Ensure that HSN/SAC is exactly 4 digits.
         """
-        if len(value) != 4:
-            raise serializers.ValidationError("HSN/SAC must be exactly 4 digits.")
+        if  len(value) < 4 or len(value) > 6:
+            raise serializers.ValidationError("HSN/SAC must be 4 to 6 digits.")
         return value
 
     def validate_gst_rate(self, value):

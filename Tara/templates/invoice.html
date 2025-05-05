@@ -75,7 +75,7 @@
                       Tax Invoice
                     </h1>
                     <p style="white-space: nowrap; text-align: right">
-                      Place of supply: {{place_of_supply}}
+                      Place of supply : {{place_of_supply}}
                     </p>
                   </div>
                 </td>
@@ -111,10 +111,10 @@
                     <p style="margin: 0">{{ customer_name }}</p>
                     <p style="margin: 0">{{ bill_to_address }}</p>
                     <p style="margin: 0">{{ bill_to_state }}</p>
-                    <p style="margin: 0">{{ bill_to_country }}</p>
-                    <p style="margin: 0">{{ customer_gstin }}</p>
-                    <p style="margin: 0">{{customer_pan}}</p>
-                    <p style="margin: 0">{{ bill_to_pincode }}</p>
+                    <p style="margin: 0">{{ bill_to_country }} - {{ bill_to_pincode }}</p>
+                    <p style="margin: 0">GSTIN : {{ customer_gstin }}</p>
+                    <p style="margin: 0">PAN : {{customer_pan}}</p>
+                    <p style="margin: 0"></p>
                   </div>
                 </td>
                 {% if ship_to_address != "NA" and ship_to_address is not None %}
@@ -177,7 +177,7 @@
                     color: #5c6ac4;
                   "
                 >
-                  Item & Description
+                  Item
                 </td>
                 <td
                   style="
@@ -318,6 +318,9 @@
                   "
                 >
                   {{ item.item }}
+                  {% if item.note %}
+                    <p style="margin: 0; font-style: italic">({{item.note}})</p>
+                  {% endif %}
                 </td>
                 <td
                   style="
@@ -410,6 +413,11 @@
                 <td colspan="2">
                   <h3 style="margin: 0">Total In Words :</h3>
                   <br />{{total_in_words}}
+                  {% if terms_and_conditions and terms_and_conditions != "" and terms_and_conditions != "NA" %}
+                  <br /><br />
+                  <h3 style="margin: 0; color: #5c6ac4; font-weight: 700">Terms and Conditions:</h3>
+                  <p style="margin-top: 0.5rem; font-style: italic; color: #525252">{{terms_and_conditions}}</p>
+                  {% endif %}
                 </td>
                 <td colspan="9">
                   <table
@@ -462,6 +470,40 @@
                                   </div>
                                 </td>
                               </tr>
+                              <!-- {% if discount != "0" and discount != "0.00" and discount != 0 %}
+                              <tr>
+                                <td
+                                  style="
+                                    border-bottom-width: 1px;
+                                    padding: 0.75rem;
+                                  "
+                                >
+                                  <div
+                                    style="white-space: nowrap; color: #94a3b8"
+                                  >
+                                    DISCOUNT:
+                                  </div>
+                                </td>
+                                <td
+                                  style="
+                                    border-bottom-width: 1px;
+                                    padding: 0.75rem;
+                                    text-align: right;
+                                  "
+                                >
+                                  <div
+                                    style="
+                                      white-space: nowrap;
+                                      font-weight: 700;
+                                      color: #5c6ac4;
+                                    "
+                                  >
+                                    {{discount}}
+                                  </div>
+                                </td>
+                              </tr>
+                              {% endif %} -->
+                              {% if shipping != "0" and shipping != "0.00" and shipping != 0 %}
                               <tr>
                                 <td
                                   style="
@@ -493,6 +535,8 @@
                                   </div>
                                 </td>
                               </tr>
+                              {% endif %}
+                              {% if cgst != "0" and cgst != "0.00" and cgst != 0 %}
                               <tr>
                                 <td style="padding: 0.75rem">
                                   <div
@@ -513,6 +557,8 @@
                                   </div>
                                 </td>
                               </tr>
+                              {% endif %}
+                              {% if sgst != "0" and sgst != "0.00" and sgst != 0 %}
                               <tr>
                                 <td style="padding: 0.75rem">
                                   <div
@@ -533,7 +579,8 @@
                                   </div>
                                 </td>
                               </tr>
-                              {% if igst_amt %}
+                              {% endif %}
+                              {% if igst_amt != "0" and igst_amt != "0.00" and igst_amt != 0 %}
                               <tr>
                                 <td
                                   style="
@@ -613,6 +660,8 @@
             </tbody>
           </table>
         </div>
+
+
         <div
           style="
             display: grid;
@@ -669,8 +718,6 @@
             text-align: center;
           "
         >
-          <p style="margin: 0; color: #5c6ac4; font-weight: 700">{{note}}</p>
-          <p style="margin: 0; font-style: italic">{{terms_and_conditions}}</p>
         </div>
 
         <footer

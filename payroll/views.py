@@ -3040,7 +3040,7 @@ def employee_monthly_salary_template(request):
         # Allowance Keys to Extract
         allowance_keys = [
             "Basic", "HRA", "Conveyance Allowance", "Travelling Allowance",
-            "Medical Allowance", "Internet Allowance", "Special Allowance", "Miscellaneous Allowance"
+            "Medical Allowance", "Internet Allowance", "Special Allowance", "Miscellaneous Allowance","Other Allowances"
         ]
 
         # Initialize Allowance Dictionary
@@ -3103,8 +3103,8 @@ def employee_monthly_salary_template(request):
             "doj": getattr(salary_record.employee, "doj", ""),
             "pay_period": f"{month_name} {year_}",
             "pay_date": "",
-            "bank_account_number": "",
-            "uan_number": "",
+            "bank_account_number": getattr(salary_record.employee.employee_bank_details,"account_number",""),
+            "uan_number": salary_record.employee.statutory_components.get('employee_provident_fund', {}).get('uan', '') if hasattr(salary_record.employee, 'statutory_components') and salary_record.employee.statutory_components else "",
 
             # Earnings and Allowances
             "basic": format_with_commas(allowance_values.get("basic", 0)),
@@ -3115,15 +3115,19 @@ def employee_monthly_salary_template(request):
             "internet_allowance": format_with_commas(allowance_values.get("internet_allowance", 0)),
             "special_allowance": format_with_commas(allowance_values.get("special_allowance", 0)),
             "miscellaneous_allowance": format_with_commas(allowance_values.get("miscellaneous_allowance", 0)),
+            "other_allowances": format_with_commas(allowance_values.get("other_allowances",0)),
 
             # Gross and Net Salary
             "gross_earnings": format_with_commas(earned_salary),
             "salary_adjustments": 0,  # Placeholder if any adjustments apply
 
             # Individual Deductions
+            "epf": EPF.objects.filter(payroll=getattr(salary_record.employee,"payroll_id","")).exists(),
             "epf_contribution": format_with_commas(deduction_values.get("epf_employee_contribution", 0)),
-            "professional_tax": format_with_commas(deduction_values.get("professional_tax", 0)),
+            "pt": PT.objects.filter(payroll=getattr(salary_record.employee,"payroll_id","")).exists(),
+            "professional_tax": format_with_commas(deduction_values.get("professional_tax",0)),
             "income_tax": format_with_commas(deduction_values.get("income_tax", 0)),
+            "esi": ESI.objects.filter(payroll=getattr(salary_record.employee,"payroll_id","")).exists(),
             "esi_employee_contribution": format_with_commas(deduction_values.get("esi_employee_contribution", 0)),
             "total_deduction": format_with_commas(total_deduction),
 

@@ -40,11 +40,12 @@ def create_order(request):
         # Create order on Razorpay
         razorpay_order = client.order.create({
             'amount': amount_paise,
-            'currency': currency,
+            'currency': 'INR',
             'payment_capture': 1,
             'notes': {
-                'context_id': str(context.id),
+                'type': 'module',  # <-- Required for webhook to route correctly
                 'plan_id': str(plan.id),
+                'context_id': str(context.id),
                 'added_by': str(added_by.id)
             }
         })

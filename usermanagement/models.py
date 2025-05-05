@@ -364,6 +364,7 @@ class Module(models.Model):
 
 class Service(models.Model):  # Use singular 'Service'
     name = models.CharField(max_length=255)
+    group_key = models.CharField(max_length=255, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     is_active = models.CharField(
         max_length=3,

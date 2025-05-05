@@ -21,6 +21,7 @@ from .service_serializers import *
 
 
 @api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
 def service_list_create(request):
     if request.method == 'GET':
         services = Service.objects.all()
@@ -36,6 +37,7 @@ def service_list_create(request):
 
 
 @api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([AllowAny])
 def service_detail(request, service_id):
     try:
         service = Service.objects.get(id=service_id)
@@ -59,6 +61,7 @@ def service_detail(request, service_id):
 
 
 @api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
 def service_plan_list_create(request, service_id):
     try:
         service = Service.objects.get(id=service_id)
@@ -81,6 +84,7 @@ def service_plan_list_create(request, service_id):
 
 
 @api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([AllowAny])
 def service_plan_detail(request, plan_id):
     try:
         plan = ServicePlan.objects.get(id=plan_id)

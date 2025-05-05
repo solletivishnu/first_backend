@@ -708,7 +708,7 @@ class UsersKYCDetailView(APIView):
         Retrieve user details by ID.
         """
         try:
-            user_details = UserKYC.objects.get(pk=pk, user=request.user)
+            user_details = UserKYC.objects.get(user=pk)
             serializer = UsersKYCSerializer(user_details)
             return Response(serializer.data)
         except UserKYC.DoesNotExist:
@@ -2325,6 +2325,37 @@ def list_consultations(request):
 
     serializer = ConsultationSerializer(consultations, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
+
+# Add these functions at the end of the file
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def user_detail(request, pk):
+    """
+    Get, update or delete a user by ID.
+    """
+    try:
+        user = Users.objects.get(pk=pk)
+    except Users.DoesNotExist:
+        return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        serializer = UserSerializer(user)
+        return Response(serializer.data)
+
+    elif request.method == 'PUT':
+        serializer = UserSerializer(user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "message": "User updated successfully",
+                "data": serializer.data
+            })
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        user.delete()
+        return Response({"message": "User deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
 
 
 

@@ -617,6 +617,25 @@
                           style="
                             border-bottom-width: 1px;
                             padding: 0.75rem 0 0.75rem 0.75rem;
+                          "
+                        >
+                          Other Allowances
+                        </td>
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0.75rem 0.75rem 0;
+                            text-align: right;
+                          "
+                        >
+                          {{other_allowances}}
+                        </td>
+                      </tr>
+                      <tr style="border-bottom: 1px solid #e2e2e2">
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0 0.75rem 0.75rem;
                             font-weight: 700;
                             color: #5c6ac4;
                           "
@@ -689,6 +708,7 @@
                       </tr>
                     </thead>
                     <tbody>
+                      {% if epf %}
                       <tr style="border-bottom: 1px solid #e2e2e2">
                         <td
                           style="
@@ -708,6 +728,8 @@
                           {{epf_contribution}}
                         </td>
                       </tr>
+                      {% endif %}
+                      {% if esi %}
                       <tr style="border-bottom: 1px solid #e2e2e2">
                         <td
                           style="
@@ -727,6 +749,8 @@
                           {{esi_employee_contribution}}
                         </td>
                       </tr>
+                      {% endif %}
+                      {% if pt %}
                       <tr style="border-bottom: 1px solid #e2e2e2">
                         <td
                           style="
@@ -746,6 +770,7 @@
                           {{professional_tax}}
                         </td>
                       </tr>
+                      {% endif %}
                       <tr style="border-bottom: 1px solid #e2e2e2">
                         <td
                           style="
