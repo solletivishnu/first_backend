@@ -323,6 +323,8 @@ class Users(AbstractBaseUser):
     )
     first_name = models.CharField(max_length=40, null=True, blank=True, default=None)
     last_name = models.CharField(max_length=40, null=True, blank=True, default=None)
+    is_super_user = models.BooleanField(default=False,
+                                        help_text="Marks whether the user is a super user with full access.")
 
     objects = CustomAccountManager()
 
@@ -366,6 +368,7 @@ class Service(models.Model):  # Use singular 'Service'
     name = models.CharField(max_length=255)
     group_key = models.CharField(max_length=255, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
+    type = models.CharField(max_length=30, null=True, blank=True)
     is_active = models.CharField(
         max_length=3,
         choices=YES_NO_CHOICES,

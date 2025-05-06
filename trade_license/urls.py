@@ -17,4 +17,7 @@ urlpatterns = [
     # Partner Details
     path('partner-details/', views.partner_details_list, name='partner_details_list'),
     path('partner-details/<int:pk>/', views.partner_details, name='partner_detail'),
+    
+    # Get all Trade License data for a service request
+    path('service-request-trade-license/<int:service_request_id>/', views.get_trade_license_service_request_data, name='get_trade_license_service_request_data'),
 ]

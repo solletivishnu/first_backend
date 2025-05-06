@@ -276,3 +276,75 @@ def add_subscription_to_business(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_module_subscriptions(request,pk):
+    """
+    Retrieve module subscription details for a specific context.
+    
+    Query parameters:
+    - context_id: ID of the context to get subscriptions for
+    """
+
+    
+    try:
+        # Verify context exists
+        try:
+            context = Context.objects.get(pk=pk)
+        except Context.DoesNotExist:
+            return Response(
+                {"error": "Context not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get all module subscriptions for the context
+        subscriptions = ModuleSubscription.objects.filter(context=pk)
+        
+        # Format the response data
+        subscription_data = []
+        for subscription in subscriptions:
+            # Get module features if needed
+            price = subscription.plan.base_price
+            if hasattr(price, 'to_decimal'):  # Check if it's a Decimal128 object
+                price = float(price.to_decimal())
+            else:
+                # Try to convert to float if it's not Decimal128 but still needs conversion
+                try:
+                    price = float(price)
+                except (TypeError, ValueError):
+                    price = str(price)  # Fallback to string if conversion fails
+
+
+            subscription_data.append({
+                "id": subscription.id,
+                "module": {
+                    "id": subscription.module.id,
+                    "name": subscription.module.name,
+                    "description": subscription.module.description
+                },
+                "plan": {
+                    "id": subscription.plan.id,
+                    "name": subscription.plan.name,
+                    "description": subscription.plan.description,
+                    "price": price,
+                    "billing_cycle_days": subscription.plan.billing_cycle_days
+                },
+                "status": subscription.status,
+                "start_date": subscription.start_date,
+                "end_date": subscription.end_date,
+                "auto_renew": subscription.auto_renew,
+            })
+        
+        return Response(
+            {"subscriptions": subscription_data},
+            status=status.HTTP_200_OK
+        )
+        
+    except Exception as e:
+        logger.error(f"Error retrieving module subscriptions: {str(e)}")
+        return Response(
+            {"error": f"An error occurred while retrieving module subscriptions: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+

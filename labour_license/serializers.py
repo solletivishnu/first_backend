@@ -50,3 +50,16 @@ class filesSerializer(serializers.ModelSerializer):
     class Meta:
         model = Files
         fields = '__all__'
+
+class LabourLicenseServiceRequestSerializer(serializers.ModelSerializer):
+    """
+    Comprehensive serializer that combines all Labour License-related data for a service request
+    """
+    establishment_details = EstablishmentDetailsSerializerRetrival(source='EstablishmentDetails', read_only=True, many=True)
+    work_locations = WorkLocationSerializerRetrival(source='work_location', read_only=True, many=True)
+    employer_details = EmployerDetailsSerializerRetrival(source='employer_details', read_only=True, many=True)
+    files = filesSerializer(source='files_uploaded', read_only=True, many=True)
+    
+    class Meta:
+        model = EntrepreneurDetails
+        fields = '__all__'

@@ -17,4 +17,9 @@ urlpatterns = [
 
     path('principal-place/', principal_place_list, name='principal_place_list'),
     path('principal-place/<int:pk>/', principal_place_detail_view, name='principal_place_detail'),
+    
+    # Comprehensive data retrieval
+    path('service-request-gst/<int:service_request_id>/', get_gst_service_request_data, name='get-gst-service-request-data'),
+
+    
     ]

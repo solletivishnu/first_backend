@@ -5,6 +5,7 @@ from djongo.models import ArrayField, EmbeddedField, JSONField
 from .helpers import *
 from usermanagement.models import *
 
+
 class BasicDetail(models.Model):
     Genders = [
         ('male', 'Male'),
@@ -17,6 +18,7 @@ class BasicDetail(models.Model):
         ('director', 'Director'),
         ('proprietor', 'Proprietor')
     ]
+    service_request = models.ForeignKey(ServiceRequest, on_delete=models.CASCADE)
     user = models.ForeignKey(Users,on_delete=models.CASCADE)
     first_name = models.CharField(max_length=255)
     middle_name = models.CharField(max_length=255, blank=True, null=True)
@@ -35,6 +37,7 @@ class BasicDetail(models.Model):
     def __str__(self):
         return self.first_name
 
+
 class TradeLicenseExistOrNot(models.Model):
     license = models.ForeignKey(BasicDetail, on_delete=models.CASCADE, related_name='trade_license')
     tin_number = models.CharField(max_length=255,blank=True,null=True)
@@ -42,6 +45,7 @@ class TradeLicenseExistOrNot(models.Model):
 
     def __str__(self):
         return self.license
+
 
 class TradeEntity(models.Model):
     Trade_Premises = [
@@ -76,6 +80,7 @@ class TradeEntity(models.Model):
 
     def __str__(self):
         return self.name_of_entity
+
 
 class PartnerDetails(models.Model):
     license = models.ForeignKey(BasicDetail, on_delete=models.CASCADE, related_name='trade_license_partner')

@@ -452,11 +452,11 @@ class ChangePasswordView(APIView):
         new_password = request.data.get("new_password")
 
         if not old_password or not new_password:
-            raise ValidationError({"detail": "Both 'old_password' and 'new_password' are required."})
+            raise ValidationError({"error": "Both 'old_password' and 'new_password' are required."})
 
         # Check if the old password is correct
         if not user.check_password(old_password):
-            raise ValidationError({"old_password": "Old password is incorrect."})
+            raise ValidationError({"error": "Old password is incorrect."})
 
         # Validate the new password
         try:

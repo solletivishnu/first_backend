@@ -992,3 +992,31 @@ class ServicePaymentInfoSerializer(serializers.ModelSerializer):
     class Meta:
         model = ServicePaymentInfo
         fields = '__all__'
+
+
+class PaymentInfoSerializer(serializers.ModelSerializer):
+    plan_name = serializers.SerializerMethodField()
+    suite_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PaymentInfo
+        fields = [
+            'id',
+            'razorpay_order_id',
+            'razorpay_payment_id',
+            'amount',
+            'currency',
+            'status',
+            'payment_method',
+            'card_last4',
+            'payment_captured',
+            'plan_name',
+            'suite_name',
+            'created_at'
+        ]
+
+    def get_plan_name(self, obj):
+        return obj.plan.name if obj.plan else None
+
+    def get_suite_name(self, obj):
+        return obj.suite_subscription.name if obj.suite_subscription else None

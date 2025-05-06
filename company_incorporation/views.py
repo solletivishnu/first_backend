@@ -24,7 +24,7 @@ def create_company(request):
                 return Response({"error": "Invalid JSON format for address"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            company_detail = CompanyIncorporation.objects.get(user_id=data['user'])
+            company_detail = CompanyIncorporation.objects.get(service_request=data['service_request'])
             serializer = CompanyIncorporationSerializer(company_detail, data=data, partial=True)
         except:
             serializer = CompanyIncorporationSerializer(data=data)
@@ -381,3 +381,18 @@ def existing_company_detail(request, pk):
                 {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+
+@api_view(['GET'])
+def get_company_incorporation_by_service_request(request):
+    service_request_id = request.GET.get('service_request_id')
+
+    if not service_request_id:
+        return Response({'error': 'Missing service_request_id'}, status=400)
+
+    try:
+        incorporation = CompanyIncorporation.objects.get(service_request_id=service_request_id)
+        serializer = CompanyIncorporationDataSerializer(incorporation)
+        return Response(serializer.data, status=200)
+    except CompanyIncorporation.DoesNotExist:
+        return Response({'error': 'CompanyIncorporation not found for given service_request_id'}, status=404)

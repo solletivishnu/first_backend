@@ -101,3 +101,13 @@ class DetailsOfExistingDirectorshipsSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.save()
         return instance
+
+
+class CompanyIncorporationDataSerializer(serializers.ModelSerializer):
+    directors_details = DirectorsDetailsSerializer(many=True, read_only=True)
+    authorized_capital = AuthorizedAndPaidUpCapitalSerializer(many=True, read_only=True)
+    share_holders = ShareHoldersInformationSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = CompanyIncorporation
+        fields = '__all__'

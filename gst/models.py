@@ -7,8 +7,10 @@ from django.db import models
 
 # Create your models here.
 
+
 class BasicDetails(models.Model):
     user = models.ForeignKey(Users,on_delete=models.CASCADE)
+    service_request = models.ForeignKey(ServiceRequest, on_delete=models.CASCADE)
     legal_name = models.CharField(max_length=255)
     pan = models.CharField(max_length=15)
     state = models.CharField(max_length=50)
@@ -18,6 +20,7 @@ class BasicDetails(models.Model):
 
     def __str__(self):
         return self.legal_name
+
 
 class BusinessDetails(models.Model):
     option = [
@@ -41,6 +44,7 @@ class BusinessDetails(models.Model):
     def __str__(self):
         return self.legal_name
 
+
 class Partner(models.Model):
     gst = models.ForeignKey(BasicDetails, on_delete=models.CASCADE, related_name='partner_details')
     first_name = models.CharField(max_length=100)
@@ -61,6 +65,7 @@ class Partner(models.Model):
     def __str__(self):
         return "{} - {}".format(self.first_name, self.last_name)
 
+
 class BusinessDocuments(models.Model):
 
     gst = models.ForeignKey(BasicDetails, on_delete=models.CASCADE, related_name='business_document')
@@ -72,6 +77,7 @@ class BusinessDocuments(models.Model):
 
     def __str__(self):
         return "Business Document {}".format(self.business_pan)
+
 
 class PrincipalPlaceDetails(models.Model):
     ADDRESS_DOCUMENT_CHOICES = [

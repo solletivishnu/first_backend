@@ -42,6 +42,8 @@ urlpatterns = [
     path('business/create/', context_business_subscription.create_business_context, name='create-business-context'),
     path('business/subscription/add/', context_business_subscription.add_subscription_to_business,
          name='add-subscription-to-business'),
+    path('context-subscriptions/<int:pk>/', context_business_subscription.get_module_subscriptions,
+         name='get-context-subscriptions'),
 
     # Personal context registration
     path('api/context/personal/create/', personal_context_registration.create_personal_context,
@@ -281,4 +283,18 @@ urlpatterns = [
 
     # User detail
     path('users/<int:pk>/', other_factors.user_detail, name='user-detail'),
+
+    path('service-payments-history', service_payment.get_service_payment_history, name='service-payment-history'),
+
+    path('module-payment-history', payment_webhooks.payment_history, name='payment-history'),
+    
+    # Get service requests by context
+
+    path('context-service-requests/<int:pk>/', service_views.get_context_service_requests,
+         name='get-context-service-requests'),
+
+    path('payment-history', payment_webhooks.unified_payment_history, name='unified-payment-history'),
+
+    path('services-by-type', service_views.get_services_by_type, name='get-services-by-type'),
+
 ]

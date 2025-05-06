@@ -87,9 +87,6 @@ def list_modules(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-
-
-
 @api_view(['GET', 'PUT'])
 def update_module(request, module_id):
     """
