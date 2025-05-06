@@ -71,57 +71,62 @@ class PayrollOrgList(APIView):
         return Response(serializer.data)
 
     def post(self, request):
-        data = request.data.copy()
-        file = request.FILES.get('logo')  # Handle uploaded file (logo)
-        bucket_name = S3_BUCKET_NAME
-        business_id = data.get('business')
-        business_data = data.pop('business_details', None)
-
-        # Fetch business instance
         try:
-            business = Business.objects.get(pk=business_id)
-        except ObjectDoesNotExist:
-            return Response({"error": "Business not found"}, status=status.HTTP_404_NOT_FOUND)
+            # Create a mutable copy of the data
+            data = request.data.copy()  # Use .copy() to create a mutable copy
+            file = request.FILES.get('logo') if 'logo' in request.FILES else None
+            business_id = data.get('business')
+            business_data = data.pop('business_details', None)
 
-        # Update business details if provided
-        if business_data:
-            if isinstance(business_data, list):  # Ensure we are working with a list
-                business_data = business_data[0]  # Extract the first element (string)
+            # Fetch business instance
             try:
-                business_data = json.loads(business_data)  # Convert JSON string to dictionary
-            except json.JSONDecodeError:
-                return Response({"error": "Invalid JSON format in business_details"},
-                                status=status.HTTP_400_BAD_REQUEST)
-            business_serializer = BusinessSerializer(business, data=business_data, partial=True)
-            if business_serializer.is_valid():
-                business_serializer.save()
-            else:
-                return Response(business_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                business = Business.objects.get(pk=business_id)
+            except ObjectDoesNotExist:
+                return Response({"error": "Business not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        # Handle file upload
-        if file:
-            sanitized_file_name = file.name.replace(" ", "_")
-            object_key = f'{business.nameOfBusiness}/business_logo/{sanitized_file_name}'
+            # Update business details if provided
+            if business_data:
+                if isinstance(business_data, list):  # Ensure we are working with a list
+                    business_data = business_data[0]  # Extract the first element (string)
+                try:
+                    business_data = json.loads(business_data)  # Convert JSON string to dictionary
+                except json.JSONDecodeError:
+                    return Response({"error": "Invalid JSON format in business_details"},
+                                    status=status.HTTP_400_BAD_REQUEST)
+                business_serializer = BusinessSerializer(business, data=business_data, partial=True)
+                if business_serializer.is_valid():
+                    business_serializer.save()
+                else:
+                    return Response(business_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+            # Remove logo from data to avoid validation errors
+            if file:
+                if 'logo' in data:
+                    data.pop('logo')
 
             try:
-                data['logo'] = upload_to_s3(file.read(), bucket_name, object_key)
-            except Exception as e:
-                return Response({"error": f"File upload failed: {str(e)}"},
-                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                payroll_org = PayrollOrg.objects.get(business_id=business_id)
+                serializer = PayrollOrgSerializer(payroll_org, data=data, partial=True)
+            except PayrollOrg.DoesNotExist:
+                serializer = PayrollOrgSerializer(data=data)
 
-        # Fetch or create PayrollOrg
-        try:
-            payroll_org = PayrollOrg.objects.get(business_id=business_id)
-            serializer = PayrollOrgSerializer(payroll_org, data=data, partial=True)
-        except PayrollOrg.DoesNotExist:
-            serializer = PayrollOrgSerializer(data=data)
+            # Validate and save PayrollOrg
+            if serializer.is_valid():
+                payroll_org = serializer.save()
 
-        # Validate and save PayrollOrg
-        if serializer.is_valid():
-            payroll_org = serializer.save()
-            return Response(PayrollOrgSerializer(payroll_org).data, status=status.HTTP_201_CREATED)
+                # Handle the file upload separately after the model is saved
+                try:
+                    if file:
+                        payroll_org.logo = file
+                        payroll_org.save(update_fields=['logo'])
+                except Exception as e:
+                    return Response({"error": f"Error uploading file: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                return Response(PayrollOrgSerializer(payroll_org).data, status=status.HTTP_201_CREATED)
+
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET'])
@@ -235,30 +240,8 @@ class PayrollOrgDetail(APIView):
         except PayrollOrg.DoesNotExist:
             return Response({"error": "PayrollOrg not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        data = request.data.copy()
-        file = request.FILES.get('logo')  # Handle uploaded file (logo)
-        bucket_name = S3_BUCKET_NAME
-
-        if file:
-            # Replace spaces with underscores in the file name
-            sanitized_file_name = file.name.replace(" ", "_")
-            business_name = request.data.get('org_name', 'default_org').replace(" ",
-                                                                                "_")  # Ensure no spaces in org_name
-            object_key = f'{business_name}/business_logo/{sanitized_file_name}'
-
-            try:
-                # Upload file to S3 as private
-                url = upload_to_s3(file.read(), bucket_name, object_key)  # Read file content for upload
-                # Store the S3 URL in the `logo` field
-                data['logo'] = url
-            except Exception as e:
-                return Response(
-                    {"error": f"File upload failed: {str(e)}"},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-
         # Validate and update the serializer
-        serializer = PayrollOrgSerializer(payroll_org, data=data, partial=True)
+        serializer = PayrollOrgSerializer(payroll_org, data=request.data, partial=True)
         if serializer.is_valid():
             payroll_org = serializer.save()  # Update the instance directly
             return Response(
@@ -290,29 +273,24 @@ def update_payroll_org(request, business_id):
     except PayrollOrg.DoesNotExist:
         return Response({"error": "PayrollOrg not found for this business"}, status=status.HTTP_404_NOT_FOUND)
 
-    data = request.data.copy()
-    file = request.FILES.get('logo')  # Handle uploaded file (logo)
-    bucket_name = S3_BUCKET_NAME
-
-    if file:
-        # Sanitize file name
-        sanitized_file_name = file.name.replace(" ", "_")
-        business_name = request.data.get('org_name', 'default_org').replace(" ", "_")
-        object_key = f'{business_name}/business_logo/{sanitized_file_name}'
-
-        try:
-            # Upload file to S3
-            url = upload_to_s3(file.read(), bucket_name, object_key)
-            data['logo'] = url
-        except Exception as e:
-            return Response({"error": f"File upload failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
     # Get fields dynamically from serializers
     payroll_org_fields = set(PayrollOrgSerializer().get_fields().keys())
     business_fields = set(BusinessSerializer().get_fields().keys())
 
-    payroll_org_data = {key: value for key, value in data.items() if key in payroll_org_fields}
-    business_data = {key: value for key, value in data.items() if key in business_fields}
+    # Split the data to update PayrollOrg and Business separately
+    payroll_org_data = {}
+    business_data = {}
+    
+    # Process non-file fields
+    for key, value in request.data.items():
+        if key in payroll_org_fields:
+            payroll_org_data[key] = value
+        elif key in business_fields:
+            business_data[key] = value
+
+    # Process file field separately
+    if 'logo' in request.FILES:
+        payroll_org_data['logo'] = request.FILES['logo']
 
     # Use a transaction to ensure atomicity
     with transaction.atomic():
@@ -3040,7 +3018,7 @@ def employee_monthly_salary_template(request):
         # Allowance Keys to Extract
         allowance_keys = [
             "Basic", "HRA", "Conveyance Allowance", "Travelling Allowance",
-            "Medical Allowance", "Internet Allowance", "Special Allowance", "Miscellaneous Allowance"
+            "Medical Allowance", "Internet Allowance", "Special Allowance", "Miscellaneous Allowance","Other Allowances"
         ]
 
         # Initialize Allowance Dictionary
@@ -3103,8 +3081,8 @@ def employee_monthly_salary_template(request):
             "doj": getattr(salary_record.employee, "doj", ""),
             "pay_period": f"{month_name} {year_}",
             "pay_date": "",
-            "bank_account_number": "",
-            "uan_number": "",
+            "bank_account_number": getattr(salary_record.employee.employee_bank_details,"account_number",""),
+            "uan_number": salary_record.employee.statutory_components.get('employee_provident_fund', {}).get('uan', '') if hasattr(salary_record.employee, 'statutory_components') and salary_record.employee.statutory_components else "",
 
             # Earnings and Allowances
             "basic": format_with_commas(allowance_values.get("basic", 0)),
@@ -3115,15 +3093,19 @@ def employee_monthly_salary_template(request):
             "internet_allowance": format_with_commas(allowance_values.get("internet_allowance", 0)),
             "special_allowance": format_with_commas(allowance_values.get("special_allowance", 0)),
             "miscellaneous_allowance": format_with_commas(allowance_values.get("miscellaneous_allowance", 0)),
+            "other_allowances": format_with_commas(allowance_values.get("other_allowances",0)),
 
             # Gross and Net Salary
             "gross_earnings": format_with_commas(earned_salary),
             "salary_adjustments": 0,  # Placeholder if any adjustments apply
 
             # Individual Deductions
+            "epf": EPF.objects.filter(payroll=getattr(salary_record.employee,"payroll_id","")).exists(),
             "epf_contribution": format_with_commas(deduction_values.get("epf_employee_contribution", 0)),
-            "professional_tax": format_with_commas(deduction_values.get("professional_tax", 0)),
+            "pt": PT.objects.filter(payroll=getattr(salary_record.employee,"payroll_id","")).exists(),
+            "professional_tax": format_with_commas(deduction_values.get("professional_tax",0)),
             "income_tax": format_with_commas(deduction_values.get("income_tax", 0)),
+            "esi": ESI.objects.filter(payroll=getattr(salary_record.employee,"payroll_id","")).exists(),
             "esi_employee_contribution": format_with_commas(deduction_values.get("esi_employee_contribution", 0)),
             "total_deduction": format_with_commas(total_deduction),
 

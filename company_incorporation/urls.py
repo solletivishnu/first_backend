@@ -16,5 +16,6 @@ urlpatterns = [
     path('directors-details/<int:pk>/',directors_details_update,name='directors_detail'),
 
     path('existing-company/', existing_company, name='directors_details'),
-    path('existing-company/<int:pk>/', existing_company_detail, name='directors_detail')
+    path('existing-company/<int:pk>/', existing_company_detail, name='directors_detail'),
+    path('service-request-company-incorporation', get_company_incorporation_by_service_request)
 ]

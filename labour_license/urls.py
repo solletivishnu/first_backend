@@ -19,4 +19,7 @@ urlpatterns = [
 
     path('employers-file/', files_list, name='files-list'),
     path('employers-file/<int:pk>/', files_detail, name='files-detail'),
+    
+    # Comprehensive data retrieval
+    path('service-request-labour-license/<int:service_request_id>/', get_labour_license_service_request_data, name='get-labour-license-service-request-data'),
 ]

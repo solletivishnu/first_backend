@@ -97,3 +97,17 @@ class PrincipalPlaceDetailSerializer(serializers.ModelSerializer):
         instance.save()  # Make sure you're calling save() on the instance, not the model class
 
         return instance
+
+class GSTServiceRequestSerializer(serializers.ModelSerializer):
+    """
+    Comprehensive serializer that combines all GST-related data for a service request
+    """
+    basic_details = BasicDetailsSerializer(read_only=True)
+    business_details = BusinessDetailsSerializerRetrieval(source='BusinessDetails', read_only=True, many=True)
+    business_documents = BusinessDocumentsSerializer(source='business_document', read_only=True, many=True)
+    partners = PartnerSerializer(source='partner_details', read_only=True, many=True)
+    principal_place_details = PrincipalPlaceDetailSerializer(source='principal_place', read_only=True, many=True)
+    
+    class Meta:
+        model = BasicDetails
+        fields = '__all__'

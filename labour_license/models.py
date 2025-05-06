@@ -5,12 +5,14 @@ from djongo.models import ArrayField, EmbeddedField, JSONField
 from .helpers import *
 from usermanagement.models import *
 
+
 class EntrepreneurDetails(models.Model):
     Genders = [
         ('male', 'Male'),
         ('female', 'Female'),
         ('other', 'Other')
     ]
+    service_request = models.ForeignKey(ServiceRequest, on_delete=models.CASCADE)
     user = models.ForeignKey(Users, on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
     email = models.EmailField()
@@ -20,6 +22,7 @@ class EntrepreneurDetails(models.Model):
 
     def __str__(self):
         return self.name
+
 
 class EstablishmentDetails(models.Model):
     license = models.ForeignKey(EntrepreneurDetails, on_delete=models.CASCADE, related_name='EstablishmentDetails')
@@ -31,9 +34,11 @@ class EstablishmentDetails(models.Model):
     def __str__(self):
         return self.name_of_establishment
 
+
 class WorkLocation(models.Model):
     license = models.ForeignKey(EntrepreneurDetails, on_delete=models.CASCADE, related_name='work_location')
     work_location = JSONField(default=dict)
+
 
 class EmployerDetails(models.Model):
     Genders = [
@@ -59,6 +64,7 @@ class EmployerDetails(models.Model):
 
     def __str__(self):
         return self.first_name
+
 
 class Files(models.Model):
     license = models.ForeignKey(EntrepreneurDetails, on_delete=models.CASCADE, related_name='files_uploaded')

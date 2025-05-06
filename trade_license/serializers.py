@@ -35,3 +35,16 @@ class PartnerDetailsSerializer(serializers.ModelSerializer):
     class Meta:
         model = PartnerDetails
         fields = '__all__'
+
+class TradeLicenseServiceRequestSerializer(serializers.ModelSerializer):
+    """
+    Comprehensive serializer that combines all Trade License related data for a service request
+    """
+    trade_license = TradeLicenseExistOrNotSerializer(many=True, read_only=True)
+    trade_license_entity = TradeEntitySerializerRetrieval(many=True, read_only=True)
+    trade_license_partner = PartnerDetailsSerializer(many=True, read_only=True)
+    address = serializers.JSONField()
+    
+    class Meta:
+        model = BasicDetail
+        fields = '__all__'

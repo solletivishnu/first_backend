@@ -1,6 +1,7 @@
 from django.db import models
 from django.core.exceptions import ValidationError
 from djongo.models import ArrayField, EmbeddedField, JSONField
+from .helpers import *
 from usermanagement.models import *
 from datetime import date
 from collections import OrderedDict
@@ -16,7 +17,7 @@ def validate_pincode(value):
 class PayrollOrg(models.Model):
     business = models.OneToOneField(Business, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)  # Use auto_now_add for creation timestamp
-    logo = models.CharField(max_length=200, null=True, blank=True)
+    logo = models.FileField(upload_to=logo_upload_path, null=True, blank=True, default=None)
     sender_email = models.EmailField(max_length=120, null=True, blank=True)
     filling_address_line1 = models.CharField(max_length=150, null=True, blank=True)
     filling_address_line2 = models.CharField(max_length=150, null=True, blank=True)

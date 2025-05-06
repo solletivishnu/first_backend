@@ -20,7 +20,7 @@ def create_basic_details(request):
     elif request.method == 'POST':
         data = request.data
         try:
-            details = BasicDetails.objects.get(user_id=data['user'])
+            details = BasicDetails.objects.get(service_request=data['service_request'])
             serializer = BasicDetailsSerializer(details, data=data, partial=True)
         except:
             serializer = BasicDetailsSerializer(data=data)
@@ -257,3 +257,31 @@ def principal_place_detail_view(request, pk):
     elif request.method == 'DELETE':
         principal_place.delete()
         return Response({"message": "Deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['GET'])
+@parser_classes([JSONParser])
+def get_gst_service_request_data(request, service_request_id):
+    """
+    Retrieve all GST data related to a specific service request
+    """
+    try:
+        # Check if basic details exist for this service request
+        try:
+            basic_details = BasicDetails.objects.get(service_request_id=service_request_id)
+        except BasicDetails.DoesNotExist:
+            return Response(
+                {"error": "No GST data found for this service request."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Use the comprehensive serializer to get all related data
+        serializer = GSTServiceRequestSerializer(basic_details)
+        
+        return Response(serializer.data, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

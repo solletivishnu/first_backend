@@ -760,7 +760,7 @@ class UsersKYCSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         address_data = validated_data.pop('address', {})
         user = self.context['request'].user
-        return UserKYC.objects.create(user=user, address=address_data, **validated_data)
+        return UserKYC.objects.create(address=address_data, **validated_data)
 
 
     def update(self, instance, validated_data):
@@ -992,3 +992,31 @@ class ServicePaymentInfoSerializer(serializers.ModelSerializer):
     class Meta:
         model = ServicePaymentInfo
         fields = '__all__'
+
+
+class PaymentInfoSerializer(serializers.ModelSerializer):
+    plan_name = serializers.SerializerMethodField()
+    suite_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PaymentInfo
+        fields = [
+            'id',
+            'razorpay_order_id',
+            'razorpay_payment_id',
+            'amount',
+            'currency',
+            'status',
+            'payment_method',
+            'card_last4',
+            'payment_captured',
+            'plan_name',
+            'suite_name',
+            'created_at'
+        ]
+
+    def get_plan_name(self, obj):
+        return obj.plan.name if obj.plan else None
+
+    def get_suite_name(self, obj):
+        return obj.suite_subscription.name if obj.suite_subscription else None

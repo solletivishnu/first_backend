@@ -1,3 +1,5 @@
+import os
+
 default_earnings = [
                     {
                         "component_name": "Basic",
@@ -263,4 +265,8 @@ default_leave_management = [
     },
 ]
 
-
+def logo_upload_path(instance, filename):
+    # Get the name of the business, replace spaces with underscores
+    business_name = instance.business.nameOfBusiness.replace(' ', '_')
+    # Construct the upload path
+    return os.path.join(business_name, 'business_logos', filename)

@@ -303,3 +303,31 @@ def files_detail(request, pk):
         return Response({"message": "File deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
     else:
         return Response({"error": "Invalid request method"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@parser_classes([JSONParser])
+def get_labour_license_service_request_data(request, service_request_id):
+    """
+    Retrieve all Labour License data related to a specific service request
+    """
+    try:
+        # Check if entrepreneur details exist for this service request
+        try:
+            entrepreneur = EntrepreneurDetails.objects.get(service_request_id=service_request_id)
+        except EntrepreneurDetails.DoesNotExist:
+            return Response(
+                {"error": "No Labour License data found for this service request."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Use the comprehensive serializer to get all related data
+        serializer = LabourLicenseServiceRequestSerializer(entrepreneur)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

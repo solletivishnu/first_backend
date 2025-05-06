@@ -35,3 +35,13 @@ class ServiceRequestCreateSerializer(serializers.Serializer):
             context=context,
             status='initiated'
         )
+
+
+class ServiceRequestSerializer(serializers.ModelSerializer):
+    service_name = serializers.ReadOnlyField(source='service.name')
+    plan_name = serializers.ReadOnlyField(source='plan.name')
+    
+    class Meta:
+        model = ServiceRequest
+        fields = ['id', 'user', 'service', 'service_name', 'plan', 'plan_name', 
+                  'context', 'status', 'payment_order_id', 'created_at', 'updated_at']
