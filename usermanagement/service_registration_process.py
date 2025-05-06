@@ -23,13 +23,13 @@ User = get_user_model()
 def register_user_with_service(request):
     email = request.data.get('email')
     password = request.data.get('password')
-    business_name = request.data.get('business_name')
+    name = request.data.get('name')
     service_id = request.data.get('service_id')
 
     # ✅ Step 1: Validate input presence
-    if not all([email, password, business_name, service_id]):
+    if not all([email, password, name, service_id]):
         return Response(
-            {"error": "All fields are required: email, password, business_name, service_id"},
+            {"error": "All fields are required: email, password, name, service_id"},
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -44,7 +44,7 @@ def register_user_with_service(request):
         return Response({"error": "Invalid service ID."}, status=status.HTTP_400_BAD_REQUEST)
 
     # ✅ Step 4: Validate business name uniqueness
-    if Context.objects.filter(name=business_name, context_type='business').exists():
+    if Context.objects.filter(name=name, context_type='business').exists():
         return Response({"error": "Business context with this name already exists."}, status=status.HTTP_400_BAD_REQUEST)
 
     # ✅ Step 5: Validate role exists
@@ -66,7 +66,7 @@ def register_user_with_service(request):
             )
 
             context = Context.objects.create(
-                name=business_name,
+                name=name,
                 context_type='business',
                 owner_user=user,
                 status='active',
