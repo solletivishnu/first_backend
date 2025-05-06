@@ -380,7 +380,6 @@ class Service(models.Model):  # Use singular 'Service'
     def __str__(self):
         return self.name
 
-
 class ServicePlan(models.Model):
     PLAN_TYPE_CHOICES = [
         ('fixed', 'Fixed'),
