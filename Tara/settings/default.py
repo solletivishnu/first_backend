@@ -320,8 +320,8 @@ print("*******************")
 S3_BUCKET_NAME = "tarafirstdevelopment"
 
 # database connections
-userName = os.getenv('database_username')
-password = os.getenv('password')
+userName = os.getenv('prod_database_username')
+password = os.getenv('prod_password')
 
 
 DATABASES = {
