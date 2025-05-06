@@ -30,7 +30,7 @@ urlpatterns = [
     # Redoc documentation URL
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
     # Include user management URLs
-    path('user_management/', include('user_management.urls')),
+    # path('user_management/', include('user_management.urls')),
     # Include Invoicing URLs
     path('invoicing/', include('invoicing.urls')),
     # Include Invoicing URLs
@@ -38,6 +38,17 @@ urlpatterns = [
 
     path('openapi.json', schema_view.without_ui(cache_timeout=0), name='schema-json'),
 
+    path('user_management/', include('usermanagement.urls')),
+
+    path('companyincorporation/',include('company_incorporation.urls')),
+
+    path('gst/',include('gst.urls')),
+
+    path('labourlicense/',include('labour_license.urls')),
+
+    path('msme/',include('msme_registration.urls')),
+
+    path('tradelicense/',include('trade_license.urls')),
     # Token authentication URL
     path('token_auth/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

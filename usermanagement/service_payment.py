@@ -28,7 +28,7 @@ def create_razorpay_order_for_services(request):
         return Response({"error": "Both service_request_id and plan_id are required."}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        service_request = ServiceRequest.objects.get(id=service_request_id, user=request.user)
+        service_request = ServiceRequest.objects.get(id=service_request_id)
 
         if service_request.status != 'initiated':
             return Response({"error": "Payment not allowed. Service already processed."},
@@ -250,42 +250,95 @@ def handle_service_payment(order_id, payment_id, method):
 
 def handle_module_payment(notes, order_id, payment_id, method):
     try:
-        subscription_id = notes.get('subscription_id')
+        plan_id = notes.get('plan_id')
         context_id = notes.get('context_id')
+        added_by_id = notes.get('added_by')
 
-        print(f"[ModulePayment] Looking for ModuleSubscription id={subscription_id}, context_id={context_id}")
-        subscription = ModuleSubscription.objects.get(id=subscription_id, context_id=context_id)
+        if not all([plan_id, context_id, added_by_id]):
+            return JsonResponse({'error': 'Missing Razorpay notes (plan_id, context_id, added_by)'}, status=400)
 
-        if subscription.status == 'active':
-            print(f"[ModulePayment] Subscription already active for id={subscription_id}")
-            return JsonResponse({'status': 'already active'}, status=200)
+        plan = SubscriptionPlan.objects.get(id=plan_id)
+        module = plan.module
+        context = Context.objects.get(id=context_id)
+        added_by = Users.objects.get(id=added_by_id)
+        now = timezone.now()
 
-        print(f"[ModulePayment] Activating subscription...")
-        subscription.status = 'active'
-        subscription.payment_status = 'captured'
-        subscription.payment_method = method
-        subscription.razorpay_payment_id = payment_id
-        subscription.paid_at = timezone.now()
-        subscription.save()
+        with transaction.atomic():
+            # Step 1: Update or create subscription
+            subscription = ModuleSubscription.objects.filter(
+                context=context,
+                module=module
+            ).first()
 
-        create_subscription_cycle(subscription)
+            if subscription:
+                subscription.plan = plan
+                subscription.status = 'active'
+                subscription.start_date = now
+                subscription.end_date = now + timedelta(days=30)
+                subscription.save()
 
-        return JsonResponse({'status': 'module subscription processed'})
-    except ModuleSubscription.DoesNotExist:
-        print(f"[ModulePayment][ERROR] ModuleSubscription not found for id={subscription_id}, context={context_id}")
-        return JsonResponse({'error': 'ModuleSubscription not found'}, status=404)
+                # End any overlapping cycles
+                SubscriptionCycle.objects.filter(
+                    subscription=subscription,
+                    end_date__gt=now
+                ).update(end_date=now)
+            else:
+                subscription = ModuleSubscription.objects.create(
+                    context=context,
+                    module=module,
+                    plan=plan,
+                    status='active',
+                    start_date=now,
+                    end_date=now + timedelta(days=30),
+                    added_by=added_by
+                )
+
+            # Step 2: Create subscription cycle
+            create_subscription_cycle(subscription)
+
+            # Step 3: Update PaymentInfo
+            try:
+                payment_info = PaymentInfo.objects.get(razorpay_order_id=order_id)
+                payment_info.razorpay_payment_id = payment_id
+                payment_info.status = 'paid'
+                payment_info.payment_method = method
+                payment_info.payment_captured = True
+                payment_info.updated_at = now
+                payment_info.save()
+                print(f"[PaymentInfo] Updated successfully for order_id={order_id}")
+            except PaymentInfo.DoesNotExist:
+                print(f"[PaymentInfo][WARNING] No PaymentInfo found for Razorpay order_id={order_id}")
+
+        return JsonResponse({'status': 'subscription and payment updated'})
+
+    except (SubscriptionPlan.DoesNotExist, Context.DoesNotExist, Users.DoesNotExist) as e:
+        return JsonResponse({'error': str(e)}, status=404)
+    except Exception as e:
+        import traceback
+        print("[Webhook][ModulePayment][ERROR]:", traceback.format_exc())
+        return JsonResponse({'error': str(e)}, status=500)
 
 
 def create_subscription_cycle(subscription):
     try:
         print(f"[SubscriptionCycle] Creating cycle for subscription id={subscription.id}")
-        with transaction.atomic():
-            initial_feature_usage = {}
-            if subscription.plan.features_enabled:
-                for feature, details in subscription.plan.features_enabled.items():
-                    if isinstance(details, dict) and 'limit' in details:
-                        initial_feature_usage[feature] = 0
 
+        with transaction.atomic():
+            # Initialize feature usage if defined in the plan
+            initial_feature_usage = {}
+            features = subscription.plan.features_enabled or {}
+
+            for feature_key, config in features.items():
+                if isinstance(config, dict) and 'limit' in config:
+                    initial_feature_usage[feature_key] = 0
+
+            # End any overlapping cycles
+            SubscriptionCycle.objects.filter(
+                subscription=subscription,
+                end_date__gt=subscription.start_date
+            ).update(end_date=subscription.start_date)
+
+            # Create new cycle
             SubscriptionCycle.objects.create(
                 subscription=subscription,
                 start_date=subscription.start_date,
@@ -294,6 +347,35 @@ def create_subscription_cycle(subscription):
                 is_paid='yes',
                 feature_usage=initial_feature_usage
             )
+
             print("[SubscriptionCycle] Created successfully")
+
     except Exception as e:
+        import traceback
         print(f"[SubscriptionCycle][ERROR] Failed to create cycle: {str(e)}")
+        print(traceback.format_exc())
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_service_payment_history(request):
+    """
+    Get all service payment records for a user.
+    Optional filters: context_id, service_request_id
+    """
+    user = request.user
+    context_id = request.GET.get('context_id')
+    service_request_id = request.GET.get('service_request_id')
+
+    payments = ServicePaymentInfo.objects.filter(user=user)
+
+    if context_id:
+        payments = payments.filter(service_request__context_id=context_id)
+
+    if service_request_id:
+        payments = payments.filter(service_request_id=service_request_id)
+
+    payments = payments.order_by('-created_at')
+    serializer = ServicePaymentInfoSerializer(payments, many=True)
+    return Response(serializer.data)
+
