@@ -90,7 +90,6 @@ def list_modules(request):
 @api_view(['GET', 'PUT'])
 def update_module(request, module_id):
     """
-    API endpoint for updating a module
     Expected JSON payload:
     {
         "name": "Updated Payroll",
