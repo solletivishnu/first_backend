@@ -68,7 +68,7 @@ def register_user_with_service(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
-    # ✅ All validation passed — now safely write
+    # ✅ All validation passed — now safely
     try:
         with transaction.atomic():
             user = User.objects.create_user(
