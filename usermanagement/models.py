@@ -380,18 +380,37 @@ class Service(models.Model):  # Use singular 'Service'
     def __str__(self):
         return self.name
 
-
 class ServicePlan(models.Model):
-    service = models.ForeignKey('Service', on_delete=models.CASCADE, related_name='plans')
-    name = models.CharField(max_length=100)  # e.g., "Standard", "Combo", "Mega"
-    plan_type = models.CharField(max_length=20, null=False, blank=False)
+    PLAN_TYPE_CHOICES = [
+        ('fixed', 'Fixed'),
+        ('range', 'Range'),
+        ('custom', 'Custom Quote'),
+        ('success_based', 'Success Based'),
+    ]
+
+    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='plans')
+    name = models.CharField(max_length=100)
+    plan_type = models.CharField(max_length=20, choices=PLAN_TYPE_CHOICES)
     description = models.TextField(null=True, blank=True)
-    amount = models.FloatField()
+    amount = models.FloatField(null=True, blank=True)         # For fixed price
+    min_amount = models.FloatField(null=True, blank=True)      # For range price
+    max_amount = models.FloatField(null=True, blank=True)      # For range price
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.service.name} - {self.name}"
+
+    def display_price(self):
+        if self.plan_type == 'fixed' and self.amount is not None:
+            return f"₹{self.amount}"
+        elif self.plan_type == 'range' and self.min_amount is not None and self.max_amount is not None:
+            return f"₹{self.min_amount}–₹{self.max_amount}"
+        elif self.plan_type == 'custom':
+            return "Custom Quote"
+        elif self.plan_type == 'success_based':
+            return "Success-Based"
+        return "Contact for Pricing"
 
 
 class ServiceRequest(models.Model):
@@ -429,7 +448,8 @@ class ServicePaymentInfo(models.Model):
         ('failed', 'Failed'),
     ]
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    user = models.ForeignKey(Users, on_delete=models.CASCADE)
+    context = models.ForeignKey(Context, on_delete=models.CASCADE)
     service_request = models.ForeignKey('ServiceRequest', on_delete=models.CASCADE)
     plan = models.ForeignKey('ServicePlan', on_delete=models.CASCADE, null=True, blank=True)
 

@@ -21,8 +21,11 @@ client = razorpay.Client(auth=(RAZORPAY_CLIENT_ID, RAZORPAY_CLIENT_SECRET))
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_razorpay_order_for_services(request):
+
+    context_id = request.data.get('context_id')
     service_request_id = request.data.get('service_request_id')
     plan_id = request.data.get('plan_id')
+    added_by_id = request.data.get('added_by_id')  # Required (User who initiated)
 
     if not all([service_request_id, plan_id]):
         return Response({"error": "Both service_request_id and plan_id are required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -39,6 +42,17 @@ def create_razorpay_order_for_services(request):
         if plan.service.id != service_request.service.id:
             return Response({"error": "Selected plan does not belong to the requested service."},
                             status=status.HTTP_400_BAD_REQUEST)
+
+        # ADD THIS CHECK:
+        if plan.plan_type != 'fixed':
+            return Response(
+                {
+                    "error": "Online payment is only available for"
+                             "fixed price plans. Please contact support for this plan type."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        added_by = Users.objects.get(id=added_by_id)
+        context = Context.objects.get(id=context_id)
 
         # Update plan selection
         service_request.plan = plan
@@ -71,7 +85,9 @@ def create_razorpay_order_for_services(request):
             "payment_capture": 1,
             "notes": {
                 "type": "service",
-                "service_payment_id": str(service_request.id)
+                "service_payment_id": str(service_request.id),
+                "context_id": str(context.id),
+                "added_by": str(added_by.id)
             }
         })
 
@@ -81,9 +97,10 @@ def create_razorpay_order_for_services(request):
             raise ValueError("Razorpay order creation failed: no order ID returned.")
 
         serializer = ServicePaymentInfoSerializer(data={
-            'user': request.user.id,
+            'user': added_by_id,
             'service_request': service_request.id,
             'plan': plan.id,
+            'context':context_id,
             'amount': plan.amount,
             'razorpay_order_id': order_id,
             'status': 'initiated',
