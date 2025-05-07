@@ -232,15 +232,7 @@ class InvoicingProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = InvoicingProfile
-        fields = [
-            'business',
-            'bank_name', 'account_number', 'ifsc_code', 'swift_code',
-            'gst_registered', 'gstin', 'signature',
-            # Business patch fields (used only during POST/PUT)
-            'nameOfBusiness', 'registrationNumber', 'entityType',
-            'email', 'mobile_number', 'pan',
-            'address_line1', 'address_line2', 'state', 'pincode'
-        ]
+        fields = '__all__'
 
     def business_patch(self, business, validated_data):
         # Update simple fields if value is provided and different

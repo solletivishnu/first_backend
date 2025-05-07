@@ -25,6 +25,7 @@ def register_user_with_service(request):
     password = request.data.get('password')
     name = request.data.get('name')
     service_id = request.data.get('service_id')
+    account_type = request.data.get('account_type', 'business')  # Default to business if not specified
 
     # ✅ Step 1: Validate input presence
     if not all([email, password, name, service_id]):
@@ -33,25 +34,39 @@ def register_user_with_service(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # ✅ Step 2: Validate user does not already exist
+    # ✅ Step 2: Validate account_type
+    if account_type not in ['personal', 'business']:
+        return Response(
+            {"error": "Invalid account_type. Must be either 'personal' or 'business'"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # ✅ Step 3: Validate user does not already exist
     if User.objects.filter(email=email).exists():
         return Response({"error": "User already exists with this email."}, status=status.HTTP_400_BAD_REQUEST)
 
-    # ✅ Step 3: Validate service
+    # ✅ Step 4: Validate service
     try:
         service = Service.objects.get(id=service_id)
     except Service.DoesNotExist:
         return Response({"error": "Invalid service ID."}, status=status.HTTP_400_BAD_REQUEST)
 
-    # ✅ Step 4: Validate business name uniqueness
-    if Context.objects.filter(name=name, context_type='business').exists():
-        return Response({"error": "Business context with this name already exists."}, status=status.HTTP_400_BAD_REQUEST)
+    # ✅ Step 5: Validate context name uniqueness based on account_type
+    if account_type == 'business':
+        if Context.objects.filter(name=name, context_type='business').exists():
+            return Response({"error": "Business context with this name already exists."}, status=status.HTTP_400_BAD_REQUEST)
+    else:  # personal
+        if Context.objects.filter(name=name, context_type='personal').exists():
+            return Response({"error": "Personal context with this name already exists."}, status=status.HTTP_400_BAD_REQUEST)
 
-    # ✅ Step 5: Validate role exists
-    role_qs = Role.objects.filter(name='Owner', context_type='business', is_system_role=True)
+    # ✅ Step 6: Validate role exists based on account_type
+    role_name = 'Owner'
+    role_qs = Role.objects.filter(name=role_name, context_type=account_type, is_system_role=True)
     if not role_qs.exists():
-        return Response({"error": "System role 'Owner' for business context not found."},
-                        status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(
+            {"error": f"System role '{role_name}' for {account_type} context not found."},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
     # ✅ All validation passed — now safely write
     try:
@@ -65,19 +80,21 @@ def register_user_with_service(request):
                 status='active'
             )
 
+            # Create context based on account_type
             context = Context.objects.create(
                 name=name,
-                context_type='business',
+                context_type=account_type,
                 owner_user=user,
                 status='active',
                 profile_status='incomplete',
-                metadata={}
+                metadata={'account_type': account_type}
             )
 
             user.active_context = context
             user.save()
 
-            role = Role.objects.get(name='Owner', context=context)
+            # Get appropriate role based on account_type
+            role = Role.objects.get(name=role_name, context=context)
             UserContextRole.objects.create(user=user, context=context, role=role, status='active', added_by=user)
 
             ServiceRequest.objects.create(
@@ -119,6 +136,7 @@ def register_user_with_service(request):
                 "user_id": user.id,
                 "context_id": context.id,
                 "service_id": service.id,
+                "account_type": account_type,
                 "activation_link": activation_link
             }, status=status.HTTP_201_CREATED)
 
