@@ -327,6 +327,7 @@ def get_module_subscriptions(request,pk):
                     "id": subscription.plan.id,
                     "name": subscription.plan.name,
                     "description": subscription.plan.description,
+                    "plan_type": subscription.plan.plan_type,
                     "price": price,
                     "billing_cycle_days": subscription.plan.billing_cycle_days
                 },

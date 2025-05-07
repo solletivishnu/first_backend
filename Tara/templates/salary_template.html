@@ -771,6 +771,7 @@
                         </td>
                       </tr>
                       {% endif %}
+                      {% if income_tax > 0 %}
                       <tr style="border-bottom: 1px solid #e2e2e2">
                         <td
                           style="
@@ -790,6 +791,28 @@
                           {{income_tax}}
                         </td>
                       </tr>
+                      {% endif %}
+                      {% if loan_emi != '0' %}
+                      <tr style="border-bottom: 1px solid #e2e2e2">
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0 0.75rem 0.75rem;
+                          "
+                        >
+                          Loan EMI
+                        </td>
+                        <td
+                          style="
+                            border-bottom-width: 1px;
+                            padding: 0.75rem 0.75rem 0.75rem 0;
+                            text-align: right;
+                          "
+                        >
+                          {{loan_emi}}
+                        </td>
+                      </tr>
+                      {% endif %}
                       <tr style="border-bottom: 1px solid #e2e2e2">
                         <td
                           style="

@@ -10,6 +10,9 @@ class ServiceSerializer(serializers.ModelSerializer):
 
 class ServicePlanSerializer(serializers.ModelSerializer):
     service = serializers.PrimaryKeyRelatedField(queryset=Service.objects.all())
+    amount = serializers.FloatField(allow_null=True, default=None)  # For fixed price
+    min_amount = serializers.FloatField(allow_null=True, default=None)  # For range price
+    max_amount = serializers.FloatField(allow_null=True, default=None)
 
     class Meta:
         model = ServicePlan
