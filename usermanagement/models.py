@@ -448,7 +448,8 @@ class ServicePaymentInfo(models.Model):
         ('failed', 'Failed'),
     ]
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    user = models.ForeignKey(Users, on_delete=models.CASCADE)
+    context = models.ForeignKey(Context, on_delete=models.CASCADE)
     service_request = models.ForeignKey('ServiceRequest', on_delete=models.CASCADE)
     plan = models.ForeignKey('ServicePlan', on_delete=models.CASCADE, null=True, blank=True)
 

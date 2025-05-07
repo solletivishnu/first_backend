@@ -19,6 +19,7 @@ class PayrollOrg(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)  # Use auto_now_add for creation timestamp
     logo = models.FileField(upload_to=logo_upload_path, null=True, blank=True, default=None)
     sender_email = models.EmailField(max_length=120, null=True, blank=True)
+    filling_address_location_name = models.CharField(max_length=120, null=True, blank=True,default="Head Office")
     filling_address_line1 = models.CharField(max_length=150, null=True, blank=True)
     filling_address_line2 = models.CharField(max_length=150, null=True, blank=True)
     filling_address_state = models.CharField(max_length=150, null=True, blank=True)
