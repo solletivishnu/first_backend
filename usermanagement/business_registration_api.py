@@ -51,6 +51,36 @@ def register_business(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
+    # Validate user does not already exist
+    if Users.objects.filter(email=email).exists():
+        return Response({"error": "User already exists with this email."}, status=400)
+
+    # Validate module
+    try:
+        module = Module.objects.get(id=module_id)
+    except Module.DoesNotExist:
+        return Response({"error": f"Module with ID {module_id} does not exist."}, status=404)
+
+    # Validate business does not exist
+    if Context.objects.filter(name__iexact=business_name).exists():
+        return Response({"error": "Business with this name already exists."}, status=400)
+
+    # Validate owner role
+    try:
+        owner_role = Role.objects.get(context_type='business', role_type='owner')
+    except Role.DoesNotExist:
+        return Response({"error": "Owner role is not defined."}, status=500)
+
+    # Validate trial plan exists
+    trial_plan = SubscriptionPlan.objects.filter(module=module, plan_type='trial', is_active='yes').first()
+    if not trial_plan:
+        return Response({"error": "No active trial plan found for the selected module."}, status=400)
+
+    # Validate module features
+    module_features = ModuleFeature.objects.filter(module=module)
+    if not module_features.exists():
+        return Response({"error": "No features found for the selected module."}, status=400)
+
     try:
         # Use transaction to ensure all operations succeed or fail together
         with transaction.atomic():
