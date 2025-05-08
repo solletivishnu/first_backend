@@ -67,7 +67,7 @@ default_earnings = [
                         "component_type": "Fixed",
                         "calculation_type": {
                             "type": "Flat Amount",
-                            "value": 50000
+                            "value": 0
                         },
                         "is_active": True,
                         "is_part_of_employee_salary_structure": True,
@@ -147,7 +147,7 @@ default_earnings = [
                         "component_type": "Fixed",
                         "calculation_type": {
                             "type": "Flat Amount",
-                            "value": 1600
+                            "value": 0
                         },
                         "is_active": True,
                         "is_part_of_employee_salary_structure": True,
@@ -167,7 +167,7 @@ default_earnings = [
                         "component_type": "Fixed",
                         "calculation_type": {
                             "type": "Flat Amount",
-                            "value": 1600
+                            "value": 0
                         },
                         "is_active": True,
                         "is_part_of_employee_salary_structure": True,
@@ -187,7 +187,7 @@ default_earnings = [
                         "component_type": "Fixed",
                         "calculation_type": {
                             "type": "Flat Amount",
-                            "value": 1600
+                            "value": 0
                         },
                         "is_active": True,
                         "is_part_of_employee_salary_structure": False,

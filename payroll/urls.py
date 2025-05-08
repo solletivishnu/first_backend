@@ -11,6 +11,9 @@ urlpatterns = [
     # URL for retrieving, updating, or deleting a specific PayrollOrg by its ID
     path('update-payroll-org/<int:business_id>/', views.update_payroll_org, name='update_payroll_org'),
 
+    # URL for clearing the logo field of a PayrollOrg instance
+    path('clear-payroll-org-logo/<int:pk>/', views.clear_payroll_org_logo, name='clear_payroll_org_logo'),
+
     # path('business-payroll/<int:business_id>/', views.PayrollOrgBusinessDetail.as_view(), name='payroll-org-detail'),
 
     path('business-payroll/<int:business_id>/', views.PayrollOrgBusinessDetailView.as_view(),

@@ -1158,7 +1158,8 @@ class UserKYC(models.Model):
             required_fields.append(self.icai_number)
 
         if self.address:
-            required_address_fields = ['address_line1', 'address_line2', 'state', 'city', 'country']
+            # Exclude 'address_line2' as it's optional
+            required_address_fields = ['address_line1', 'state', 'city', 'country']
             for field in required_address_fields:
                 if not self.address.get(field):
                     return False  # If any required address field is missing or empty, return False

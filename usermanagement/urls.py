@@ -161,7 +161,7 @@ urlpatterns = [
     path('document_view', other_factors.documents_view, name='get_gst_document_url'),
 
     # Reset password view
-    path('reset-password/<uid>/<token>/', other_factors.ResetPasswordView.as_view(), name='reset-password'),
+    path('reset-password', other_factors.ResetPasswordView.as_view(), name='reset-password'),
 
     # Refresh token view
     path('refresh-token/', other_factors.RefreshTokenView.as_view(), name='refresh-token'),
