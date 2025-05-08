@@ -65,11 +65,6 @@ def register_business(request):
     if Context.objects.filter(name__iexact=business_name).exists():
         return Response({"error": "Business with this name already exists."}, status=400)
 
-    # Validate owner role
-    try:
-        owner_role = Role.objects.get(context_type='business', role_type='owner')
-    except Role.DoesNotExist:
-        return Response({"error": "Owner role is not defined."}, status=500)
 
     # Validate trial plan exists
     trial_plan = SubscriptionPlan.objects.filter(module=module, plan_type='trial', is_active='yes').first()
@@ -290,11 +285,6 @@ def add_another_context(request):
         if user_id:
             # Check if the authenticated user has permission to add context for another user
             # This is a simple check - you might want to implement more sophisticated permission logic
-            # if not authenticated_user.is_staff and not authenticated_user.is_superuser:
-            #     return Response(
-            #         {"error": "You don't have permission to add a context for another user."},
-            #         status=status.HTTP_403_FORBIDDEN
-            #     )
 
             # Get the specified user
             try:
