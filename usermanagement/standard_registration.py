@@ -156,50 +156,62 @@ def select_context(request):
         if user.is_active != 'yes':
             return Response({"error": "User is not active."}, status=status.HTTP_403_FORBIDDEN)
 
-        # Extract context name early for validation
-        context_name = user_kyc_data.get('name') if context_type == 'personal' else business_data.get('nameOfBusiness')
-        if not context_name:
-            return Response({"error": "Missing name in user_kyc or business_details."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Check duplicate business
-        if context_type == 'business' and Business.objects.filter(nameOfBusiness=context_name).exists():
-            return Response({"error": "Business with this name already exists."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Check for existing UserKYC
-        if context_type == 'personal' and hasattr(user, 'userkyc'):
-            return Response({"error": "UserKYC already exists."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # ✅ Validate all data FIRST (no database writes yet)
         if context_type == 'personal':
-            serializer = UsersKYCSerializer(data=user_kyc_data, context={'request': request})
-            serializer.is_valid(raise_exception=True)
+            # Ensure only one personal context per user
+            if hasattr(user, 'userkyc'):
+                return Response({"error": "Personal context already exists for this user."}, status=status.HTTP_400_BAD_REQUEST)
+
+            name = user_kyc_data.get('name')
+            if not name:
+                return Response({"error": "Missing name in user_kyc data."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Validate UserKYC data
+            kyc_serializer = UsersKYCSerializer(data=user_kyc_data, context={'request': request, 'user': user})
+            kyc_serializer.is_valid(raise_exception=True)
+
+            # Create Context
+            context = Context.objects.create(
+                name=name,
+                context_type='personal',
+                owner_user=user,
+                metadata={}
+            )
+
+            # Save UserKYC with associated user
+            kyc_serializer.save(user=user)
+
         else:
-            # Temporarily inject 'client' since BusinessSerializer expects it in .save()
+            business_name = business_data.get('nameOfBusiness')
+            if not business_name:
+                return Response({"error": "Missing nameOfBusiness in business_details."}, status=status.HTTP_400_BAD_REQUEST)
+
+            if Business.objects.filter(nameOfBusiness=business_name).exists():
+                return Response({"error": "Business with this name already exists."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Validate Business Data
             business_data_with_client = {**business_data, 'client': user.id}
             business_serializer = BusinessSerializer(data=business_data_with_client)
             business_serializer.is_valid(raise_exception=True)
 
-        # ✅ All validation passed, safe to write
-        context = Context.objects.create(
-            name=context_name,
-            context_type=context_type,
-            owner_user=user,
-            metadata={}
-        )
+            # Create Context
+            context = Context.objects.create(
+                name=business_name,
+                context_type='business',
+                owner_user=user,
+                metadata={}
+            )
 
-        if context_type == 'personal':
-            serializer.save()
-        else:
-            business = context.business
+            # Business should be auto-created via signal
+            business = getattr(context, 'business', None)
             if not business:
-                return Response({"error": "Business creation failed via signal."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                return Response({"error": "Business creation via signal failed."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-            # Update the business with validated data (client already set in signal)
+            # Update business with validated data
             business_serializer = BusinessSerializer(business, data=business_data, partial=True)
             business_serializer.is_valid(raise_exception=True)
             business_serializer.save()
 
-        # Assign default role and set active context
+        # Assign role and make this the active context
         role = Role.objects.get(name='Owner', context=context)
         UserContextRole.objects.create(user=user, context=context, role=role, status='active')
         user.active_context = context
@@ -219,6 +231,7 @@ def select_context(request):
         return Response({"error": e.message_dict if hasattr(e, 'message_dict') else str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         return Response({"error": f"Context selection failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 @api_view(['POST'])

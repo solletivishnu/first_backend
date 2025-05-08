@@ -502,19 +502,6 @@ class TestProtectedAPIView(APIView):
 class ForgotPasswordView(APIView):
     permission_classes = [AllowAny]
 
-    @swagger_auto_schema(
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'email': openapi.Schema(type=openapi.TYPE_STRING, description='Email address'),
-            }
-        ),
-        responses={
-            200: openapi.Response("Reset link sent if the email exists"),
-            400: openapi.Response("Bad Request")
-        },
-        operation_description="Send a password reset link to the user's email."
-    )
     def post(self, request, *args, **kwargs):
         """
         Handle forgot password functionality with Amazon SES.
@@ -537,7 +524,7 @@ class ForgotPasswordView(APIView):
         # Generate reset token and link
         token = default_token_generator.make_token(user)
         uid = urlsafe_base64_encode(str(user.pk).encode())
-        reset_link = f"{Reference_link}/reset-password/{uid}/{token}/"
+        reset_link = f"{Reference_link}reset-password?uid={uid}&token={token}"
 
         # Send the email via Amazon SES
         try:
@@ -584,34 +571,23 @@ class ForgotPasswordView(APIView):
 class ResetPasswordView(APIView):
     permission_classes = [AllowAny]
 
-    @swagger_auto_schema(
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'password': openapi.Schema(type=openapi.TYPE_STRING, description='New password'),
-            }
-        ),
-        manual_parameters=[
-            openapi.Parameter('uid', openapi.IN_PATH, description="User ID", type=openapi.TYPE_STRING),
-            openapi.Parameter('token', openapi.IN_PATH, description="Reset Token", type=openapi.TYPE_STRING)
-        ],
-        responses={
-            200: openapi.Response("Password has been successfully reset"),
-            400: openapi.Response("Invalid reset link or expired token"),
-        },
-        operation_description="Reset user's password using token and UID."
-    )
-    def post(self, request, uid, token, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
         """
-        Reset user password.
+        Reset user password via query parameters (?uid=...&token=...)
         """
         password = request.data.get("password")
         if not password:
             logger.warning("Password not provided in the request.")
             raise ValidationError("Password is required.")
 
+        uid_b64 = request.query_params.get("uid")
+        token = request.query_params.get("token")
+
+        if not uid_b64 or not token:
+            return Response({"message": "Missing UID or token in query parameters."}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
-            uid = urlsafe_base64_decode(uid).decode()
+            uid = urlsafe_base64_decode(uid_b64).decode()
             user = Users.objects.get(pk=uid)
             logger.info(f"User found for UID: {uid}")
         except (Users.DoesNotExist, ValueError, TypeError) as e:
@@ -626,6 +602,7 @@ class ResetPasswordView(APIView):
 
         logger.warning(f"Invalid or expired token for user: {user.email}")
         return Response({"message": "Invalid or expired token"}, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 # Refresh Token
@@ -1133,7 +1110,12 @@ def gst_details_list_create(request):
     List all GST details or create a new GST detail.
     """
     if request.method == 'POST':
-        serializer = GSTDetailsSerializer(data=request.data)
+        data = request.data.copy()
+        # Remove gst_document from data if it's not provided
+        if 'gst_document' not in request.FILES:
+            data.pop('gst_document', None)
+
+        serializer = GSTDetailsSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -1146,19 +1128,22 @@ def gst_details_detail(request, pk):
     """
     Retrieve, update or delete a GST detail by ID.
     """
-
-
     if request.method == 'GET':
         try:
             gst_detail = GSTDetails.objects.filter(business_id=pk)
-            serializer = GSTDetailsSerializer(gst_detail,many=True)
+            serializer = GSTDetailsSerializer(gst_detail, many=True)
             return Response(serializer.data)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method in ['PUT']:
         gst_detail = GSTDetails.objects.get(pk=pk)
-        serializer = GSTDetailsSerializer(gst_detail, data=request.data, partial=True)
+        data = request.data.copy()
+        # Remove gst_document from data if it's not provided
+        if 'gst_document' not in request.FILES:
+            data.pop('gst_document', None)
+            
+        serializer = GSTDetailsSerializer(gst_detail, data=data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
