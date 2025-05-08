@@ -65,11 +65,6 @@ def register_business(request):
     if Context.objects.filter(name__iexact=business_name).exists():
         return Response({"error": "Business with this name already exists."}, status=400)
 
-    # Validate owner role
-    try:
-        owner_role = Role.objects.get(context_type='business', role_type='owner')
-    except Role.DoesNotExist:
-        return Response({"error": "Owner role is not defined."}, status=500)
 
     # Validate trial plan exists
     trial_plan = SubscriptionPlan.objects.filter(module=module, plan_type='trial', is_active='yes').first()
