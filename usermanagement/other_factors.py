@@ -502,19 +502,6 @@ class TestProtectedAPIView(APIView):
 class ForgotPasswordView(APIView):
     permission_classes = [AllowAny]
 
-    @swagger_auto_schema(
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'email': openapi.Schema(type=openapi.TYPE_STRING, description='Email address'),
-            }
-        ),
-        responses={
-            200: openapi.Response("Reset link sent if the email exists"),
-            400: openapi.Response("Bad Request")
-        },
-        operation_description="Send a password reset link to the user's email."
-    )
     def post(self, request, *args, **kwargs):
         """
         Handle forgot password functionality with Amazon SES.
