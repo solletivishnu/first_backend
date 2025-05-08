@@ -285,11 +285,6 @@ def add_another_context(request):
         if user_id:
             # Check if the authenticated user has permission to add context for another user
             # This is a simple check - you might want to implement more sophisticated permission logic
-            # if not authenticated_user.is_staff and not authenticated_user.is_superuser:
-            #     return Response(
-            #         {"error": "You don't have permission to add a context for another user."},
-            #         status=status.HTTP_403_FORBIDDEN
-            #     )
 
             # Get the specified user
             try:
