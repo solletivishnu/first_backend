@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'user_management',
     'drf_yasg',
+    'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
     'invoicing',
@@ -72,7 +73,10 @@ INSTALLED_APPS = [
     'gst',
     'labour_license',
     'msme_registration',
-    'trade_license'
+    'trade_license',
+    'docwallet',
+    'servicetasks',
+    'income_tax_returns',
 ]
 
 MIDDLEWARE = [
@@ -197,6 +201,9 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',  # Only JSON response, no HTML
+    ]
 }
 
 
@@ -380,6 +387,8 @@ SANDBOX_API_VERSION = '1.0'
 AWS_S3_SIGNATURE_VERSION = 's3v4'
 
 AWS_STORAGE_BUCKET_NAME = "tarafirstdevelopment"
+
+AWS_PRIVATE_BUCKET_NAME = "taradevelopmentprivate"
 
 AWS_DEFAULT_ACL = 'private'
 AWS_S3_OBJECT_PARAMETERS = {

@@ -5,329 +5,411 @@ from django.http import JsonResponse
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from .serializers import *
 import json
+from .helpers import IsPlatformOrAssociatedUser
+from rest_framework.decorators import api_view, permission_classes, parser_classes
+
 
 # 1. Entrepreneur Details Views
 @api_view(['GET', 'POST'])
-@parser_classes([MultiPartParser, FormParser,JSONParser])
-def entrepreneur_details_list(request):
-    if request.method == 'GET':
-        entrepreneurs = EntrepreneurDetails.objects.all()
-        serializer = EntrepreneurDetailsSerializerRetrival(entrepreneurs, many=True)
-        return Response(serializer.data)
-
-    elif request.method == 'POST':
-        data = request.data.copy()
-        if 'address_of_entrepreneur' in data:
-            address_data = data.get('address_of_entrepreneur')
-            if isinstance(address_data, str):
-                try:
-                    address_data = json.loads(address_data)  # Convert string to dict
-                    data['address_of_entrepreneur'] = address_data
-                except json.JSONDecodeError:
-                    return Response({"error": "Invalid JSON format for address"},
-                                    status=status.HTTP_400_BAD_REQUEST)
-        try:
-            entrepreneurs = EntrepreneurDetails.objects.get(user_id=data['user'])
-            serializer = EntrepreneurDetailsSerializer(entrepreneurs,data=data,partial=True)
-
-        except:
-            serializer = EntrepreneurDetailsSerializer(data=data)
-
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-@api_view(['GET', 'PUT', 'DELETE'])
-@parser_classes([MultiPartParser, FormParser,JSONParser])
-def entrepreneur_details_detail(request, pk):
-    try:
-        entrepreneur = EntrepreneurDetails.objects.get(pk=pk)
-    except EntrepreneurDetails.DoesNotExist:
-        return Response({"error": "Entrepreneur not found"}, status=status.HTTP_404_NOT_FOUND)
-
-    if request.method == 'GET':
-        serializer = EntrepreneurDetailsSerializerRetrival(entrepreneur)
-        return Response(serializer.data)
-
-    elif request.method == 'PUT':
-        data = request.data.copy()
-        if 'address_of_entrepreneur' in data:
-            address_data = data.get('address_of_entrepreneur')
-            if isinstance(address_data, str):
-                try:
-                    address_data = json.loads(address_data)  # Convert string to dict
-                    data['address_of_entrepreneur'] = address_data
-                except json.JSONDecodeError:
-                    return Response({"error": "Invalid JSON format for address"},
-                                    status=status.HTTP_400_BAD_REQUEST)
-        serializer = EntrepreneurDetailsSerializer(entrepreneur, data=data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    elif request.method == 'DELETE':
-        entrepreneur.delete()
-        return Response({"message": "Entrepreneur deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
-
-# 2. Establishment Details Views
-@api_view(['GET', 'POST'])
-@parser_classes([MultiPartParser, FormParser,JSONParser])
-def establishment_details_list(request):
-    if request.method == 'GET':
-        establishments = EstablishmentDetails.objects.all()
-        serializer = EstablishmentDetailsSerializerRetrival(establishments, many=True)
-        return Response(serializer.data)
-
-    elif request.method == 'POST':
-        data = request.data.copy()
-        if 'address_of_establishment' in data:
-            address_data = data.get('address_of_establishment')
-            if isinstance(address_data, str):
-                try:
-                    address_data = json.loads(address_data)
-                    data['address_of_establishment'] = address_data
-                except json.JSONDecodeError:
-                    return Response({"error": "Invalid JSON format for address"},
-                                    status=status.HTTP_400_BAD_REQUEST)
-        try:
-            establishments = EstablishmentDetails.objects.get(license_id=data['license'])
-            serializer = EstablishmentDetailsSerializer(establishments,data=data,partial=True)
-        except:
-            serializer = EstablishmentDetailsSerializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-@api_view(['GET', 'PUT', 'DELETE'])
-@parser_classes([MultiPartParser, FormParser,JSONParser])
-def establishment_details_detail(request, pk):
-    try:
-        establishment = EstablishmentDetails.objects.get(  license_id=pk)
-    except EstablishmentDetails.DoesNotExist:
-        return Response({"error": "Establishment not found"}, status=status.HTTP_404_NOT_FOUND)
-
-    if request.method == 'GET':
-        serializer = EstablishmentDetailsSerializerRetrival(establishment)
-        return Response(serializer.data)
-
-    elif request.method == 'PUT':
-        establishment = EstablishmentDetails.objects.get(license_id=pk)
-        data = request.data.copy()
-        if 'address_of_establishment' in data:
-            address_data = data.get('address_of_establishment')
-            if isinstance(address_data, str):
-                try:
-                    address_data = json.loads(address_data)
-                    data['address_of_establishment'] = address_data
-                except json.JSONDecodeError:
-                    return Response({"error": "Invalid JSON format for address"},
-                                    status=status.HTTP_400_BAD_REQUEST)
-
-        serializer = EstablishmentDetailsSerializer(establishment, data=data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    elif request.method == 'DELETE':
-        establishment.delete()
-        return Response({"message": "Establishment deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
-
-@api_view(['GET', 'POST'])
-@parser_classes([MultiPartParser, FormParser,JSONParser])
-def work_location_list(request):
-    if request.method == 'GET':
-        worklocation = WorkLocation.objects.all()
-        serializer = WorkLocationSerializerRetrival(worklocation, many=True)
-        return Response(serializer.data)
-
-    elif request.method == 'POST':
-        data = request.data.copy()
-        if 'WorkLocation' in data:
-            address_data = data.get('WorkLocation')
-            if isinstance(address_data, str):
-                try:
-                    address_data = json.loads(address_data)  # Convert string to dict
-                    data['WorkLocation'] = address_data
-                except json.JSONDecodeError:
-                    return Response({"error": "Invalid JSON format for address"},
-                                    status=status.HTTP_400_BAD_REQUEST)
-        serializer = WorkLocationSerializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-@api_view(['GET', 'PUT', 'DELETE'])
-@parser_classes([MultiPartParser, FormParser,JSONParser])
-def work_location_detail(request, pk):
-    try:
-        worklocation = WorkLocation.objects.filter(license_id=pk)
-    except WorkLocation.DoesNotExist:
-        return Response({"error": "Work Location not found"}, status=status.HTTP_404_NOT_FOUND)
-    if request.method == 'GET':
-        serializer = WorkLocationSerializerRetrival(worklocation,many=True)
-        return Response(serializer.data)
-    elif request.method == 'PUT':
-        worklocation = WorkLocation.objects.get(license_id=pk)
-        serializer = WorkLocationSerializer(worklocation, data=request.data,partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    elif request.method == 'DELETE':
-        worklocation.delete()
-        return Response({"message": "Work Location deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
-    else:
-        return Response({"error": "Invalid request method"}, status=status.HTTP_400_BAD_REQUEST)
-
-# 3. Employer Details Views
-@api_view(['GET', 'POST'])
 @parser_classes([MultiPartParser, FormParser, JSONParser])
-def employer_details_list(request):
+def business_identity_structure_list(request):
     if request.method == 'GET':
-        employers = EmployerDetails.objects.all()
-        serializer = EmployerDetailsSerializerRetrival(employers, many=True)
-        return Response(serializer.data)
-
-    elif request.method == 'POST':
-        data = request.data
-
-        if 'address_of_employer' in data and isinstance(data.get('address_of_employer'), str):
-            try:
-                data['address_of_employer'] = json.loads(data['address_of_employer'])
-            except json.JSONDecodeError:
-                return Response({"error": "Invalid JSON format for address"}, status=status.HTTP_400_BAD_REQUEST)
-
-        if 'total_employees' in data and isinstance(data.get('total_employees'), str):
-            try:
-                data['total_employees'] = json.loads(data['total_employees'])
-            except json.JSONDecodeError:
-                return Response({"error": "Invalid JSON format for total_employees"},
-                                status=status.HTTP_400_BAD_REQUEST)
-        try:
-            employers = EmployerDetails.objects.get(license_id=data['license'])
-            serializer = EmployerDetailsSerializer(employers,data=data,partial=True)
-        except:
-            serializer = EmployerDetailsSerializer(data=data)
-
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-@api_view(['GET', 'PUT', 'DELETE'])
-@parser_classes([MultiPartParser, FormParser,JSONParser])
-def employer_details_detail(request, pk):
-    try:
-        employer = EmployerDetails.objects.get(license_id=pk)
-    except EmployerDetails.DoesNotExist:
-        return Response({"error": "Employer not found"}, status=status.HTTP_404_NOT_FOUND)
-
-    if request.method == 'GET':
-        serializer = EmployerDetailsSerializerRetrival(employer)
-        return Response(serializer.data)
-    elif request.method == 'PUT':
-        data = request.data.copy()
-        if 'address_of_employer' in data:
-            address_data = data.get('address_of_employer')
-            if isinstance(address_data, str):
-                try:
-                    address_data = json.loads(address_data)  # Convert string to dict
-                    data['address_of_employer'] = address_data
-                except json.JSONDecodeError:
-                    return Response({"error": "Invalid JSON format for address"},
-                                    status=status.HTTP_400_BAD_REQUEST)
-        if 'total_employees' in data:
-            address_data = data.get('total_employees')
-            if isinstance(address_data, str):
-                try:
-                    address_data = json.loads(address_data)  # Convert string to dict
-                    data['total_employees'] = address_data
-                except json.JSONDecodeError:
-                    return Response({"error": "Invalid JSON format for address"},
-                                    status=status.HTTP_400_BAD_REQUEST)
-        serializer = EmployerDetailsSerializer(employer, data=data,partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    elif request.method == 'DELETE':
-        employer.delete()
-        return Response({"message": "Employer deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
-
-@api_view(['GET', 'POST'])
-@parser_classes([MultiPartParser, FormParser,JSONParser])
-def files_list(request):
-    if request.method == 'GET':
-        file = Files.objects.all()
-        serializer = filesSerializer(file, many=True)
+        records = BusinessIdentityStructure.objects.all()
+        serializer = BusinessIdentityStructureSerializer(records, many=True)
         return Response(serializer.data)
     elif request.method == 'POST':
-        data = request.data
-        try:
-            file = Files.objects.get(license_id=data['license'])
-            serializer = filesSerializer(file,data=data,partial=True)
-        except:
-            serializer = filesSerializer(data=data)
-
+        serializer = BusinessIdentityStructureSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-@api_view(['GET', 'PUT', 'DELETE'])
-@parser_classes([MultiPartParser, FormParser,JSONParser])
-def files_detail(request, pk):
-    try:
-        file = Files.objects.get(license_id=pk)
-    except Files.DoesNotExist:
-        return Response({"error": "File not found"}, status=status.HTTP_404_NOT_FOUND)
-    if request.method == 'GET':
-        serializer = filesSerializer(file)
-        return Response(serializer.data)
-    elif request.method == 'PUT':
-        serializer = filesSerializer(file, data=request.data,partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    elif request.method == 'DELETE':
-        file.delete()
-        return Response({"message": "File deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
-    else:
-        return Response({"error": "Invalid request method"}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET'])
-@parser_classes([JSONParser])
-def get_labour_license_service_request_data(request, service_request_id):
+@parser_classes([MultiPartParser, FormParser, JSONParser])
+def get_business_identity_structure(request):
     """
-    Retrieve all Labour License data related to a specific service request
+    Retrieve BusinessIdentityStructure based on either service_request_id or service_task_id (query param).
+    Query Params: ?service_request_id=<id> or ?service_task_id=<id>
     """
-    try:
-        # Check if entrepreneur details exist for this service request
-        try:
-            entrepreneur = EntrepreneurDetails.objects.get(service_request_id=service_request_id)
-        except EntrepreneurDetails.DoesNotExist:
-            return Response(
-                {"error": "No Labour License data found for this service request."},
-                status=status.HTTP_404_NOT_FOUND
-            )
+    service_request_id = request.query_params.get('service_request_id')
+    service_task_id = request.query_params.get('service_task_id')
 
-        # Use the comprehensive serializer to get all related data
-        serializer = LabourLicenseServiceRequestSerializer(entrepreneur)
-
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    except Exception as e:
+    if not service_request_id and not service_task_id:
         return Response(
-            {"error": str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            {"error": "Provide either 'service_request_id' or 'service_task_id' as a query parameter."},
+            status=status.HTTP_400_BAD_REQUEST
         )
+
+    try:
+        if service_request_id:
+            instance = BusinessIdentityStructure.objects.get(service_request_id=service_request_id)
+        else:
+            instance = BusinessIdentityStructure.objects.get(service_task_id=service_task_id)
+    except BusinessIdentityStructure.DoesNotExist:
+        return Response({"error": "No matching BusinessIdentityStructure found."}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = BusinessIdentityStructureSerializer(instance)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
+def business_identity_structure_detail(request, pk):
+    try:
+        record = BusinessIdentityStructure.objects.get(pk=pk)
+    except BusinessIdentityStructure.DoesNotExist:
+        return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        serializer = BusinessIdentityStructureSerializer(record)
+        return Response(serializer.data)
+    elif request.method == 'PUT':
+        serializer = BusinessIdentityStructureSerializer(record, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    elif request.method == 'DELETE':
+        record.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# 2. Establishment Details Views
+@api_view(['GET', 'POST'])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
+def signatory_details_list(request):
+    if request.method == 'GET':
+        records = SignatoryDetails.objects.all()
+        serializer = SignatoryDetailsSerializer(records, many=True)
+        return Response(serializer.data)
+    elif request.method == 'POST':
+        serializer = SignatoryDetailsSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
+def get_signatory_details(request):
+    """
+    Retrieve SignatoryDetails based on either service_request_id or service_task_id.
+    Query Params: ?service_request_id=<id> or ?service_task_id=<id>
+    """
+    service_request_id = request.query_params.get('service_request_id')
+    service_task_id = request.query_params.get('service_task_id')
+
+    if not service_request_id and not service_task_id:
+        return Response(
+            {"error": "Provide either 'service_request_id' or 'service_task_id' as a query parameter."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        if service_request_id:
+            instance = SignatoryDetails.objects.filter(service_request_id=service_request_id)
+        else:
+            instance = SignatoryDetails.objects.filter(service_task_id=service_task_id)
+    except SignatoryDetails.DoesNotExist:
+        return Response({"error": "No matching SignatoryDetails found."}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = SignatoryDetailsSerializer(instance, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
+def get_business_location_proofs(request):
+    """
+    Retrieve BusinessLocationProofs based on either service_request_id or service_task_id.
+    Query Params: ?service_request_id=<id> or ?service_task_id=<id>
+    """
+    service_request_id = request.query_params.get('service_request_id')
+    service_task_id = request.query_params.get('service_task_id')
+
+    if not service_request_id and not service_task_id:
+        return Response(
+            {"error": "Provide either 'service_request_id' or 'service_task_id' as a query parameter."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        if service_request_id:
+            instance = BusinessLocationProofs.objects.get(service_request_id=service_request_id)
+        else:
+            instance = BusinessLocationProofs.objects.get(service_task_id=service_task_id)
+    except BusinessLocationProofs.DoesNotExist:
+        return Response({"error": "No matching BusinessLocationProofs found."}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = BusinessLocationProofsSerializer(instance)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
+def signatory_details_detail(request, pk):
+    try:
+        record = SignatoryDetails.objects.get(pk=pk)
+    except SignatoryDetails.DoesNotExist:
+        return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        serializer = SignatoryDetailsSerializer(record)
+        return Response(serializer.data)
+    elif request.method == 'PUT':
+        serializer = SignatoryDetailsSerializer(record, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    elif request.method == 'DELETE':
+        record.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['GET', 'POST'])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
+def business_location_proofs_list(request):
+    if request.method == 'GET':
+        records = BusinessLocationProofs.objects.all()
+        serializer = BusinessLocationProofsSerializer(records, many=True)
+        return Response(serializer.data)
+    elif request.method == 'POST':
+        data = request.data.copy()
+        if 'principal_place_of_business' in data and isinstance(data['principal_place_of_business'], str):
+            try:
+                address = json.loads(data['principal_place_of_business'])
+            except json.JSONDecodeError:
+                return Response({"error": "Invalid JSON"}, status=status.HTTP_400_BAD_REQUEST)
+        data['principal_place_of_business'] = json.dumps(address)
+        serializer = BusinessLocationProofsSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
+def business_location_proofs_detail(request, pk):
+    try:
+        record = BusinessLocationProofs.objects.get(pk=pk)
+    except BusinessLocationProofs.DoesNotExist:
+        return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        serializer = BusinessLocationProofsSerializer(record)
+        return Response(serializer.data)
+    elif request.method == 'PUT':
+        data = request.data.copy()
+        if 'principal_place_of_business' in data and isinstance(data['principal_place_of_business'], str):
+            try:
+                address = json.loads(data['principal_place_of_business'])
+            except json.JSONDecodeError:
+                return Response({"error": "Invalid JSON"}, status=status.HTTP_400_BAD_REQUEST)
+        data['principal_place_of_business'] = json.dumps(address)
+        serializer = BusinessLocationProofsSerializer(record, data=data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    elif request.method == 'DELETE':
+        record.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['GET'])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
+def get_business_registration_documents(request):
+    """
+    Retrieve BusinessRegistrationDocuments based on either service_request_id or service_task_id.
+    """
+    service_request_id = request.query_params.get('service_request_id')
+    service_task_id = request.query_params.get('service_task_id')
+
+    if not service_request_id and not service_task_id:
+        return Response(
+            {"error": "Provide either 'service_request_id' or 'service_task_id' as a query parameter."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        if service_request_id:
+            instance = BusinessRegistrationDocuments.objects.get(service_request_id=service_request_id)
+        else:
+            instance = BusinessRegistrationDocuments.objects.get(service_task_id=service_task_id)
+    except BusinessRegistrationDocuments.DoesNotExist:
+        return Response({"error": "No matching BusinessRegistrationDocuments found."}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = BusinessRegistrationDocumentsSerializer(instance)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET', 'POST'])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
+def additional_space_business_list(request):
+    if request.method == 'GET':
+        records = AdditionalSpaceBusiness.objects.all()
+        serializer = AdditionalSpaceBusinessSerializer(records, many=True)
+        return Response(serializer.data)
+    elif request.method == 'POST':
+        data = request.data
+        if 'address' in data and isinstance(data['address'], str):
+            try:
+                address = json.loads(data['address'])  # convert string to dict
+            except json.JSONDecodeError:
+                return Response({"address": ["Value must be valid JSON."]}, status=status.HTTP_400_BAD_REQUEST)
+            data['address'] = json.dumps(address)  # convert dict back to string for storage
+
+        serializer = AdditionalSpaceBusinessSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
+def additional_space_business_detail(request, pk):
+    try:
+        record = AdditionalSpaceBusiness.objects.get(pk=pk)
+    except AdditionalSpaceBusiness.DoesNotExist:
+        return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        serializer = AdditionalSpaceBusinessSerializer(record)
+        return Response(serializer.data)
+    elif request.method == 'PUT':
+        data = request.data.copy()
+        if 'address' in data and isinstance(data['address'], str):
+            try:
+                address = json.loads(data['address'])
+            except json.JSONDecodeError:
+                return Response({"error": "Invalid JSON"}, status=status.HTTP_400_BAD_REQUEST)
+        data['address'] = json.dumps(address)
+        serializer = AdditionalSpaceBusinessSerializer(record, data=data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    elif request.method == 'DELETE':
+        record.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['GET'])
+def get_additional_space_business_details(request):
+    business_location_proofs_id = request.query_params.get('business_location_proofs')
+    if not business_location_proofs_id:
+        return Response({'error': "Provide either 'business_location_proofs_id' as a query parameter."})
+
+    try:
+        instance = AdditionalSpaceBusiness.objects.filter(business_location_proofs_id=business_location_proofs_id)
+    except AdditionalSpaceBusiness.DoesNotExist:
+        return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = AdditionalSpaceBusinessSerializer(instance, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['GET', 'POST'])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
+def business_registration_documents_list(request):
+    if request.method == 'GET':
+        records = BusinessRegistrationDocuments.objects.all()
+        serializer = BusinessRegistrationDocumentsSerializer(records, many=True)
+        return Response(serializer.data)
+    elif request.method == 'POST':
+        serializer = BusinessRegistrationDocumentsSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
+def business_registration_documents_detail(request, pk):
+    try:
+        record = BusinessRegistrationDocuments.objects.get(pk=pk)
+    except BusinessRegistrationDocuments.DoesNotExist:
+        return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        serializer = BusinessRegistrationDocumentsSerializer(record)
+        return Response(serializer.data)
+    elif request.method == 'PUT':
+        serializer = BusinessRegistrationDocumentsSerializer(record, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    elif request.method == 'DELETE':
+        record.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['GET', 'POST'])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
+def review_filing_certificate_list(request):
+    if request.method == 'GET':
+        records = ReviewFilingCertificate.objects.all()
+        serializer = ReviewFilingCertificateSerializer(records, many=True)
+        return Response(serializer.data)
+    elif request.method == 'POST':
+        serializer = ReviewFilingCertificateSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
+def review_filing_certificate_detail(request, pk):
+    try:
+        record = ReviewFilingCertificate.objects.get(pk=pk)
+    except ReviewFilingCertificate.DoesNotExist:
+        return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        serializer = ReviewFilingCertificateSerializer(record)
+        return Response(serializer.data)
+    elif request.method == 'PUT':
+        serializer = ReviewFilingCertificateSerializer(record, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    elif request.method == 'DELETE':
+        record.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['GET'])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
+def get_review_filing_certificate(request):
+    """
+    Retrieve ReviewFilingCertificate based on either service_request_id or service_task_id.
+    """
+    service_request_id = request.query_params.get('service_request_id')
+    service_task_id = request.query_params.get('service_task_id')
+
+    if not service_request_id and not service_task_id:
+        return Response(
+            {"error": "Provide either 'service_request_id' or 'service_task_id' as a query parameter."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        if service_request_id:
+            instance = ReviewFilingCertificate.objects.get(service_request_id=service_request_id)
+        else:
+            instance = ReviewFilingCertificate.objects.get(service_task_id=service_task_id)
+    except ReviewFilingCertificate.DoesNotExist:
+        return Response({"error": "No matching ReviewFilingCertificate found."}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = ReviewFilingCertificateSerializer(instance)
+    return Response(serializer.data, status=status.HTTP_200_OK)

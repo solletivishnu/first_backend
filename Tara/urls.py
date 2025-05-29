@@ -42,13 +42,19 @@ urlpatterns = [
 
     path('companyincorporation/',include('company_incorporation.urls')),
 
-    path('gst/',include('gst.urls')),
+    path('gst/', include('gst.urls')),
 
-    path('labourlicense/',include('labour_license.urls')),
+    path('labourlicense/', include('labour_license.urls')),
 
-    path('msme/',include('msme_registration.urls')),
+    path('servicetasks/', include('servicetasks.urls')),
 
-    path('tradelicense/',include('trade_license.urls')),
+    path('income_tax_returns/', include('income_tax_returns.urls')),
+
+    path('msme/', include('msme_registration.urls')),
+
+    path('docwallet/', include('docwallet.urls')),
+
+    path('tradelicense/', include('trade_license.urls')),
     # Token authentication URL
     path('token_auth/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

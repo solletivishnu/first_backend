@@ -1,11 +1,12 @@
 from rest_framework import serializers
 from .models import (
     Users, Context, Module, Role, UserContextRole,
-    UserFeaturePermission, SubscriptionPlan, ModuleSubscription,
+    UserFeaturePermission, SubscriptionPlan, ModuleSubscription,Branch, BusinessLogo
 )
 from .models import *
 from django.utils.timezone import now
 import re
+
 
 class UserSerializer(serializers.ModelSerializer):
     """Serializer for the Users model"""
@@ -15,7 +16,7 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'email', 'mobile_number', 'created_at', 'status', 'first_name', 'last_name',
                   'service_request', 'created_by', 'active_context',
                   'registration_flow', 'initial_selection', 'registration_completed']
-        read_only_fields = ['id', 'created_at']
+        read_only_fields = ['id', 'created_at','is_super_admin']
         extra_kwargs = {
             'password': {'write_only': True}
         }
@@ -35,7 +36,7 @@ class ContextSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Context
-        fields = ['id', 'name', 'context_type', 'status', 'profile_status']
+        fields = ['id', 'name', 'context_type', 'status', 'profile_status', 'is_platform_context']
 
 
 class ModuleSerializer(serializers.ModelSerializer):
@@ -303,12 +304,12 @@ class ContextDetailSerializer(ContextSerializer):
 
 
 class AddressSerializer(serializers.Serializer):
-    address_line1 = serializers.CharField(max_length=255, required=False)
-    address_line2 = serializers.CharField(max_length=255, required=False)
+    address_line1 = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    address_line2 = serializers.CharField(max_length=255, required=False, allow_blank=True)
     address_line3 = serializers.CharField(max_length=255, required=False, allow_blank=True)
     pincode = serializers.IntegerField(required=False, allow_null=True)
-    state = serializers.CharField(max_length=20, required=False)
-    city = serializers.CharField(max_length=20, required=False)
+    state = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    city = serializers.CharField(max_length=20, required=False, allow_blank=True)
     country = serializers.CharField(max_length=20, required=False)
 
 
@@ -441,6 +442,30 @@ class BusinessSerializer(serializers.ModelSerializer):
         return instance
 
 
+class LogoSerializer(serializers.ModelSerializer):
+    logo = serializers.FileField(allow_null=True, required=False)
+
+    class Meta:
+        model = BusinessLogo
+        fields = '__all__'
+
+    def create(self, validated_data):
+        """
+        Create and return a new `Business` instance, given the validated data.
+        """
+        instance = self.Meta.model(**validated_data)
+        instance.save()
+        return instance
+
+    def update(self, instance, validated_data):
+        """
+        Update and return an existing `Business` instance, given the validated data.
+        """
+        [setattr(instance, k, v) for k, v in validated_data.items()]
+        instance.save()
+        return instance
+
+
 class GSTDetailsSerializer(serializers.ModelSerializer):
     gst_document = serializers.FileField(allow_null=True, required=False)
 
@@ -463,6 +488,13 @@ class GSTDetailsSerializer(serializers.ModelSerializer):
         [setattr(instance, k, v) for k, v in validated_data.items()]
         instance.save()
         return instance
+
+
+class BranchSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Branch
+        fields = '__all__'
+
 
 class TDSDetailsSerializer(serializers.ModelSerializer):
     authorized_personal_Details = serializers.JSONField(required=False, allow_null=True)
@@ -685,6 +717,7 @@ class BusinessUserSerializer(serializers.ModelSerializer):
     pan = serializers.CharField(max_length=15, required=True)
     headOffice = serializers.JSONField(default=dict)
     gst_details = GSTDetailsSerializer(many=True, read_only=True)
+    branches = BranchSerializer(many=True, read_only=True)
 
     class Meta:
         model = Business

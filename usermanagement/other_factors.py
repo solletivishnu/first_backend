@@ -697,7 +697,7 @@ class UsersKYCDetailView(APIView):
         """
         try:
             user_details = UserKYC.objects.get(pk=pk, user=request.user)
-            serializer = UsersKYCSerializer(user_details, data=request.data)
+            serializer = UsersKYCSerializer(user_details, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
                 return Response({"detail": "User details updated successfully."}, status=status.HTTP_200_OK)
@@ -1373,6 +1373,43 @@ def kmp_detail(request, pk):
                             status=status.HTTP_204_NO_CONTENT)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET', 'POST'])
+def branch_list_create(request):
+    if request.method == 'GET':
+        branches = Branch.objects.all()
+        serializer = BranchSerializer(branches, many=True)
+        return Response(serializer.data)
+
+    elif request.method == 'POST':
+        serializer = BranchSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+def branch_detail(request, pk):
+
+    if request.method == 'GET':
+        branch = Branch.objects.filter(business_id=pk)
+        serializer = BranchSerializer(branch, many=True)
+        return Response(serializer.data)
+
+    elif request.method == 'PUT':
+        branch = Branch.objects.get(pk=pk)
+        serializer = BranchSerializer(branch, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        branch = Branch.objects.get(pk=pk)
+        branch.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 def documents_view(request):
@@ -2189,6 +2226,49 @@ def create_contact(request):
 
 
 @api_view(["GET"])
+@permission_classes([AllowAny])
+def list_contacts(request):
+    try:
+        contacts = Contact.objects.all().order_by('-created_date')
+        serializer = ContactSerializer(contacts, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response(
+            {"error": f"An error occurred while retrieving contacts: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(["PUT", "DELETE"])
+@permission_classes([AllowAny])
+def contact_detail(request, pk):
+    try:
+        contact = Contact.objects.get(pk=pk)
+    except Contact.DoesNotExist:
+        return Response({"error": "Contact not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'PUT':
+        try:
+            serializer = ContactSerializer(contact, data=request.data, partial=True)
+            if serializer.is_valid():
+                try:
+                    serializer.save()
+                    return Response(serializer.data)
+                except Exception as e:
+                    return Response({"error": f"Failed to update contact: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": f"Failed to update contact: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        try:
+            contact.delete()
+            return Response({"message": "Contact deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            return Response({"error": f"Failed to delete contact: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(["GET"])
 def list_contacts_by_date(request):
     """API to list contacts for a specific date"""
     date_str = request.GET.get("date")  # Get date from query parameters (YYYY-MM-DD)
@@ -2299,6 +2379,21 @@ def create_consultation(request):
 
 
 @api_view(["GET"])
+@permission_classes([AllowAny])
+def list_consultation(request):
+    try:
+        consultations = Consultation.objects.all().order_by('-created_date')
+        serializer = ConsultationSerializer(consultations, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response(
+            {"error": f"An error occurred while retrieving contacts: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(["GET"])
 def list_consultations(request):
     """ API to list all consultations or filter by date """
     date = request.GET.get("date")  # User passes date as a query param (YYYY-MM-DD)
@@ -2311,8 +2406,37 @@ def list_consultations(request):
     serializer = ConsultationSerializer(consultations, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
-# Add these functions at the end of the file
 
+@api_view(['PUT', 'DELETE'])
+@permission_classes([AllowAny])
+def consultation_detail(request, pk):
+    try:
+        consultation = Consultation.objects.get(pk=pk)
+    except Consultation.DoesNotExist:
+        return Response({"error": "Consultation not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'PUT':
+        try:
+            serializer = ConsultationSerializer(consultation, data=request.data, partial=True)
+            if serializer.is_valid():
+                try:
+                    serializer.save()
+                    return Response(serializer.data)
+                except Exception as e:
+                    return Response({"error": f"Failed to update consultation: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": f"Failed to update consultation: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        try:
+            consultation.delete()
+            return Response({"message": "Consultation deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            return Response({"error": f"Failed to delete consultation: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+# Add these functions at the end of the file
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def user_detail(request, pk):
@@ -2343,4 +2467,55 @@ def user_detail(request, pk):
         return Response({"message": "User deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
 
 
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def upload_business_logo(request):
+    """
+    Upload a logo for the user.
+    """
+    if request.method == 'POST':
+        serializer = LogoSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    elif request.method == 'GET':
+        logos = BusinessLogo.objects.all()
+        serializer = LogoSerializer(logos, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def business_logo_detail(request, pk):
+    """
+    Get, update or delete a logo by ID.
+    """
+    if request.method == 'GET':
+        try:
+            logo = BusinessLogo.objects.get(business_id=pk)
+        except BusinessLogo.DoesNotExist:
+            return Response({"error": "Logo not found"}, status=status.HTTP_404_NOT_FOUND)
+        serializer = LogoSerializer(logo)
+        return Response(serializer.data)
+
+    elif request.method == 'PUT':
+        try:
+            logo = BusinessLogo.objects.get(pk=pk)
+        except BusinessLogo.DoesNotExist:
+            return Response({"error": "Logo not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = LogoSerializer(logo, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        try:
+            logo = BusinessLogo.objects.get(pk=pk)
+        except BusinessLogo.DoesNotExist:
+            return Response({"error": "Logo not found"}, status=status.HTTP_404_NOT_FOUND)
+        logo.delete()
+        return Response({"message": "Logo deleted successfully"}, status=status.HTTP_204_NO_CONTENT)

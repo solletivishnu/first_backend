@@ -62,10 +62,11 @@ def initial_registration(request):
         # Create user
         user = User.objects.create(
             email=email,
-            status='pending',
+            status='invited',
             registration_flow='standard',
-            registration_completed=False,
-            is_active='no'
+            registration_completed='no',
+            is_active='no',
+            is_super_admin=False,
         )
         user.set_password(password)
         user.save()
@@ -184,9 +185,6 @@ def select_context(request):
             business_name = business_data.get('nameOfBusiness')
             if not business_name:
                 return Response({"error": "Missing nameOfBusiness in business_details."}, status=status.HTTP_400_BAD_REQUEST)
-
-            if Business.objects.filter(nameOfBusiness=business_name).exists():
-                return Response({"error": "Business with this name already exists."}, status=status.HTTP_400_BAD_REQUEST)
 
             # Validate Business Data
             business_data_with_client = {**business_data, 'client': user.id}

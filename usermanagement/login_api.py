@@ -80,6 +80,7 @@ def login_user(request):
                 "created_at": context.created_at,
                 "is_active": context.id == user.active_context.id if user.active_context else False,
                 "business_id": context.business_id,
+                "is_platform_context": context.is_platform_context,
                 "role": {
                     "id": ucr.role.id,
                     "name": ucr.role.name,
@@ -99,6 +100,7 @@ def login_user(request):
                 "profile_status": active_context.profile_status,
                 "created_at": active_context.created_at,
                 "business_id": active_context.business_id,
+                "is_platform_context": active_context.is_platform_context,
             }
 
             try:
@@ -170,7 +172,7 @@ def login_user(request):
             "created_at": user.created_at,
             "last_login": user.last_login,
             "user_context_role": user_context_role_id,
-            "is_super_user": user.is_super_user
+            "is_super_admin": user.is_super_admin,
         }
 
         if active_user_context_role:

@@ -77,7 +77,8 @@ def register_user_with_service(request):
                 is_active='no',
                 registration_flow='service',
                 registration_completed=False,
-                status='active'
+                status='active',
+                is_super_admin=False,
             )
 
             # Create context based on account_type

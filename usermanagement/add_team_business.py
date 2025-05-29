@@ -104,11 +104,10 @@ def add_team_member_to_business(request):
     authenticated_user = request.user
 
     # Validate required fields
-    if not all([context_id, email, first_name, last_name, mobile_number]):
+    if not all([context_id, email,role_id]):
         return Response(
             {
-                "error": "Missing required fields. Please provide context_id, email, "
-                         "first_name, last_name, and mobile_number."},
+                "error": "Missing required fields. Please provide context_id, email, role_id."},
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -129,11 +128,11 @@ def add_team_member_to_business(request):
             status__in=['active', 'trial']
         ).values_list('module_id', flat=True)
 
-        if not active_subscriptions:
-            return Response(
-                {"error": "This context has no active module subscriptions."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # if not active_subscriptions:
+        #     return Response(
+        #         {"error": "This context has no active module subscriptions."},
+        #         status=status.HTTP_400_BAD_REQUEST
+        #     )
 
         # Get the role
         if role_id:
@@ -236,16 +235,23 @@ def add_team_member_to_business(request):
                 is_new_user = False
             except Users.DoesNotExist:
                 # Create new user if they don't exist
+                if not all([first_name, last_name, mobile_number]):
+                    return Response(
+                        {"error": "New user must provide first_name, last_name, and mobile_number."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
                 user = Users.objects.create(
                     email=email,
                     first_name=first_name,
                     last_name=last_name,
                     mobile_number=mobile_number,
-                    status='pending',
-                    registration_flow='invited',
-                    registration_completed=False,
+                    status='invited',
+                    registration_flow='standard',
+                    registration_completed='no',
                     is_active='no',
                     created_by=authenticated_user,
+                    is_super_admin=False,
+                    active_context=context
                 )
                 is_new_user = True
 
@@ -506,10 +512,11 @@ def accept_team_invitation(request):
         logger.info("User context role activated successfully")
 
         # For new users, update their status
-        if user.status == 'pending' and user.registration_flow == 'invited':
+        if user.status in ['pending', 'invited'] and user.registration_flow in ['invited', 'standard']:
             user.status = 'active'
             user.registration_completed = True
             user.is_active = 'yes'
+            user.active_context = user_context_role.context.id
             user.save()
             logger.info("New user status updated successfully")
 

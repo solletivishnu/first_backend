@@ -1,50 +1,72 @@
 from rest_framework import serializers
 from .models import *
 
-class BasicDetailsSerializer(serializers.ModelSerializer):
-    trade_license_file = serializers.FileField(required=False)
-    upload_photo = serializers.FileField(required=False)
+
+class BusinessIdentitySerializer(serializers.ModelSerializer):
+
     class Meta:
-        model = BasicDetail
+        model = BusinessIdentity
         fields = '__all__'
 
-class BasicDetailsSerializerRetrieval(serializers.ModelSerializer):
+
+    def create(self, validated_data):
+        print("VALIDATED DATA:", validated_data)  # Debugging
+        return super().create(validated_data)
+
+
+class ApplicantDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ApplicantDetails
+        fields = '__all__'
+
+
+class SignatoryDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SignatoryDetails
+        fields = '__all__'
+
+
+class BusinessLocationSerializer(serializers.ModelSerializer):
     address = serializers.JSONField()
     class Meta:
-        model = BasicDetail
+        model = BusinessLocation
         fields = '__all__'
 
-class TradeLicenseExistOrNotSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = TradeLicenseExistOrNot
-        fields = '__all__'
 
-class TradeEntitySerializer(serializers.ModelSerializer):
-    # address = serializers.JSONField()
-    class Meta:
-        model = TradeEntity
-        fields = '__all__'
-
-class TradeEntitySerializerRetrieval(serializers.ModelSerializer):
+class AdditionalSpaceBusinessSerializer(serializers.ModelSerializer):
     address = serializers.JSONField()
     class Meta:
-        model = TradeEntity
+        model = AdditionalSpaceBusiness
         fields = '__all__'
 
-class PartnerDetailsSerializer(serializers.ModelSerializer):
+
+class TradeLicenseDetailsSerializer(serializers.ModelSerializer):
     class Meta:
-        model = PartnerDetails
+        model = TradeLicenseDetails
         fields = '__all__'
 
-class TradeLicenseServiceRequestSerializer(serializers.ModelSerializer):
-    """
-    Comprehensive serializer that combines all Trade License related data for a service request
-    """
-    trade_license = TradeLicenseExistOrNotSerializer(many=True, read_only=True)
-    trade_license_entity = TradeEntitySerializerRetrieval(many=True, read_only=True)
-    trade_license_partner = PartnerDetailsSerializer(many=True, read_only=True)
-    address = serializers.JSONField()
-    
+    def validate(self, data):
+        apply_new_license = data.get('apply_new_license', getattr(self.instance, 'apply_new_license', 'yes'))
+
+        if apply_new_license == 'no':
+            trade_license_number = data.get('trade_license_number') or getattr(self.instance, 'trade_license_number', None)
+            trade_license_file = data.get('trade_license_file') or getattr(self.instance, 'trade_license_file', None)
+
+            if not trade_license_number:
+                raise serializers.ValidationError({"trade_license_number": "This field is required when applying for a new license."})
+            if not trade_license_file:
+                raise serializers.ValidationError({"trade_license_file": "This file is required when applying for a new license."})
+
+        return data
+
+
+class BusinessDocumentDetailsSerializer(serializers.ModelSerializer):
     class Meta:
-        model = BasicDetail
+        model = BusinessDocumentDetails
+        fields = '__all__'
+
+
+class ReviewFilingCertificateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReviewFilingCertificate
         fields = '__all__'

@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import *
 from django.core.files.storage import FileSystemStorage
 from usermanagement.serializers import *
-
+import json
 
 class CustomerProfileSerializers(serializers.Serializer):
     invoicing_profile = serializers.PrimaryKeyRelatedField(
@@ -21,6 +21,7 @@ class CustomerProfileSerializers(serializers.Serializer):
     email = serializers.CharField(max_length=100, allow_null=True, allow_blank=True)
     mobile_number = serializers.CharField(max_length=15, allow_null=True, allow_blank=True)
     opening_balance = serializers.IntegerField(allow_null=True)
+    entity_type = serializers.CharField(max_length=100, allow_null=True, allow_blank=True)
 
     def create(self, validated_data):
         """
@@ -167,6 +168,7 @@ class InvoiceSerializer(serializers.Serializer):
         default=[],
     )
     gstin = serializers.CharField(max_length=60, allow_null=True)
+    branch_code = serializers.CharField(max_length=60, allow_null=True, allow_blank=True)
     total_amount = serializers.FloatField(allow_null=True)
     subtotal_amount = serializers.FloatField(allow_null=True)
     shipping_amount = serializers.FloatField(allow_null=True)
@@ -282,9 +284,28 @@ class CustomerProfileGetSerializers(serializers.ModelSerializer):
         exclude = ['invoicing_profile']
 
 
+class InvoiceFormatSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InvoiceFormat
+        fields = '__all__'
+
+    def validate(self, data):
+        invoicing_profile = data.get('invoicing_profile')
+        gstin = data.get('gstin')
+
+        # Check if the combination of invoicing_profile and gstin already exists
+        if gstin and InvoiceFormat.objects.filter(
+                invoicing_profile=invoicing_profile,
+                gstin=gstin
+        ).exclude(id=self.instance.id if self.instance else None).exists():
+            raise serializers.ValidationError("GSTIN already exists for this Invoicing Profile.")
+
+        return data
+
+
 class InvoicingProfileSerializers(serializers.ModelSerializer):
     customer_profiles = CustomerProfileGetSerializers(many=True, source='customerprofile_set')
-    invoice_format = serializers.JSONField()
+    invoice_formats = InvoiceFormatSerializer(many=True, source='invoice_formats')
 
     class Meta:
         model = InvoicingProfile
@@ -328,25 +349,6 @@ class InvoicingProfileGoodsAndServicesSerializer(serializers.ModelSerializer):
             'business',
             'goods_and_services',  # Nested goods and services
         ]
-
-
-class InvoiceFormatSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = InvoiceFormat
-        fields = ['id', 'invoicing_profile', 'gstin', 'invoice_format']
-
-    def validate(self, data):
-        invoicing_profile = data.get('invoicing_profile')
-        gstin = data.get('gstin')
-
-        # Check if the combination of invoicing_profile and gstin already exists
-        if gstin and InvoiceFormat.objects.filter(
-                invoicing_profile=invoicing_profile,
-                gstin=gstin
-        ).exclude(id=self.instance.id if self.instance else None).exists():
-            raise serializers.ValidationError("GSTIN already exists for this Invoicing Profile.")
-
-        return data
 
 
 class InvoicingExistsBusinessSerializers(serializers.ModelSerializer):
