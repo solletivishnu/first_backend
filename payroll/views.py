@@ -1,10 +1,12 @@
+from typing import Union
+import logging
 from rest_framework import status
 from rest_framework.response import Response
 from django.db.models import Count
 from rest_framework.views import APIView
 from .models import *
 from .serializers import *
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 import boto3
 from Tara.settings.default import *
 from botocore.exceptions import ClientError
@@ -26,6 +28,9 @@ from django.http import HttpResponse
 import pdfkit
 from django.http import JsonResponse
 from django.db.models import OuterRef, Subquery, Q
+from datetime import datetime
+import io
+from rest_framework.permissions import AllowAny
 
 
 def upload_to_s3(pdf_data, bucket_name, object_key):
@@ -72,9 +77,7 @@ class PayrollOrgList(APIView):
 
     def post(self, request):
         try:
-            # Create a mutable copy of the data
-            data = request.data.copy()  # Use .copy() to create a mutable copy
-            file = request.FILES.get('logo') if 'logo' in request.FILES else None
+            data = request.data.copy()  # Use copy if no logo
             business_id = data.get('business')
             business_data = data.pop('business_details', None)
 
@@ -99,11 +102,6 @@ class PayrollOrgList(APIView):
                 else:
                     return Response(business_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-            # Remove logo from data to avoid validation errors
-            if file:
-                if 'logo' in data:
-                    data.pop('logo')
-
             try:
                 payroll_org = PayrollOrg.objects.get(business_id=business_id)
                 serializer = PayrollOrgSerializer(payroll_org, data=data, partial=True)
@@ -111,18 +109,12 @@ class PayrollOrgList(APIView):
                 serializer = PayrollOrgSerializer(data=data)
 
             # Validate and save PayrollOrg
-            if serializer.is_valid():
-                payroll_org = serializer.save()
-
-                # Handle the file upload separately after the model is saved
-                try:
-                    if file:
-                        payroll_org.logo = file
-                        payroll_org.save(update_fields=['logo'])
-                except Exception as e:
-                    return Response({"error": f"Error uploading file: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
-
-                return Response(PayrollOrgSerializer(payroll_org).data, status=status.HTTP_201_CREATED)
+            try:
+                if serializer.is_valid():
+                    serializer.save()
+                    return Response(serializer.data, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
@@ -466,7 +458,8 @@ def work_location_create(request):
                     serializer.save()
                     return Response(serializer.data, status=status.HTTP_201_CREATED)
                 except Exception as e:
-                    return Response({"error": "A work location with this name already exists. Please enter a unique location name."},
+                    return Response({"error": "A work location with this name already exists."
+                                              " Please enter a unique location name."},
                                     status=status.HTTP_400_BAD_REQUEST)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
@@ -475,53 +468,71 @@ def work_location_create(request):
 
 @api_view(['POST'])
 def bulk_work_location_upload(request):
-    # Get payroll_id from form data
     payroll_id = request.data.get('payroll_id')
     if not payroll_id:
         return Response({"error": "Payroll ID is required in the form data."}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        # Fetch PayrollOrg based on payroll_id
         payroll_org = PayrollOrg.objects.get(id=payroll_id)
     except PayrollOrg.DoesNotExist:
         return Response({"error": "PayrollOrg not found."}, status=status.HTTP_404_NOT_FOUND)
 
-    # Check if file is provided
     file = request.FILES.get('file')
     if not file:
         return Response({"error": "No file provided."}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Check file format (CSV or Excel)
-    if file.name.endswith('.csv'):
-        try:
+    # Read and parse file
+    try:
+        if file.name.endswith('.csv'):
             data = csv.DictReader(TextIOWrapper(file, encoding='utf-8'))
             records = list(data)
-        except Exception as e:
-            return Response({"error": f"CSV file reading failed: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
-    elif file.name.endswith('.xlsx'):
-        try:
+        elif file.name.endswith('.xlsx'):
             df = pd.read_excel(file)
             records = df.to_dict(orient='records')
-        except Exception as e:
-            return Response({"error": f"Excel file reading failed: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
-    else:
-        return Response({"error": "Unsupported file format. Please upload CSV or Excel."},
-                        status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({"error": "Unsupported file format. Use CSV or XLSX."}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({"error": f"Failed to read file: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Validate and Save Records
     errors = []
-    for record in records:
-        record['payroll'] = payroll_org  # Add payroll to each record manually
+    seen_in_file = set()
+    valid_data = []
+
+    for idx, record in enumerate(records):
+        location_name = record.get('location_name')
+
+        if not location_name:
+            errors.append({"row": idx + 2, "error": "Missing location_name"})
+            continue
+
+        # Check for duplicate in uploaded file
+        key_in_file = (location_name.lower().strip())
+        if key_in_file in seen_in_file:
+            errors.append({"row": idx + 2, "error": f"Duplicate location_name '{location_name}' in file"})
+            continue
+        seen_in_file.add(key_in_file)
+
+        # Check for duplicates in DB
+        if WorkLocations.objects.filter(payroll_id=payroll_id, location_name__iexact=location_name).exists():
+            errors.append({"row": idx + 2, "error": f"location_name '{location_name}' already exists in database"})
+            continue
+
+        # Inject payroll ID
+        record['payroll'] = payroll_id
         serializer = WorkLocationSerializer(data=record)
         if serializer.is_valid():
-            serializer.save()
+            valid_data.append(serializer)
         else:
-            errors.append({"record": record, "errors": serializer.errors})
+            errors.append({"row": idx + 2, "error": serializer.errors})
 
     if errors:
-        return Response({"message": "Partial success", "errors": errors}, status=status.HTTP_207_MULTI_STATUS)
+        return Response({"status": "failed", "errors": errors}, status=status.HTTP_400_BAD_REQUEST)
 
-    return Response({"message": "All locations uploaded successfully."}, status=status.HTTP_201_CREATED)
+    # Save all records in bulk
+    for serializer in valid_data:
+        serializer.save()
+
+    return Response({"status": "success", "message": f"{len(valid_data)} locations uploaded successfully."}, status=status.HTTP_201_CREATED)
 
 
 # Retrieve a specific WorkLocation by ID
@@ -630,41 +641,92 @@ def parse_file(file):
 
 @api_view(['POST'])
 def bulk_department_upload(request):
-    # Validate payroll_id
+    # Validate required fields
     payroll_id = request.data.get('payroll_id')
-    if not payroll_id:
-        return Response({"error": "Payroll ID is required in the form data."}, status=status.HTTP_400_BAD_REQUEST)
-
-    # Fetch PayrollOrg
-    try:
-        payroll_org = PayrollOrg.objects.get(id=payroll_id)
-    except PayrollOrg.DoesNotExist:
-        return Response({"error": "PayrollOrg not found."}, status=status.HTTP_404_NOT_FOUND)
-
-    # Check for file in request
     file = request.FILES.get('file')
+
+    if not payroll_id:
+        return Response({"error": "Payroll ID is required"}, status=status.HTTP_400_BAD_REQUEST)
     if not file:
-        return Response({"error": "No file provided."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "No file provided"}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Parse file based on format (CSV or Excel)
-    records, parse_error = parse_file(file)
-    if parse_error:
-        return Response({"error": parse_error}, status=status.HTTP_400_BAD_REQUEST)
+    # Validate file format
+    if not file.name.endswith(('.csv', '.xlsx')):
+        return Response({"error": "Unsupported file format. Use CSV or XLSX"}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Validate and save each record
-    errors = []
-    for record in records:
-        record['payroll'] = payroll_org  # Assign payroll org to each record
-        serializer = DepartmentsSerializer(data=record)
-        if serializer.is_valid():
-            serializer.save()
-        else:
-            errors.append({"record": record, "errors": serializer.errors})
+    try:
+        # Get payroll org and validate it exists
+        payroll_org = PayrollOrg.objects.get(id=payroll_id)
 
-    if errors:
-        return Response({"message": "Partial success", "errors": errors}, status=status.HTTP_207_MULTI_STATUS)
+        # Read file based on format
+        if file.name.endswith('.csv'):
+            records = list(csv.DictReader(TextIOWrapper(file, encoding='utf-8')))
+        else:  # xlsx
+            records = pd.read_excel(file).to_dict(orient='records')
 
-    return Response({"message": "All departments uploaded successfully."}, status=status.HTTP_201_CREATED)
+        errors = []
+        valid_departments = []
+        seen_in_file = set()
+
+        # Get existing departments for duplicate checking
+        existing_departments = Departments.objects.filter(payroll_id=payroll_id)
+        existing_dept_names = {dept.dept_name.lower() for dept in existing_departments}
+        existing_dept_codes = {dept.dept_code.lower() for dept in existing_departments}
+
+        # Process records
+        for idx, record in enumerate(records):
+            dept_name = record.get('dept_name', '').strip()
+            dept_code = record.get('dept_code', '').strip()
+
+            if not dept_name:
+                errors.append({"row": idx + 2, "error": "Missing department name"})
+                continue
+            if not dept_code:
+                errors.append({"row": idx + 2, "error": "Missing department code"})
+                continue
+
+            # Check for duplicate in uploaded file
+            key_in_file = (dept_name.lower(), dept_code.lower())
+            if key_in_file in seen_in_file:
+                errors.append({"row": idx + 2,
+                               "error": f"Duplicate department (name: '{dept_name}', code: '{dept_code}') in file"})
+                continue
+            seen_in_file.add(key_in_file)
+
+            # Check for duplicates in DB
+            if dept_name.lower() in existing_dept_names:
+                errors.append({"row": idx + 2, "error": f"Department name '{dept_name}' already exists in database"})
+                continue
+            if dept_code.lower() in existing_dept_codes:
+                errors.append({"row": idx + 2, "error": f"Department code '{dept_code}' already exists in database"})
+                continue
+
+            # Create model instance
+            valid_departments.append(Departments(
+                payroll=payroll_org,
+                dept_name=dept_name,
+                dept_code=dept_code
+            ))
+
+        if errors:
+            return Response({"status": "failed", "errors": errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Bulk create valid departments
+        if valid_departments:
+            Departments.objects.bulk_create(valid_departments)
+
+        return Response({
+            "status": "success",
+            "message": f"{len(valid_departments)} departments uploaded successfully"
+        }, status=status.HTTP_201_CREATED)
+
+    except PayrollOrg.DoesNotExist:
+        return Response({"error": "PayrollOrg not found"}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({
+            "error": "Failed to process file",
+            "details": str(e)
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Retrieve, update or delete a specific department
@@ -758,41 +820,85 @@ def designation_detail(request, pk):
 
 @api_view(['POST'])
 def bulk_designation_upload(request):
-    # Validate payroll_id
+    # Validate required fields
     payroll_id = request.data.get('payroll_id')
-    if not payroll_id:
-        return Response({"error": "Payroll ID is required in the form data."}, status=status.HTTP_400_BAD_REQUEST)
-
-    # Fetch PayrollOrg
-    try:
-        payroll_org = PayrollOrg.objects.get(id=payroll_id)
-    except PayrollOrg.DoesNotExist:
-        return Response({"error": "PayrollOrg not found."}, status=status.HTTP_404_NOT_FOUND)
-
-    # Check for file in request
     file = request.FILES.get('file')
+
+    if not payroll_id:
+        return Response({"error": "Payroll ID is required"}, status=status.HTTP_400_BAD_REQUEST)
     if not file:
-        return Response({"error": "No file provided."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "No file provided"}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Parse file based on format (CSV or Excel)
-    records, parse_error = parse_file(file)
-    if parse_error:
-        return Response({"error": parse_error}, status=status.HTTP_400_BAD_REQUEST)
+    # Validate file format
+    if not file.name.endswith(('.csv', '.xlsx')):
+        return Response({"error": "Unsupported file format. Use CSV or XLSX"}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Validate and save each record
-    errors = []
-    for record in records:
-        record['payroll'] = payroll_org  # Assign payroll org to each record
-        serializer = DesignationSerializer(data=record)
-        if serializer.is_valid():
-            serializer.save()
-        else:
-            errors.append({"record": record, "errors": serializer.errors})
+    try:
+        # Get payroll org and validate it exists
+        payroll_org = PayrollOrg.objects.get(id=payroll_id)
 
-    if errors:
-        return Response({"message": "Partial success", "errors": errors}, status=status.HTTP_207_MULTI_STATUS)
+        # Read file based on format
+        if file.name.endswith('.csv'):
+            records = list(csv.DictReader(TextIOWrapper(file, encoding='utf-8')))
+        else:  # xlsx
+            records = pd.read_excel(file).to_dict(orient='records')
 
-    return Response({"message": "All departments uploaded successfully."}, status=status.HTTP_201_CREATED)
+        errors = []
+        valid_designations = []
+        seen_in_file = set()
+
+        # Get existing designations for duplicate checking
+        existing_designations = set(
+            Designation.objects.filter(payroll_id=payroll_id)
+            .values_list('designation_name', flat=True)
+        )
+
+        # Process records
+        for idx, record in enumerate(records):
+            designation_name = record.get('designation_name', '').strip()
+
+            if not designation_name:
+                errors.append({"row": idx + 2, "error": "Missing designation name"})
+                continue
+
+            # Check for duplicate in uploaded file
+            key_in_file = designation_name.lower()
+            if key_in_file in seen_in_file:
+                errors.append({"row": idx + 2, "error": f"Duplicate designation name '{designation_name}' in file"})
+                continue
+            seen_in_file.add(key_in_file)
+
+            # Check for duplicates in DB
+            if designation_name.lower() in {name.lower() for name in existing_designations}:
+                errors.append(
+                    {"row": idx + 2, "error": f"Designation name '{designation_name}' already exists in database"})
+                continue
+
+            # Create model instance
+            valid_designations.append(Designation(
+                payroll=payroll_org,
+                designation_name=designation_name
+            ))
+
+        if errors:
+            return Response({"status": "failed", "errors": errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Bulk create valid designations
+        if valid_designations:
+            Designation.objects.bulk_create(valid_designations)
+
+        return Response({
+            "status": "success",
+            "message": f"{len(valid_designations)} designations uploaded successfully"
+        }, status=status.HTTP_201_CREATED)
+
+    except PayrollOrg.DoesNotExist:
+        return Response({"error": "PayrollOrg not found"}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({
+            "error": "Failed to process file",
+            "details": str(e)
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 
 # List and create EPF details
@@ -1385,7 +1491,10 @@ def calculate_payroll(request):
 
         # Adjust Fixed Allowance so that Gross Salary = Annual CTC - Benefits
         total_earnings = safe_sum(item["annually"] for item in earnings if item["component_name"] != "Fixed Allowance")
-        fixed_allowance = annual_ctc - total_benefits - total_earnings
+        print(total_earnings)
+        print(total_benefits)
+        print(annual_ctc)
+        fixed_allowance = (annual_ctc - total_benefits - total_earnings)
 
         for earning in earnings:
             if earning["component_name"] == "Fixed Allowance":
@@ -1577,8 +1686,6 @@ def pay_schedule_detail_update_delete(request, schedule_id):
                     'fourth_saturday'
                 ]
             ])
-            if days_selected < 2:
-                return Response({"error": "At least two days must be selected."}, status=status.HTTP_400_BAD_REQUEST)
             serializer.save()
             return Response({"data": serializer.data, "message": "Pay Schedule updated successfully."},
                             status=status.HTTP_200_OK)
@@ -1772,8 +1879,11 @@ def employee_list(request):
     elif request.method == 'POST':
         serializer = EmployeeManagementSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            try:
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                return Response({"error":str(e)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -1797,6 +1907,59 @@ def employee_detail(request, pk):
         return Response({"message": "Employee data Removed Successfully.",
                          "status":"Success"},
                         status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['GET'])
+def employee_tds_list(request):
+    
+    def get_required_params():
+        data = request.query_params
+        try:
+            payroll_id = int(data.get('payroll_id'))
+            month = int(data.get('month'))
+            financial_year = data.get('financial_year')
+
+            if not all([payroll_id, month, financial_year]):
+                raise ValueError("Missing required parameters.")
+            return payroll_id, month, financial_year
+        except (TypeError, ValueError) as e:
+            raise ValueError(f"Invalid parameter: {str(e)}")
+
+    try:
+        payroll_id, month, financial_year = get_required_params()
+
+        tds_records = EmployeeSalaryHistory.objects.filter(payroll_id=payroll_id,month=month,financial_year=financial_year)
+
+        serializer = EmployeeSalaryHistorySerializer(tds_records, many=True)
+        return Response(serializer.data, status=200)
+
+    except ValueError as e:
+        return Response({"error": str(e)}, status=400)
+    except Exception as e:
+        return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=500)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+def employee_tds_detail(request, pk):
+    try:
+        tds_entry = EmployeeSalaryHistory.objects.get(pk=pk)
+    except EmployeeSalaryHistory.DoesNotExist:
+        return Response({"error": "TDS record not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        serializer = EmployeeSalaryHistorySerializer(tds_entry)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    elif request.method == 'PUT':
+        serializer = EmployeeSalaryHistorySerializer(tds_entry, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        tds_entry.delete()
+        return Response({"message": "TDS record deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
 
 
 @api_view(['GET'])
@@ -1925,11 +2088,17 @@ def employee_personal_list(request):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     elif request.method == 'POST':
-        serializer = EmployeePersonalDetailsSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            serializer = EmployeePersonalDetailsSerializer(data=request.data)
+            if serializer.is_valid():
+                try:
+                    serializer.save()
+                    return Response(serializer.data, status=status.HTTP_201_CREATED)
+                except ValidationError as e:
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET', 'PUT', 'DELETE'])
@@ -2420,157 +2589,313 @@ def calculate_holidays_and_week_offs(payroll_id, year, month):
     }
 
 
+logger = logging.getLogger(__name__)
+
+
 @api_view(['POST'])
+@permission_classes([AllowAny])
 def generate_next_month_attendance(request):
     """
-    Automatically creates attendance records for all employees under a given payroll_id for the next month,
-    excluding employees who have left the organization.
+    Auto-generates attendance for all active employees in all PayrollOrgs for the next month.
+    Skips exited employees and already existing attendance records.
+    Collects and returns all errors without failing the whole run.
     """
-    payroll_id = request.query_params.get("payroll_id")
-
-    if not payroll_id:
-        return Response({"error": "Payroll ID is required."}, status=status.HTTP_400_BAD_REQUEST)
 
     today = date.today()
     next_month = today.month + 1 if today.month < 12 else 1
     next_year = today.year if today.month < 12 else today.year + 1
     first_day_next_month = date(next_year, next_month, 1)
 
-    # Exclude employees who have exited before the next month's start date
-    active_employees = EmployeeManagement.objects.filter(
-        payroll=payroll_id
-    ).exclude(
-        Q(employee_exit_details__doe__lt=first_day_next_month)  # Employees who exited before next month
-    )
-
-    if not active_employees.exists():
-        return Response({"error": "No active employees found for the given payroll ID."},
-                        status=status.HTTP_404_NOT_FOUND)
-
-    # Fetch holiday and week-off details
-    holiday_data = calculate_holidays_and_week_offs(payroll_id, next_year, next_month)
-
-    if "error" in holiday_data:
-        return Response({"error": holiday_data["error"]}, status=status.HTTP_400_BAD_REQUEST)
-
-    total_days = holiday_data["total_days"]
-    holidays = holiday_data["holiday_count"]
-    week_offs = holiday_data["week_off_count"]
-
     created_records = 0
-    for employee in active_employees:
-        # Determine financial year
-        financial_year = f"{next_year}-{next_year + 1}" if next_month >= 4 else f"{next_year - 1}-{next_year}"
+    created_employee_ids = []
+    error_cases = []
 
-        # Calculate present and balance days
-        present_days = 0
-        balance_days = 0
+    payroll_orgs = PayrollOrg.objects.all()
 
-        EmployeeAttendance.objects.create(
-            employee=employee,
-            financial_year=financial_year,
-            month=next_month,
-            total_days_of_month=total_days,
-            holidays=holidays,
-            week_offs=week_offs,
-            present_days=present_days,
-            balance_days=balance_days,
-            casual_leaves=0,
-            sick_leaves=0,
-            earned_leaves=0,
-            loss_of_pay =0
-        )
+    for payroll_org in payroll_orgs:
+        try:
+            employees = EmployeeManagement.objects.filter(payroll=payroll_org)
 
-        created_records += 1
+            # Calculate holidays and week-offs
+            holiday_data = calculate_holidays_and_week_offs(payroll_org.id, next_year, next_month)
+            if "error" in holiday_data:
+                error_cases.append({
+                    "org_id": payroll_org.id,
+                    "error": holiday_data["error"]
+                })
+                continue
+
+            total_days = holiday_data["total_days"]
+            holidays = holiday_data["holiday_count"]
+            week_offs = holiday_data["week_off_count"]
+
+            financial_year = (
+                f"{next_year}-{next_year + 1}" if next_month >= 4 else f"{next_year - 1}-{next_year}"
+            )
+
+            for employee in employees:
+                try:
+                    if hasattr(employee, 'employee_exit_details'):
+                        doe = getattr(employee.employee_exit_details, 'doe', None)
+                        if doe and doe < first_day_next_month:
+                            logger.info(f"[SKIP] Employee {employee.id} exited on {doe}")
+                            continue
+
+                    # Check individually if attendance already exists
+                    if EmployeeAttendance.objects.filter(
+                        employee=employee,
+                        financial_year=financial_year,
+                        month=next_month
+                    ).exists():
+                        logger.info(f"[SKIP] Attendance already exists for Employee {employee.id}")
+                        continue
+
+                    EmployeeAttendance.objects.create(
+                        employee=employee,
+                        financial_year=financial_year,
+                        month=next_month,
+                        total_days_of_month=total_days,
+                        holidays=holidays,
+                        week_offs=week_offs,
+                        present_days=0,
+                        balance_days=0,
+                        casual_leaves=0,
+                        sick_leaves=0,
+                        earned_leaves=0,
+                        loss_of_pay=0
+                    )
+
+                    created_records += 1
+                    created_employee_ids.append(employee.id)
+
+                except Exception as e:
+                    error_cases.append({
+                        "employee_id": employee.id,
+                        "employee_name": getattr(employee, "full_name", "Unknown"),
+                        "org_id": payroll_org.id,
+                        "error": str(e)
+                    })
+                    logger.exception(f"[ERROR] Attendance failed for Employee ID {employee.id}")
+
+        except Exception as e:
+            error_cases.append({
+                "org_id": payroll_org.id,
+                "error": str(e)
+            })
+            logger.exception(f"[ERROR] PayrollOrg ID {payroll_org.id} failed")
 
     return Response({
-        "message": f"Attendance records for {date(next_year, next_month, 1).strftime('%B %Y')} created successfully.",
-        "created_records": created_records
+        "message": f"Attendance generation completed for {date(next_year, next_month, 1).strftime('%B %Y')}.",
+        "created_records": created_records,
+        "created_employee_ids": created_employee_ids,
+        "errors": error_cases
     }, status=status.HTTP_201_CREATED)
 
+
+# @api_view(['POST'])
+# def generate_current_month_attendance(request):
+#     """
+#     Automatically creates attendance records for all employees under a given payroll_id for the current month,
+#     excluding employees who have left the organization. If records already exist, it skips them.
+#     """
+#     payroll_id = request.query_params.get("payroll_id")
+#     current_month = int(request.query_params.get("month"))
+#     financial_year = request.query_params.get("financial_year")
+#     if not payroll_id:
+#         return Response({"error": "Payroll ID is required."}, status=status.HTTP_400_BAD_REQUEST)
+#     today = date.today()
+#     if not current_month:
+#         current_month = today.month
+#     if not financial_year:
+#         current_year = today.year
+#         financial_year = f"{current_year}-{current_year + 1}" if current_month >= 4 else f"{current_year - 1}-{current_year}"
+#     else:
+#         current_year = int(financial_year.split('-')[1]) if 1 <= current_month <= 3 else int(financial_year.split('-')[0])
+#
+#     first_day_current_month = date(current_year, current_month, 1)
+#     last_day_current_month = date(current_year, current_month, calendar.monthrange(current_year, current_month)[1])
+#
+#
+#     # Fetch all employees under the given payroll_id
+#     all_employees = EmployeeManagement.objects.filter(payroll=payroll_id)
+#
+#     if not all_employees.exists():
+#         return Response({"error": "No employees found for the given payroll ID."}, status=status.HTTP_404_NOT_FOUND)
+#
+#     # Fetch exited employees
+#     exited_employees = set(
+#         EmployeeExit.objects.filter(doe__lt=first_day_current_month)
+#         .values_list("employee_id", flat=True)
+#     )
+#
+#     # Exclude exited employees manually
+#     active_employees = [
+#         emp for emp in all_employees
+#         if emp.id not in exited_employees and
+#            emp.doj <= last_day_current_month
+#     ]
+#     if not active_employees:
+#         return Response({"error": "No active employees found for the given payroll ID."}, status=status.HTTP_404_NOT_FOUND)
+#
+#     # Fetch holiday and week-off details
+#     holiday_data = calculate_holidays_and_week_offs(payroll_id, current_year, current_month)
+#
+#     if "error" in holiday_data:
+#         return Response({"error": holiday_data["error"]}, status=status.HTTP_400_BAD_REQUEST)
+#
+#     total_days = holiday_data["total_days"]
+#     holidays = holiday_data["holiday_count"]
+#     week_offs = holiday_data["week_off_count"]
+#
+#     created_records = 0
+#     skipped_records = 0
+#
+#     for employee in active_employees:
+#
+#         # Check if an attendance record already exists
+#         if EmployeeAttendance.objects.filter(
+#             employee=employee, financial_year=financial_year, month=current_month
+#         ).exists():
+#             skipped_records += 1
+#             continue  # Skip this employee
+#
+#         EmployeeAttendance.objects.create(
+#             employee=employee,
+#             financial_year=financial_year,
+#             month=current_month,
+#             total_days_of_month=total_days,
+#             holidays=holidays,
+#             week_offs=week_offs,
+#             present_days=0,
+#             balance_days=0,
+#             casual_leaves=0,
+#             sick_leaves=0,
+#             earned_leaves=0,
+#             loss_of_pay=0
+#         )
+#         created_records += 1
+#
+#     return Response({
+#         "message": f"Attendance records for {date(current_year, current_month, 1).strftime('%B %Y')} processed successfully.",
+#         "created_records": created_records,
+#         "skipped_records": skipped_records
+#     }, status=status.HTTP_201_CREATED)
 
 @api_view(['POST'])
 def generate_current_month_attendance(request):
     """
     Automatically creates attendance records for all employees under a given payroll_id for the current month,
     excluding employees who have left the organization. If records already exist, it skips them.
+    If payroll_id is not provided, fetch all payroll IDs for the current month and financial year.
     """
+    # Extract query parameters
     payroll_id = request.query_params.get("payroll_id")
-    current_month = int(request.query_params.get("month"))
+    current_month = int(
+        request.query_params.get("month", date.today().month))  # Default to current month if not provided
     financial_year = request.query_params.get("financial_year")
-    if not payroll_id:
-        return Response({"error": "Payroll ID is required."}, status=status.HTTP_400_BAD_REQUEST)
+
     today = date.today()
-    if not current_month:
-        current_month = today.month
     if not financial_year:
-        current_year = today.year
-        financial_year = f"{current_year}-{current_year + 1}" if current_month >= 4 else f"{current_year - 1}-{current_year}"
-    else:
-        current_year = int(financial_year.split('-')[1]) if 1 <= current_month <= 3 else int(financial_year.split('-')[0])
+        # Determine the financial year based on current month
+        financial_year = f"{today.year}-{today.year + 1}" if current_month >= 4 else f"{today.year - 1}-{today.year}"
 
+    current_year = int(financial_year.split('-')[1]) if 1 <= current_month <= 3 else int(financial_year.split('-')[0])
+
+    # Calculate first and last day of the current month
     first_day_current_month = date(current_year, current_month, 1)
+    last_day_current_month = date(current_year, current_month, calendar.monthrange(current_year, current_month)[1])
 
-    # Fetch all employees under the given payroll_id
-    all_employees = EmployeeManagement.objects.filter(payroll=payroll_id)
+    # Fetch all payroll_ids if payroll_id is not provided
+    if not payroll_id:
+        payroll_ids = EmployeeManagement.objects.filter(
+            payroll__payroll_year__gte=first_day_current_month,
+            payroll__payroll_year__lte=last_day_current_month
+        ).values_list('payroll_id', flat=True).distinct()
 
-    if not all_employees.exists():
-        return Response({"error": "No employees found for the given payroll ID."}, status=status.HTTP_404_NOT_FOUND)
+        if not payroll_ids:
+            return Response({"error": "No payroll IDs found for the current month and financial year."},
+                            status=status.HTTP_404_NOT_FOUND)
+    else:
+        payroll_ids = [payroll_id]
 
-    # Fetch exited employees
-    exited_employees = set(
-        EmployeeExit.objects.filter(doe__lt=first_day_current_month)
-        .values_list("employee_id", flat=True)
-    )
+    # Dictionary to track created and skipped records for each payroll_id
+    payroll_results = {}
 
-    # Exclude exited employees manually
-    active_employees = [emp for emp in all_employees if emp.id not in exited_employees]
+    # Loop through each payroll_id
+    for payroll_id in payroll_ids:
+        # Fetch all employees under the given payroll_id
+        all_employees = EmployeeManagement.objects.filter(payroll_id=payroll_id)
 
-    if not active_employees:
-        return Response({"error": "No active employees found for the given payroll ID."}, status=status.HTTP_404_NOT_FOUND)
+        if not all_employees.exists():
+            payroll_results[payroll_id] = {"created": 0, "skipped": 1}
+            continue  # Skip this payroll ID if no employees are found
 
-    # Fetch holiday and week-off details
-    holiday_data = calculate_holidays_and_week_offs(payroll_id, current_year, current_month)
-
-    if "error" in holiday_data:
-        return Response({"error": holiday_data["error"]}, status=status.HTTP_400_BAD_REQUEST)
-
-    total_days = holiday_data["total_days"]
-    holidays = holiday_data["holiday_count"]
-    week_offs = holiday_data["week_off_count"]
-
-    created_records = 0
-    skipped_records = 0
-
-    for employee in active_employees:
-
-        # Check if an attendance record already exists
-        if EmployeeAttendance.objects.filter(
-            employee=employee, financial_year=financial_year, month=current_month
-        ).exists():
-            skipped_records += 1
-            continue  # Skip this employee
-
-        EmployeeAttendance.objects.create(
-            employee=employee,
-            financial_year=financial_year,
-            month=current_month,
-            total_days_of_month=total_days,
-            holidays=holidays,
-            week_offs=week_offs,
-            present_days=0,
-            balance_days=0,
-            casual_leaves=0,
-            sick_leaves=0,
-            earned_leaves=0,
-            loss_of_pay=0
+        # Fetch exited employees
+        exited_employees = set(
+            EmployeeExit.objects.filter(doe__lt=first_day_current_month)
+            .values_list("employee_id", flat=True)
         )
-        created_records += 1
 
+        # Exclude exited employees manually
+        active_employees = [
+            emp for emp in all_employees
+            if emp.id not in exited_employees and
+               emp.doj <= last_day_current_month
+        ]
+
+        if not active_employees:
+            payroll_results[payroll_id] = {"created": 0, "skipped": len(all_employees)}
+            continue  # Skip if no active employees are found
+
+        # Fetch holiday and week-off details
+        holiday_data = calculate_holidays_and_week_offs(payroll_id, current_year, current_month)
+
+        if "error" in holiday_data:
+            payroll_results[payroll_id] = {"created": 0, "skipped": len(all_employees)}
+            continue  # Skip this payroll_id if there's an error in holiday calculation
+
+        total_days = holiday_data["total_days"]
+        holidays = holiday_data["holiday_count"]
+        week_offs = holiday_data["week_off_count"]
+
+        created_records = 0
+        skipped_records = 0
+
+        for employee in active_employees:
+            # Check if an attendance record already exists
+            if EmployeeAttendance.objects.filter(
+                    employee=employee, financial_year=financial_year, month=current_month
+            ).exists():
+                skipped_records += 1
+                continue  # Skip this employee
+
+            # Create new attendance record
+            EmployeeAttendance.objects.create(
+                employee=employee,
+                financial_year=financial_year,
+                month=current_month,
+                total_days_of_month=total_days,
+                holidays=holidays,
+                week_offs=week_offs,
+                present_days=0,
+                balance_days=0,
+                casual_leaves=0,
+                sick_leaves=0,
+                earned_leaves=0,
+                loss_of_pay=0
+            )
+            created_records += 1
+
+        # Store results for the current payroll_id
+        payroll_results[payroll_id] = {
+            "created": created_records,
+            "skipped": skipped_records
+        }
+
+    # Return a response with the results
     return Response({
         "message": f"Attendance records for {date(current_year, current_month, 1).strftime('%B %Y')} processed successfully.",
-        "created_records": created_records,
-        "skipped_records": skipped_records
+        "payroll_results": payroll_results
     }, status=status.HTTP_201_CREATED)
 
 
@@ -2624,10 +2949,13 @@ def calculate_employee_monthly_salary(request):
 
         # **Benefits Total**
         benefits_total = sum(
-            benefit["monthly"] for benefit in salary_record.benefits) if salary_record.benefits else 0
+            float(benefit["monthly"]) if isinstance(benefit["monthly"], (int, float)) else 0
+            for benefit in salary_record.benefits) if salary_record.benefits else 0
 
         # **Taxes**
-        taxes = sum(ded["monthly"] for ded in salary_record.deductions if "Tax" in ded["component_name"])
+        taxes = sum(
+            float(ded["monthly"]) if isinstance(ded["monthly"], (int, float)) else 0
+            for ded in salary_record.deductions if "Tax" in ded["component_name"])
 
         # **Advance Loan EMI Deduction (Filtered for Financial Year & Month)**
         advance_loan = getattr(employee, "employee_advance_loan", None)
@@ -2640,11 +2968,12 @@ def calculate_employee_monthly_salary(request):
             ).first()
 
             if active_loan:
-                emi_deduction = active_loan.emi_amount
+                emi_deduction = float(active_loan.emi_amount) if isinstance(active_loan.emi_amount, (int, float)) else 0
 
         # **Employee-Specific Deductions**
         employee_deductions = sum(
-            ded["monthly"] for ded in salary_record.deductions if
+            float(ded["monthly"]) if isinstance(ded["monthly"], (int, float)) else 0
+            for ded in salary_record.deductions if
             "component_name" in ded and "Tax" not in ded["component_name"]
         )
 
@@ -2671,9 +3000,10 @@ def calculate_employee_monthly_salary(request):
 
     return Response(salaries, status=status.HTTP_200_OK)
 
-
+import traceback
 @api_view(['GET'])
 def detail_employee_monthly_salary(request):
+    
     try:
         today = date.today()
         current_day = today.day
@@ -2702,12 +3032,7 @@ def detail_employee_monthly_salary(request):
 
         for salary_record in salary_records:
             employee = salary_record.employee
-            salary_history = EmployeeSalaryHistory.objects.filter(
-                employee=employee,
-                payroll=payroll_id,
-                month=month,
-                financial_year=financial_year
-            ).first()
+            salary_history = EmployeeSalaryHistory.objects.filter( employee=employee, payroll=payroll_id, month=month, financial_year=financial_year).first()
             if not salary_history:
                 # Exclude exited employees
                 exit_obj = EmployeeExit.objects.filter(employee=employee).last()
@@ -2786,7 +3111,10 @@ def detail_employee_monthly_salary(request):
                             continue  # Skip this slab if parsing fails
 
                 # Benefits
-                benefits_total = sum(b.get("monthly", 0) for b in salary_record.benefits or [])
+                benefits_total = sum(
+                    b["monthly"] if isinstance(b.get("monthly"), (int, float)) else 0
+                    for b in (salary_record.benefits or [])
+                )
 
                 # Taxes
                 taxes = sum(d.get("monthly", 0) for d in salary_record.deductions if "Tax" in d.get("component_name", ""))
@@ -2800,7 +3128,7 @@ def detail_employee_monthly_salary(request):
                         end_month__gte=date(today.year, month, 1)
                     ).first()
                     if active_loan:
-                        emi_deduction = active_loan.emi_amount
+                        emi_deduction = float(active_loan.emi_amount) if isinstance(active_loan.emi_amount, (int, float)) else 0
 
                 exclude_earnings = {"basic", "hra", "special_allowance", "bonus"}
                 exclude_deductions = {"pf", "esi", "pt", "tds", "loan_emi"}
@@ -2821,6 +3149,8 @@ def detail_employee_monthly_salary(request):
                     for deduction in salary_record.deductions:
                         name = deduction.get("component_name", "").lower().replace(" ", "_")
                         value = deduction.get("monthly", 0)
+                        value = value if isinstance(value, (int, float)) else 0  # Ensure numeric
+
                         if "tax" not in name:
                             employee_deductions += value
                         if all(ex not in name for ex in exclude_deductions):
@@ -2841,8 +3171,33 @@ def detail_employee_monthly_salary(request):
                 prorated_bonus = prorate(get_component_amount(salary_record.earnings, "bonus"))
                 prorated_special_allowance = prorate(get_component_amount(salary_record.earnings,
                                                                           "special allowance"))
-                # Create or update EmployeeSalaryHistory
+                
+                FINANCIAL_MONTH_MAP = {1: 10, 2: 11, 3: 12, 4: 1, 5: 2, 6: 3,7: 4, 8: 5, 9: 6, 10: 7, 11: 8, 12: 9}
+                
+                joined_month = FINANCIAL_MONTH_MAP.get(employee.doj.month, 1)
+                
+                annual_gross=int(round(earned_salary, 2))*12
+                
+                monthly_tds,yearly_tds=calculate_tds(regime_type=salary_record.tax_regime_opted,annual_salary=annual_gross,join_month=joined_month)
+                
+                # Looping 
+                salary_entries = EmployeeSalaryHistory.objects.filter(payroll_id=payroll_id,month=month,financial_year=financial_year).select_related('employee')
+                
+                employee_ids = [entry.employee_id for entry in salary_entries]
+                
+                current_year_tds_entries = {}
+                
+                previous_tds_entries = EmployeeSalaryHistory.objects.filter(employee_id__in=employee_ids,financial_year=financial_year,month__lt=month).values('employee_id','tds_ytd').order_by('employee_id', '-month')
+                
+                for entry in previous_tds_entries:
+                    if entry['employee_id'] not in current_year_tds_entries:
+                        current_year_tds_entries[entry['employee_id']] = entry['tds_ytd'] or Decimal('0.00')
+                
+                previous_ytd = float(current_year_tds_entries.get(employee.id, Decimal('0.00')))
+                
+                tds_ytd = float(Decimal(str(previous_ytd)) + Decimal(str(monthly_tds)))
 
+                # Create or update EmployeeSalaryHistory
                 EmployeeSalaryHistory.objects.create(
                     employee=employee,
                     payroll=employee.payroll,
@@ -2865,7 +3220,9 @@ def detail_employee_monthly_salary(request):
                     epf=pf,
                     esi=esi,
                     pt=pt_amount,
-                    tds=0,
+                    tds=monthly_tds,
+                    tds_ytd=tds_ytd,
+                    annual_tds=yearly_tds,
                     loan_emi=round(emi_deduction, 2),
                     other_deductions=round(other_deductions, 2),
                     total_deductions=round(total_deductions, 2),
@@ -2873,6 +3230,7 @@ def detail_employee_monthly_salary(request):
                     is_active=True,
                     notes="Salary processed from API"
                 )
+        
         salary_records = EmployeeSalaryHistory.objects.filter(
             payroll=payroll_id,
             month=month,
@@ -2883,7 +3241,11 @@ def detail_employee_monthly_salary(request):
 
         return Response(serializer.data, status=status.HTTP_200_OK)
     except Exception as e:
-        return Response({'error': str(e)}, status=500)
+        tb = traceback.format_exc()
+        return Response({
+            'error': str(e),
+            'traceback': tb
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 from django.db.models import Sum, Q
 from django.db.models.functions import ExtractMonth, ExtractYear
@@ -3111,7 +3473,8 @@ def employee_monthly_salary_template(request):
         # Allowance Keys to Extract
         allowance_keys = [
             "Basic", "HRA", "Conveyance Allowance", "Travelling Allowance",
-            "Medical Allowance", "Internet Allowance", "Special Allowance", "Miscellaneous Allowance", "Other Allowances"
+            "Bonus", "Commission", "Children Education Allowance", "Overtime Allowance",
+            "Fixed Allowance", "Transport Allowance"
         ]
 
         # Initialize Allowance Dictionary
@@ -3133,6 +3496,12 @@ def employee_monthly_salary_template(request):
 
         # Merge the earned allowances into allowance_values
         allowance_values.update(earned_allowances)
+
+        for k, v in allowance_values.items():
+            if v > 0:
+                earned = (v * total_working_days / attendance.total_days_of_month) if attendance.total_days_of_month \
+                    else 0
+                allowance_values[k] = round(earned, 2)
 
         # Extract Deductions from JSON
         deductions = salary_record.deductions if isinstance(salary_record.deductions, list) \
@@ -3197,6 +3566,7 @@ def employee_monthly_salary_template(request):
         total_in_words = total_in_words.replace("<br/>", ' ')
         total_in_words = total_in_words.title() + ' ' + 'Rupees Only'
 
+
         # Construct the Context Dictionary
         context = {
             "company_name": getattr(salary_record.employee.payroll.business, "nameOfBusiness", ""),
@@ -3206,25 +3576,33 @@ def employee_monthly_salary_template(request):
                        f"{getattr(salary_record.employee.payroll, 'filling_address_pincode', '')}",
             "month": month,
             "year": year_,
-            "employee_name": f"{getattr(salary_record.employee, 'first_name', '')} {getattr(salary_record.employee, 'last_name', '')}",
+            "employee_name": f"{getattr(salary_record.employee, 'first_name', '')} "
+                             f"{getattr(salary_record.employee, 'last_name', '')}",
             "designation": getattr(salary_record.employee.designation, "designation_name", ""),
             "employee_id": getattr(salary_record.employee, "associate_id", ""),
             "doj": getattr(salary_record.employee, "doj", ""),
             "pay_period": f"{month_name} {year_}",
             "pay_date": "",
-            "bank_account_number": getattr(salary_record.employee.employee_bank_details,"account_number",""),
-            "uan_number": salary_record.employee.statutory_components.get('employee_provident_fund', {}).get('uan', '') if hasattr(salary_record.employee, 'statutory_components') and salary_record.employee.statutory_components else "",
+            "bank_account_number":salary_record.employee.employee_bank_details.account_number
+            if hasattr(salary_record.employee, 'employee_bank_details')
+               and salary_record.employee.employee_bank_details.account_number
+            else
+            "",
+            "uan_number": salary_record.employee.statutory_components.get('employee_provident_fund', {}).get('uan', '')
+            if hasattr(salary_record.employee, 'statutory_components')
+               and salary_record.employee.statutory_components else "",
 
             # Earnings and Allowances
             "basic": format_with_commas(allowance_values.get("basic", 0)),
             "hra_allowance": format_with_commas(allowance_values.get("hra", 0)),
             "conveyance_allowance": format_with_commas(allowance_values.get("conveyance_allowance", 0)),
             "travelling_allowance": format_with_commas(allowance_values.get("travelling_allowance", 0)),
-            "medical_allowance": format_with_commas(allowance_values.get("medical_allowance", 0)),
-            "internet_allowance": format_with_commas(allowance_values.get("internet_allowance", 0)),
-            "special_allowance": format_with_commas(allowance_values.get("special_allowance", 0)),
-            "miscellaneous_allowance": format_with_commas(allowance_values.get("miscellaneous_allowance", 0)),
-            "other_allowances": format_with_commas(allowance_values.get("other_allowances",0)),
+            "bonus": format_with_commas(allowance_values.get("bonus", 0)),
+            "commission": format_with_commas(allowance_values.get("commission", 0)),
+            "children_education_allowance": format_with_commas(allowance_values.get("children_education_allowance", 0)),
+            "overtime_allowance": format_with_commas(allowance_values.get("overtime_allowance", 0)),
+            "transport_allowance": format_with_commas(allowance_values.get("transport_allowance", 0)),
+            "fixed_allowance": format_with_commas(allowance_values.get("fixed_allowance", 0)),
 
             # Gross and Net Salary
             "gross_earnings": format_with_commas(earned_salary),
@@ -3515,3 +3893,124 @@ def active_employee_salaries(request):
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+@api_view(['GET'])
+def download_template_xlsx(request):
+    try:
+        template_type = request.query_params.get('type', 'work_location').lower()
+        
+        if template_type == 'work_location':
+            template_data = {
+                'location_name': ['Example Location 1', 'Example Location 2'],
+                'address_line1': ['123 Main Street', '456 Park Avenue'],
+                'address_line2': ['Suite 100', 'Floor 5'],
+                'address_state': ['Karnataka', 'Maharashtra'],
+                'address_city': ['Bangalore', 'Mumbai'],
+                'address_pincode': ['560001', '400001']
+            }
+            filename = "work_location_template"
+        elif template_type == 'department':
+            template_data = {
+                'dept_code': ['DEPT001', 'DEPT002'],
+                'dept_name': ['Human Resources', 'Information Technology'],
+                'description': ['HR Department', 'IT Department']
+            }
+            filename = "department_template"
+        elif template_type == 'designation':
+            template_data = {
+                'designation_name': ['Software Engineer', 'Project Manager', 'HR Executive']
+            }
+            filename = "designation_template"
+        else:
+            return Response({
+                "error": "Invalid template type. Supported types are 'work_location', 'department', and 'designation'"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        df = pd.DataFrame(template_data)
+        output = io.BytesIO()
+
+        writer = pd.ExcelWriter(output, engine='xlsxwriter')
+        df.to_excel(writer, index=False, sheet_name='Template')
+
+        workbook = writer.book
+        worksheet = writer.sheets['Template']
+
+        header_format = workbook.add_format({
+            'bold': True,
+            'bg_color': '#D9E1F2',
+            'border': 1
+        })
+
+        for col_num, value in enumerate(df.columns.values):
+            worksheet.write(0, col_num, value, header_format)
+            worksheet.set_column(col_num, col_num, 20)
+
+        if template_type == 'work_location':
+            worksheet.data_validation('F2:F1000', {
+                'validate': 'integer',
+                'criteria': 'between',
+                'minimum': 100000,
+                'maximum': 999999
+            })
+
+        writer.close()
+        output.seek(0)
+
+        response = HttpResponse(
+            output.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}.xlsx"'
+        return response
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+def download_template_csv(request):
+    try:
+        template_type = request.query_params.get('type', 'work_location').lower()
+        
+        if template_type == 'work_location':
+            template_data = {
+                'location_name': ['Example Location 1', 'Example Location 2'],
+                'address_line1': ['123 Main Street', '456 Park Avenue'],
+                'address_line2': ['Suite 100', 'Floor 5'],
+                'address_state': ['Karnataka', 'Maharashtra'],
+                'address_city': ['Bangalore', 'Mumbai'],
+                'address_pincode': ['560001', '400001']
+            }
+            filename = "work_location_template"
+        elif template_type == 'department':
+            template_data = {
+                'dept_code': ['DEPT001', 'DEPT002'],
+                'dept_name': ['Human Resources', 'Information Technology'],
+                'description': ['HR Department', 'IT Department']
+            }
+            filename = "department_template"
+        elif template_type == 'designation':
+            template_data = {
+                'designation_name': ['Software Engineer', 'Project Manager', 'HR Executive']
+            }
+            filename = "designation_template"
+        else:
+            return Response({
+                "error": "Invalid template type. Supported types are 'work_location', 'department', and 'designation'"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        df = pd.DataFrame(template_data)
+        output = io.BytesIO()
+        
+        # Write the actual data
+        df.to_csv(output, index=False)
+        output.seek(0)
+
+        response = HttpResponse(
+            output.getvalue(),
+            content_type='text/csv'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}.csv"'
+        return response
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

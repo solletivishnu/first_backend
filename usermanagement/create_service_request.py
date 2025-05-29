@@ -7,7 +7,9 @@ from .serializers import *
 import razorpay
 from Tara.settings.default import RAZORPAY_CLIENT_ID, RAZORPAY_CLIENT_SECRET
 from .service_serializers import *  # Optional if using serializer
-
+from django.shortcuts import get_object_or_404
+from servicetasks.models import ServiceTask
+from django.db.models import Q
 # Initialize Razorpay client
 client = razorpay.Client(auth=(RAZORPAY_CLIENT_ID, RAZORPAY_CLIENT_SECRET))
 
@@ -60,7 +62,7 @@ def create_new_service_request(request):
             service_request.plan = plan
             service_request.save()
 
-            amount = int(plan.amount * 100)  # Amount in paisa
+            amount = int(plan.amount * 100) if plan.amount else int(plan.max_amount * 100)  # Convert to paise
 
             try:
                 old_payments = ServicePaymentInfo.objects.filter(
@@ -103,7 +105,7 @@ def create_new_service_request(request):
                 'service_request': service_request.id,
                 'plan': plan.id,
                 'context': context.id,
-                'amount': plan.amount,
+                'amount': plan.amount if plan.amount else plan.max_amount,
                 'razorpay_order_id': order_id,
                 'status': 'initiated',
                 'is_latest': 'yes'
@@ -140,3 +142,145 @@ def create_new_service_request(request):
         import traceback
         print(traceback.format_exc())
         return Response({'error': str(e)}, status=500)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+def manage_service_request_assignment(request, service_request_id):
+    """
+    GET: Returns the assignee and reviewer for a service request.
+    PUT: Updates the assignee and/or reviewer fields.
+         Expected JSON body: {"assignee_id": <int or null>, "reviewer_id": <int or null>}
+    DELETE: Removes (nullifies) the assignee and reviewer fields.
+    """
+
+    service_request = get_object_or_404(ServiceRequest, id=service_request_id)
+
+    # GET - Retrieve assignee and reviewer
+    if request.method == 'GET':
+        return Response({
+            "id": service_request.id,
+            "assignee": {
+                "id": service_request.assignee.id,
+                "email": service_request.assignee.email,
+                "name": f"{service_request.assignee.first_name} {service_request.assignee.last_name}"
+            } if service_request.assignee else None,
+            "reviewer": {
+                "id": service_request.reviewer.id,
+                "email": service_request.reviewer.email,
+                "name": f"{service_request.reviewer.first_name} {service_request.reviewer.last_name}"
+            } if service_request.reviewer else None
+        }, status=status.HTTP_200_OK)
+
+    # PUT - Update assignee and/or reviewer
+    elif request.method == 'PUT':
+        assignee_id = request.data.get('assignee_id')
+        reviewer_id = request.data.get('reviewer_id')
+
+        original_assignee = service_request.assignee
+        original_reviewer = service_request.reviewer
+
+        # Validate and assign assignee
+        if assignee_id is not None:
+            if assignee_id == "":
+                service_request.assignee = None
+            else:
+                assignee = Users.objects.filter(id=assignee_id).first()
+                if not assignee:
+                    return Response({"error": "Assignee user not found."}, status=status.HTTP_400_BAD_REQUEST)
+                service_request.assignee = assignee
+
+        # Validate and assign reviewer
+        if reviewer_id is not None:
+            if reviewer_id == "":
+                service_request.reviewer = None
+            else:
+                reviewer = Users.objects.filter(id=reviewer_id).first()
+                if not reviewer:
+                    return Response({"error": "Reviewer user not found."}, status=status.HTTP_400_BAD_REQUEST)
+                service_request.reviewer = reviewer
+        service_name = service_request.service.name.lower()
+        service_request.due_date = due_dates.get(service_name)
+        status_ = request.data.get('status')
+        if status_:
+            if status_ not in ['initiated', 'paid', 'in progress', 'completed', 'rejected']:
+                return Response({"error": "Invalid status."}, status=status.HTTP_400_BAD_REQUEST)
+            service_request.status = status_
+            service_request.save()
+        service_request.save(update_fields=['assignee', 'reviewer','due_date'])
+
+        # Condition: Status must be "paid" and new assignee or reviewer is added
+        if service_request.status == "paid" and (service_request.assignee or service_request.reviewer):
+            slug = service_request.service.name.lower()
+            task_names = SERVICE_TASK_MAP.get(slug, [])
+
+            for task_name in task_names:
+                # Prevent duplicates: only create if task with same name and service_request doesn't exist
+                if not ServiceTask.objects.filter(
+                        service_request=service_request,
+                        service_type=slug,
+                        category_name=task_name
+                ).exists():
+                    ServiceTask.objects.create(
+                        service_request=service_request,
+                        service_type=slug,
+                        category_name=task_name,
+                        client=service_request.user,
+                        assignee=service_request.assignee,
+                        reviewer=service_request.reviewer,
+                        status='yet to be started',
+                        due_date=service_request.due_date,
+                        priority=service_request.priority
+
+                    )
+
+        return Response({"message": "Assignment updated successfully and tasks created if eligible."},
+                        status=status.HTTP_200_OK)
+
+    # DELETE - Unassign assignee and reviewer
+    elif request.method == 'DELETE':
+        service_request.assignee = None
+        service_request.reviewer = None
+        service_request.save(update_fields=['assignee', 'reviewer'])
+        return Response(
+            {"message": "Assignee and reviewer removed successfully."},
+            status=status.HTTP_200_OK
+        )
+
+
+@api_view(['GET'])
+def user_service_requests(request):
+    user = request.user
+
+    service_requests = ServiceRequest.objects.filter(
+        Q(user=user) |
+        Q(assignee=user) |
+        Q(reviewer=user)
+    ).distinct()
+
+    serializer = ServiceRequestSerializer(service_requests, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+def superadmin_service_requests(request):
+    user = request.user
+
+    if not user.is_super_admin:
+        return Response({"error": "You are not authorized to view this."}, status=status.HTTP_403_FORBIDDEN)
+
+    assigned_param = request.query_params.get('assigned')
+    if assigned_param is None:
+        return Response(
+            {"error": "Query param 'assigned' is required (true or false)."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    assigned = assigned_param.lower() == 'true'
+
+    if assigned:
+        queryset = ServiceRequest.objects.filter(assignee__isnull=False, reviewer__isnull=False)
+    else:
+        queryset = ServiceRequest.objects.filter(models.Q(assignee__isnull=True) | models.Q(reviewer__isnull=True))
+
+    serializer = ServiceRequestSerializer(queryset, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)

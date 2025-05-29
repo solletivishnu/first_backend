@@ -61,9 +61,9 @@ def register_business(request):
     except Module.DoesNotExist:
         return Response({"error": f"Module with ID {module_id} does not exist."}, status=404)
 
-    # Validate business does not exist
-    if Context.objects.filter(name__iexact=business_name).exists():
-        return Response({"error": "Business with this name already exists."}, status=400)
+    # # Validate business does not exist
+    # if Context.objects.filter(name__iexact=business_name).exists():
+    #     return Response({"error": "Business with this name already exists."}, status=400)
 
 
     # Validate trial plan exists
@@ -86,7 +86,8 @@ def register_business(request):
                 status='active',
                 registration_flow='module',  # Set registration flow to 'module'
                 registration_completed=False,
-                is_active='no'  # Set is_active to 'yes'
+                is_active='no' ,
+                is_super_admin=False # Set is_active to 'yes'
             )
 
             # 2. Create business context

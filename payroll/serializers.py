@@ -368,8 +368,6 @@ class PayScheduleSerializer(serializers.ModelSerializer):
             data.get('wednesday', False), data.get('thursday', False), data.get('friday', False),
             data.get('saturday', False), data.get('second_saturday', False), data.get('fourth_saturday', False)
         ])
-        if selected_days < 2:
-            raise serializers.ValidationError("At least two days must be selected.")
         return data
 
     def create(self, validated_data):
@@ -388,6 +386,9 @@ class PayScheduleSerializer(serializers.ModelSerializer):
 
 
 class LeaveManagementSerializer(serializers.ModelSerializer):
+    reset_leave_balance_type = serializers.CharField(allow_blank=True, allow_null=True)
+    max_carry_forward_days = serializers.CharField(allow_blank=True, allow_null=True)
+    encashment_days = serializers.CharField(allow_blank=True, allow_null=True)
     class Meta:
         model = LeaveManagement
         fields = '__all__'
@@ -437,11 +438,44 @@ class EmployeeManagementSerializer(serializers.ModelSerializer):
         model = EmployeeManagement
         fields = '__all__'
 
+    def create(self, validated_data):
+        statutory_components = validated_data.get('statutory_components', {})
+        # Check for duplicate PAN
+        if EmployeeManagement.objects.filter(work_email=validated_data.get('work_email'),
+                                             payroll_id=validated_data.get('payroll')).exists():
+            raise ValidationError("A record with this Work Email already exists")
+
+        # Check for duplicate Aadhar
+        if EmployeeManagement.objects.filter(mobile_number=validated_data.get('mobile_number'),
+                                             payroll_id=validated_data.get('payroll')).exists():
+            raise ValidationError("A record with this Mobile Number already exists.")
+        if EmployeeManagement.objects.filter(associate_id=validated_data.get('associate_id'),
+                                             payroll_id=validated_data.get('payroll')).exists():
+            raise ValidationError("A record with this Employee ID already exists.")
+
+        uan = statutory_components.get('employee_provident_fund', {}).get('uan')
+        if uan:
+            # This fetches all records and manually checks the nested UAN field
+            for emp in EmployeeManagement.objects.filter(payroll_id=validated_data.get('payroll')):
+                existing_uan = (
+                    emp.statutory_components.get('employee_provident_fund', {}).get('uan')
+                    if emp.statutory_components else None
+                )
+                if existing_uan == uan:
+                    raise ValidationError("A record with this UAN already exists.")
+
+        return super().create(validated_data)
+
 
 class EmployeeSalaryDetailsSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmployeeSalaryDetails
         fields = '__all__'
+
+    def update(self, instance, validated_data):
+        # This ensures updated_on is only modified during PUT/PATCH
+        instance.updated_on = datetime.now()
+        return super().update(instance, validated_data)
 
 
 class SimplifiedEmployeeSalarySerializer(serializers.ModelSerializer):
@@ -493,6 +527,17 @@ class EmployeePersonalDetailsSerializer(serializers.ModelSerializer):
         model = EmployeePersonalDetails
         fields = '__all__'
 
+    def create(self, validated_data):
+        # Check for duplicate PAN
+        if EmployeePersonalDetails.objects.filter(pan=validated_data.get('pan')).exists():
+            raise ValidationError("A record with this PAN already exists")
+
+        # Check for duplicate Aadhar
+        if EmployeePersonalDetails.objects.filter(aadhar=validated_data.get('aadhar')).exists():
+            raise ValidationError("A record with this Aadhar already exists.")
+
+        return super().create(validated_data)
+
 
 class EmployeeBankDetailsSerializer(serializers.ModelSerializer):
     class Meta:
@@ -501,7 +546,7 @@ class EmployeeBankDetailsSerializer(serializers.ModelSerializer):
 
 
 class EmployeeDataSerializer(serializers.ModelSerializer):
-    employee_salary = EmployeeSalaryDetailsSerializer(many=True, read_only=True)
+    employee_salary = EmployeeSalaryDetailsSerializer(read_only=True)
     employee_personal_details = EmployeePersonalDetailsSerializer(read_only=True)
     employee_bank_details = EmployeeBankDetailsSerializer(read_only=True)
 
@@ -595,12 +640,12 @@ class CurrentMonthEmployeeDataSerializer(serializers.ModelSerializer):
 
     def get_gross_salary(self, obj):
         """Retrieves the latest gross salary (monthly) of the employee."""
-        latest_salary = obj.employee_salary.filter(valid_to__isnull=True).first()  # Get active salary
+        latest_salary = obj.employee_salary  # Already the latest active one
         return latest_salary.gross_salary.get('monthly', 0) if latest_salary and latest_salary.gross_salary else 0
 
     def get_annual_ctc(self, obj):
         """Retrieves the latest annual CTC of the employee."""
-        latest_salary = obj.employee_salary.filter(valid_to__isnull=True).first()  # Get active salary
+        latest_salary = obj.employee_salary
         return latest_salary.annual_ctc if latest_salary else 0
 
 

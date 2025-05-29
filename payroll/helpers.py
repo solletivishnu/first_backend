@@ -1,4 +1,6 @@
 import os
+from decimal import Decimal, ROUND_HALF_UP
+
 
 default_earnings = [
                     {
@@ -264,6 +266,108 @@ default_leave_management = [
         "encashment_days": 0
     },
 ]
+
+
+def to_decimal_2places(value):
+    try:
+        decimal_value = Decimal(str(value))
+        return decimal_value.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    except Exception as e:
+        print(f"Error converting to decimal: {e}")
+        return Decimal('0.00')
+
+
+def calculate_tds(regime_type, annual_salary, join_month):
+    print(regime_type, annual_salary, join_month)
+
+    # Standard deductions
+    standard_deduction_new = 75000
+    standard_deduction_old = 50000
+
+    # Rebate limits and max rebate values
+    rebate_limit_new = 1200000       # Correct new tax regime rebate limit under 87A
+    rebate_limit_old = 500000
+    
+    max_rebate_new = 60000          # For income up to ₹7,00,000 under new regime
+    max_rebate_old = 12500
+
+    cess_rate = 0.04
+
+    months_left = 13 - join_month
+    monthly_salary = annual_salary / 12
+    salary_remaining = monthly_salary * months_left
+
+    # Apply standard deduction based on the regime
+    if regime_type == "new":
+        prorated_deduction = standard_deduction_new+24000
+    else:
+        prorated_deduction = standard_deduction_old+24000
+
+    # Calculate taxable income
+    taxable_income = salary_remaining - prorated_deduction
+    taxable_income = max(0, taxable_income)
+
+    # Tax calculation for new regime
+    def slab_tax_new(income):
+        tax = 0
+        slabs = [
+            (400000, 0.0),
+            (800000, 0.05),
+            (1200000, 0.10),
+            (1600000, 0.15),
+            (2000000, 0.20),
+            (2400000, 0.25),
+            (float('inf'), 0.30)
+        ]
+        prev_limit = 0
+        for limit, rate in slabs:
+            if income > prev_limit:
+                taxable = min(income, limit) - prev_limit
+                tax += taxable * rate
+                prev_limit = limit
+            else:
+                break
+        return tax
+
+    # Tax calculation for old regime
+    def slab_tax_old(income):
+        tax = 0
+        slabs = [
+            (250000, 0.0),
+            (500000, 0.05),
+            (1000000, 0.20),
+            (float('inf'), 0.30)
+        ]
+        prev_limit = 0
+        for limit, rate in slabs:
+            if income > prev_limit:
+                taxable = min(income, limit) - prev_limit
+                tax += taxable * rate
+                prev_limit = limit
+            else:
+                break
+        return tax
+
+    # Determine tax and rebate
+    if regime_type == "new":
+        tax_before_rebate = slab_tax_new(taxable_income)
+        rebate = max_rebate_new if taxable_income <= rebate_limit_new else 0
+    else:
+        tax_before_rebate = slab_tax_old(taxable_income)
+        rebate = max_rebate_old  if taxable_income <= rebate_limit_old else 0
+
+    # Final tax calculation
+    rebate = min(rebate, tax_before_rebate)
+    tax_after_rebate = tax_before_rebate - rebate
+    cess = tax_after_rebate * cess_rate
+    total_tax = tax_after_rebate + cess
+
+    monthly_tds = total_tax / months_left if months_left > 0 else 0
+    
+    yearly_tds=monthly_tds*months_left
+
+    return monthly_tds,yearly_tds
+
 
 def logo_upload_path(instance, filename):
     # Get the name of the business, replace spaces with underscores

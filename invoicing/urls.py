@@ -10,7 +10,7 @@ urlpatterns = [
     path('invoicing-profiles/delete/', views.delete_invoicing_profile, name='delete-invoicing-profile'),
     path('customer_profiles/create/', create_customer_profile, name='create-customer-profile'),
     path('customer_profiles/', get_customer_profile, name='get-customer-profile'),
-    path('invoicing/customer_profiles/update/<int:id>/', update_customer_profile, name='update_customer_profile'),
+    path('customer_profiles/update/<int:id>/', update_customer_profile, name='update_customer_profile'),
     path('customer_profiles/delete/<int:id>', delete_customer_profile, name='delete-customer-profile'),
     path('api/v1/goods-services/create/', create_goods_service, name='create-goods-service'),
 

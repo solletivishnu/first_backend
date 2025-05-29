@@ -17,7 +17,6 @@ def validate_pincode(value):
 class PayrollOrg(models.Model):
     business = models.OneToOneField(Business, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)  # Use auto_now_add for creation timestamp
-    logo = models.FileField(upload_to=logo_upload_path, null=True, blank=True, default=None)
     sender_email = models.EmailField(max_length=120, null=True, blank=True)
     filling_address_location_name = models.CharField(max_length=120, null=True, blank=True,default="Head Office")
     filling_address_line1 = models.CharField(max_length=150, null=True, blank=True)
@@ -345,8 +344,7 @@ class PaySchedule(BaseModel):
             self.sunday, self.monday, self.tuesday, self.wednesday, self.thursday,
             self.friday, self.saturday, self.second_saturday, self.fourth_saturday
         ])
-        if selected_days < 2:
-            raise ValidationError("At least two days must be selected for the pay schedule.")
+
 
     def save(self, *args, **kwargs):
         self.clean()
@@ -484,7 +482,7 @@ class EmployeeLeaveBalance(models.Model):
 
 
 class EmployeeSalaryDetails(models.Model):
-    employee = models.ForeignKey(
+    employee = models.OneToOneField(
         'EmployeeManagement', on_delete=models.CASCADE, related_name='employee_salary'
     )  # Allows multiple salary records per employee
 
@@ -496,10 +494,11 @@ class EmployeeSalaryDetails(models.Model):
     total_ctc = models.JSONField(default=dict, blank=True)
     deductions = models.JSONField(default=list, blank=True)
     net_salary = models.JSONField(default=dict, blank=True)
-
+    tax_regime_opted = models.CharField(max_length=225, blank=True, null=True, default='new')
     valid_from = models.DateField(auto_now_add=True)  # Salary start date
     valid_to = models.DateField(null=True, blank=True)  # Salary end date (null = current salary)
     created_on = models.DateField(auto_now_add=True)
+    updated_on = models.DateTimeField(null=True, blank=True)
     created_month = models.IntegerField(editable=False)
     created_year = models.IntegerField(editable=False)
 
@@ -582,6 +581,17 @@ class EmployeePersonalDetails(BaseModel):
     alternate_contact_number = models.CharField(max_length=40, null=True, blank=True, default=None)
     marital_status = models.CharField(max_length=20, choices=MARITAL_CHOICES, default='single')
     blood_group = models.CharField(max_length=3, choices=BLOOD_GROUP_CHOICES, default='O+')
+
+    def clean(self):
+        """Validate that alternate contact number is not the same as employee's mobile number."""
+        if self.alternate_contact_number and self.employee.mobile_number:
+            if self.alternate_contact_number == self.employee.mobile_number:
+                raise ValidationError('Alternate contact number cannot be the same as the employee\'s mobile number.')
+        super().clean()
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.employee.associate_id} ({self.dob})"
@@ -746,19 +756,52 @@ def update_leave_balance(sender, instance, **kwargs):
                 ).first()
 
                 if not leave_balance:
-                    raise ValidationError(f"Leave balance for {leave_name} not found for the financial year {instance.financial_year}.")
+                    leave_policies = LeaveManagement.objects.filter(payroll=instance.employee.payroll)
 
-                # If the leave type is NOT LOP, enforce balance limits
-                if leave_name != "Loss of Pay" and leave_diff > 0:
-                    if leave_balance.leave_remaining < leave_diff:
-                        raise ValidationError(f"Insufficient {leave_name}. You have only {leave_balance.leave_remaining} left.")
+                    start_year, end_year = instance.financial_year.split('-')
 
-                    # Deduct leave from balance
-                    leave_balance.leave_remaining -= leave_diff
+                    leave_period_start = date(int(start_year), 4, 1)
+                    leave_period_end = date(int(end_year), 3, 31)
 
-                # Update leave used count
-                leave_balance.leave_used += leave_diff
-                leave_balance.save()
+                    for leave in leave_policies:
+                        total_leaves = leave.number_of_leaves
+                        print(total_leaves)
+                        pro_rated_leave = total_leaves  # Default full allocation
+
+                        # Calculate remaining months in the financial year
+                        if instance.employee.doj > leave_period_start:
+                            remaining_months = max(1, (leave_period_end.year - instance.employee.doj.year) * 12 +
+                                                   (leave_period_end.month - instance.employee.doj.month))
+
+                            if leave.employee_leave_period == "Monthly":
+                                # If leave is allocated monthly, multiply remaining months by number_of_leaves
+                                pro_rated_leave = total_leaves * remaining_months
+
+                            elif leave.employee_leave_period == "Annually":
+                                # If leave is allocated annually, divide annual leave by remaining months
+                                pro_rated_leave = abs(round((total_leaves / 12) * remaining_months))
+
+                        # Create Leave Balance Entry
+                        EmployeeLeaveBalance.objects.create(
+                            employee=instance.employee,
+                            leave_type=leave,
+                            leave_entitled=pro_rated_leave,
+                            leave_remaining=pro_rated_leave,
+                            financial_year=f"{start_year}-{end_year}"
+                        )
+
+                else:
+                    # If the leave type is NOT LOP, enforce balance limits
+                    if leave_name != "Loss of Pay" and leave_diff > 0:
+                        if leave_balance.leave_remaining < leave_diff:
+                            raise ValidationError(f"Insufficient {leave_name}. You have only {leave_balance.leave_remaining} left.")
+
+                        # Deduct leave from balance
+                        leave_balance.leave_remaining = leave_balance.leave_remaining - leave_diff
+
+                    # Update leave used count
+                    leave_balance.leave_used += leave_diff
+                    leave_balance.save()
 
 
 class EmployeeSalaryHistory(models.Model):
@@ -783,7 +826,12 @@ class EmployeeSalaryHistory(models.Model):
     epf = models.FloatField(null=False)  # EPF Contribution
     esi = models.FloatField(null=False)  # ESI Contribution
     pt = models.FloatField(null=False)  # Professional Tax
+    
     tds = models.FloatField(null=False)  # Tax Deducted at Source
+    tds_ytd = models.FloatField(null=False)  # cummulative tds
+    
+    annual_tds=models.FloatField(null=False) #Yearly Tds
+    
     loan_emi = models.FloatField(null=False)  # Loan EMI
     other_deductions = models.FloatField(null=False)  # Other Deductions
     total_deductions = models.FloatField(null=False)  # Total Deductions

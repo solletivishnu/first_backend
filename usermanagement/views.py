@@ -17,6 +17,8 @@ from rest_framework import status
 from distutils.util import strtobool
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
+from urllib.parse import urlparse
+
 # Module Management APIs
 
 
@@ -145,9 +147,6 @@ def delete_module(request, module_id):
         'success': True,
         'message': 'Module deleted successfully'
     })
-
-
-# Subscription Plan Management APIs
 
 
 # Role Management APIs
@@ -381,3 +380,10 @@ def delete_module_permission(request, permission_id):
         'success': True,
         'message': 'Module permission deleted successfully'
     })
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def happy_coder(request):
+    return Response({"message": "Happy Coder"})
+

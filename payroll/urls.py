@@ -38,6 +38,10 @@ urlpatterns = [
     # URL for deleting a specific WorkLocation by its ID
     path('work-locations/delete/<int:pk>/', views.work_location_delete, name='work_location_delete'),
 
+    # URL for downloading templates
+    path('download-template/xlsx', views.download_template_xlsx, name='download-template-xlsx'),
+    path('download-template/csv', views.download_template_csv, name='download-template-csv'),
+
     # URL for listing and creating Department instances
     path('departments/', views.department_list, name='department_list'),
 
@@ -167,7 +171,11 @@ urlpatterns = [
 
     path('bonus-incentives/by-payroll-month', views.bonus_by_payroll_month_year, name='bonus-by-payroll'),
 
-    path('employee-salaries', views.active_employee_salaries, name='active-employee-salaries')
+    path('employee-salaries', views.active_employee_salaries, name='active-employee-salaries'),
+    
+    path("employee-tds",views.employee_tds_list,name="employee-tds-list"),
+    
+    path("employee-tds/<int:pk>",views.employee_tds_detail,name="employee-tds-detail"),
 
 
 ]

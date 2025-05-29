@@ -1,25 +1,54 @@
 from django.urls import path
-from .views import *
+from . import views
 
 urlpatterns = [
-    # Entrepreneur Details
-    path('entrepreneurs/', entrepreneur_details_list, name='entrepreneur-list'),
-    path('entrepreneurs/<int:pk>/', entrepreneur_details_detail, name='entrepreneur-detail'),
+    # Business Identity Structure
+    path('business-identity/', views.business_identity_structure_list, name='business_identity_list'),
+    path('business-identity/<int:pk>/', views.business_identity_structure_detail, name='business_identity_detail'),
 
-    # Establishment Details
-    path('establishments/', establishment_details_list, name='establishment-list'),
-    path('establishments/<int:pk>/', establishment_details_detail, name='establishment-detail'),
-    path('work-location/' ,work_location_list, name='work-location-list'),
-    path('work-location/<int:pk>/', work_location_detail, name='work-location-detail'),
+    # Signatory Details
+    path('signatory-details/', views.signatory_details_list, name='signatory_details_list'),
+    path('signatory-details/<int:pk>/', views.signatory_details_detail, name='signatory_details_detail'),
+
+    # Business Location Proofs
+    path('business-location/', views.business_location_proofs_list, name='business_location_list'),
+    path('business-location/<int:pk>/', views.business_location_proofs_detail, name='business_location_detail'),
+
+    # Additional Space Business
+    path('additional-space/', views.additional_space_business_list, name='additional_space_list'),
+    path('additional-space/<int:pk>/', views.additional_space_business_detail, name='additional_space_detail'),
+    path('additional-space/view', views.get_additional_space_business_details, name='get_additional_space_business_details'),
+
+    # Business Registration Documents
+    path('registration-documents/', views.business_registration_documents_list,
+         name='registration_documents_list'),
+    path('registration-documents/<int:pk>/', views.business_registration_documents_detail,
+         name='registration_documents_detail'),
+
+    # Review Filing Certificate
+    path('review-filing/', views.review_filing_certificate_list, name='review_filing_list'),
+    path('review-filing/<int:pk>/', views.review_filing_certificate_detail, name='review_filing_detail'),
+
+    path('business-identity/by-request-or-task', views.get_business_identity_structure,
+         name='business_identity_by_request_or_task'),
 
 
-    # Employer Details
-    path('employers/', employer_details_list, name='employer-list'),
-    path('employers/<int:pk>/', employer_details_detail, name='employer-detail'),
+    # Signatory Details
+    path('signatory-details/by-request', views.get_signatory_details,
+         name='signatory_by_request'),
 
-    path('employers-file/', files_list, name='files-list'),
-    path('employers-file/<int:pk>/', files_detail, name='files-detail'),
-    
-    # Comprehensive data retrieval
-    path('service-request-labour-license/<int:service_request_id>/', get_labour_license_service_request_data, name='get-labour-license-service-request-data'),
+
+    # Business Location Proofs
+    path('business-location/by-request-or-task', views.get_business_location_proofs,
+         name='business_location_by_request_or_task'),
+
+
+    # Business Registration Documents
+    path('registration-documents/by-request-or-task', views.get_business_registration_documents,
+         name='registration_documents_by_request_or_task'),
+
+
+    # Review Filing Certificate
+    path('review-filing/by-request-or-task', views.get_review_filing_certificate,
+         name='review_filing_by_request_or_task'),
 ]

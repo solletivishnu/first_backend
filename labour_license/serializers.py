@@ -1,65 +1,45 @@
 from rest_framework import serializers
-from .models import *
+from .models import (
+    BusinessIdentityStructure, SignatoryDetails, BusinessLocationProofs,
+    AdditionalSpaceBusiness, BusinessRegistrationDocuments, ReviewFilingCertificate
+)
 
-class EntrepreneurDetailsSerializer(serializers.ModelSerializer):
+
+class BusinessIdentityStructureSerializer(serializers.ModelSerializer):
     class Meta:
-        model = EntrepreneurDetails
+        model = BusinessIdentityStructure
         fields = '__all__'
 
-class EntrepreneurDetailsSerializerRetrival(serializers.ModelSerializer):
-    address_of_entrepreneur = serializers.JSONField()
+
+class SignatoryDetailsSerializer(serializers.ModelSerializer):
     class Meta:
-        model = EntrepreneurDetails
+        model = SignatoryDetails
         fields = '__all__'
 
-class EstablishmentDetailsSerializer(serializers.ModelSerializer):
+
+class BusinessLocationProofsSerializer(serializers.ModelSerializer):
+    principal_place_of_business = serializers.JSONField()
+
     class Meta:
-        model = EstablishmentDetails
+        model = BusinessLocationProofs
         fields = '__all__'
 
-class EstablishmentDetailsSerializerRetrival(serializers.ModelSerializer):
-    address_of_establishment = serializers.JSONField()
+
+class AdditionalSpaceBusinessSerializer(serializers.ModelSerializer):
+    address = serializers.JSONField()
+
     class Meta:
-        model = EstablishmentDetails
+        model = AdditionalSpaceBusiness
         fields = '__all__'
 
-class WorkLocationSerializer(serializers.ModelSerializer):
+
+class BusinessRegistrationDocumentsSerializer(serializers.ModelSerializer):
     class Meta:
-        model = WorkLocation
+        model = BusinessRegistrationDocuments
         fields = '__all__'
 
-class WorkLocationSerializerRetrival(serializers.ModelSerializer):
-    work_location = serializers.JSONField()
-    class Meta:
-        model = WorkLocation
-        fields = '__all__'
 
-class EmployerDetailsSerializer(serializers.ModelSerializer):
+class ReviewFilingCertificateSerializer(serializers.ModelSerializer):
     class Meta:
-        model = EmployerDetails
-        fields = '__all__'
-
-class EmployerDetailsSerializerRetrival(serializers.ModelSerializer):
-    address_of_employer = serializers.JSONField()
-    total_employees = serializers.JSONField()
-    class Meta:
-        model = EmployerDetails
-        fields = '__all__'
-
-class filesSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Files
-        fields = '__all__'
-
-class LabourLicenseServiceRequestSerializer(serializers.ModelSerializer):
-    """
-    Comprehensive serializer that combines all Labour License-related data for a service request
-    """
-    establishment_details = EstablishmentDetailsSerializerRetrival(source='EstablishmentDetails', read_only=True, many=True)
-    work_locations = WorkLocationSerializerRetrival(source='work_location', read_only=True, many=True)
-    employer_details = EmployerDetailsSerializerRetrival(source='employer_details', read_only=True, many=True)
-    files = filesSerializer(source='files_uploaded', read_only=True, many=True)
-    
-    class Meta:
-        model = EntrepreneurDetails
+        model = ReviewFilingCertificate
         fields = '__all__'

@@ -127,6 +127,7 @@ class Context(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     metadata = models.JSONField(default=dict, blank=True)
+    is_platform_context = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.name} - {self.context_type}"
@@ -323,8 +324,7 @@ class Users(AbstractBaseUser):
     )
     first_name = models.CharField(max_length=40, null=True, blank=True, default=None)
     last_name = models.CharField(max_length=40, null=True, blank=True, default=None)
-    is_super_user = models.BooleanField(default=False,
-                                        help_text="Marks whether the user is a super user with full access.")
+    is_super_admin = models.BooleanField(default=False, editable=False)
 
     objects = CustomAccountManager()
 
@@ -374,6 +374,7 @@ class Service(models.Model):  # Use singular 'Service'
         choices=YES_NO_CHOICES,
         default='yes'
     )
+    label = models.CharField(max_length=100, null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -422,6 +423,12 @@ class ServiceRequest(models.Model):
         ('in_progress', 'In Progress'),
         ('completed', 'Completed'),
     ]
+    PRIORITY_STATUS_CHOICES = [
+        ('critical', 'Critical'),
+        ('medium', 'Medium'),
+        ('low', 'Low'),
+        ('high', 'High'),
+    ]
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     service = models.ForeignKey(Service, on_delete=models.CASCADE)  # ✅ actual field
@@ -433,6 +440,12 @@ class ServiceRequest(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    assignee = models.ForeignKey(Users, on_delete=models.SET_NULL, null=True, blank=True,
+                                 related_name='service_request_assignee', default=None)
+    reviewer = models.ForeignKey(Users, on_delete=models.SET_NULL, null=True, blank=True,
+                                 related_name='service_request_reviewer', default=None)
+    due_date = models.DateField(default=None, null=True)
+    priority = models.CharField(max_length=20, choices=PRIORITY_STATUS_CHOICES, default='low')
 
     def is_personal(self):
         return self.context is None
@@ -1274,7 +1287,7 @@ class Business(BaseModel):
     ]
 
     client = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='business_clients_id')
-    nameOfBusiness = models.CharField(max_length=200, unique=True, db_index=True)
+    nameOfBusiness = models.CharField(max_length=200, db_index=True)
     registrationNumber = models.CharField(max_length=120, null=True, blank=True, default=None)
     entityType = models.CharField(max_length=50, null=True, blank=True, default=None)
     headOffice = JSONField(default=dict, null=True, blank=True)
@@ -1307,6 +1320,24 @@ class Business(BaseModel):
 
     def __str__(self):
         return str(self.nameOfBusiness)
+
+
+class BusinessLogo(BaseModel):
+    business = models.OneToOneField(Business, on_delete=models.CASCADE, related_name='logos')
+    logo = models.FileField(upload_to=logo_upload_path, null=True, blank=True)
+
+    def __str__(self):
+        return f"Logo for {self.business.nameOfBusiness}"
+
+
+# Branch model to represent multiple branches of a business
+class Branch(BaseModel):
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name='branches')
+    branch_name = models.CharField(max_length=100, null=True, blank=True)
+    branch_code = models.CharField(max_length=30, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.branch_name} - {self.business.nameOfBusiness}"
 
 
 # Signals to maintain Context-Business relationship
@@ -1480,6 +1511,13 @@ class VisaApplications(models.Model):
 
 
 class Contact(models.Model):
+
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('reviewed', 'Reviewed'),
+        ('resolved', 'Resolved'),
+    ]
+
     first_name = models.CharField(max_length=40)
     last_name = models.CharField(max_length=40)
     email = models.EmailField()  # No unique constraint
@@ -1493,6 +1531,7 @@ class Contact(models.Model):
         ]
     )
     message = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     created_date = models.DateField(auto_now_add=True)  # Stores only Date (YYYY-MM-DD)
     created_time = models.TimeField(auto_now_add=True)  # Stores only Time (HH:MM:SS)
 
@@ -1501,6 +1540,13 @@ class Contact(models.Model):
 
 
 class Consultation(models.Model):
+
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('reviewed', 'Reviewed'),
+        ('resolved', 'Resolved'),
+    ]
+
     name = models.CharField(max_length=40)
     email = models.EmailField()  # No unique constraint
     mobile_number = models.CharField(
@@ -1513,6 +1559,7 @@ class Consultation(models.Model):
         ]
     )
     message = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     date = models.DateField()
     time = models.TimeField()
     created_date = models.DateField(auto_now_add=True)  # Stores only Date (YYYY-MM-DD)

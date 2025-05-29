@@ -1,5 +1,6 @@
 from django.core.validators import RegexValidator
 from django.db import models
+from .helpers import *
 from djongo.models import ArrayField, EmbeddedField, JSONField
 from usermanagement.models import Users, Business
 from django.core.exceptions import ValidationError
@@ -63,7 +64,7 @@ class InvoicingProfile(BaseModel):
     account_number = models.BigIntegerField(validators=[validate_account_number])
     ifsc_code = models.CharField(max_length=50)
     swift_code = models.CharField(max_length=50, null=True, blank=True)
-    signature = models.ImageField(upload_to="signatures/", null=True, blank=True)
+    signature = models.ImageField(upload_to=signatures_upload_path, null=True, blank=True)
     gst_registered = models.BooleanField()
     gstin = models.CharField(max_length=120, null=True, blank=True)
 
@@ -74,15 +75,30 @@ class InvoicingProfile(BaseModel):
 class InvoiceFormat(models.Model):
     invoicing_profile = models.ForeignKey(
         'InvoicingProfile',
-        related_name='invoice_formats',  # Plural for better convention
+        related_name='invoice_formats',
         on_delete=models.CASCADE,
         null=True
     )
+    # is_common_format = models.BooleanField(
+    #     default=False,
+    #     help_text="Indicates if this format applies to all GSTINs under the invoicing profile"
+    # )
+    is_common_format = models.CharField(max_length=10, choices=[('yes', 'Yes'), ('no', 'No')], default='yes')
     gstin = models.CharField(max_length=20, null=True, blank=False)
-    invoice_format = models.JSONField(default=dict)
+    prefix = models.CharField(max_length=20, blank=True, null=True)
+    series_code = models.CharField(max_length=10, blank=True, null=True)
+    running_number_start = models.IntegerField(default=1)
+    include_branch_code = models.BooleanField(default=False)
+    include_financial_year = models.BooleanField(default=True)
+    include_series_code = models.BooleanField(default=False)
+    include_running_number = models.BooleanField(default=True)
+    reset_every_fy = models.BooleanField(default=True)
+    maintain_sequence_per_branch = models.BooleanField(default=False)
+    maintain_sequence_per_gstin = models.BooleanField(default=False)
+    format_version = models.PositiveIntegerField(default=1)
 
     def __str__(self):
-        return f"Customer: {self.invoicing_profile.business_name}"
+        return f"Invoice Format for {self.invoicing_profile.gst_registered} [{self.gstin}]"
 
     def clean(self):
         # Check if the combination of invoicing_profile and gstin already exists
@@ -117,6 +133,7 @@ class CustomerProfile(models.Model):
     email = models.CharField(max_length=100, null=True, blank=True)
     mobile_number = models.CharField(max_length=15, null=True, blank=True)
     opening_balance = models.IntegerField(null=True)
+    entity_type = models.CharField(max_length=100, null=True, blank=True, default=None)
 
     def __str__(self):
         return f"Customer: {self.name}"
@@ -203,6 +220,7 @@ class Invoice(models.Model):
         blank=True
     )
     gstin = models.CharField(max_length=100, null=True, blank=True)
+    branch_code = models.CharField(max_length=100, null=True, blank=True, default="NA")
     total_amount = models.FloatField(null=True, blank=False)
     subtotal_amount = models.FloatField(null=True, blank=False)
     shipping_amount = models.FloatField(null=True, blank=False)
@@ -284,6 +302,7 @@ class Invoice(models.Model):
 @receiver(post_save, sender=CustomerInvoiceReceipt)
 def update_invoice_payment_status(sender, instance, **kwargs):
     instance.invoice.update_payment_status()
+
 
 @receiver(post_delete, sender=CustomerInvoiceReceipt)
 def update_invoice_payment_status_on_delete(sender, instance, **kwargs):
