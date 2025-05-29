@@ -149,9 +149,6 @@ def delete_module(request, module_id):
     })
 
 
-# Subscription Plan Management APIs
-
-
 # Role Management APIs
 
 @api_view(['POST'])
