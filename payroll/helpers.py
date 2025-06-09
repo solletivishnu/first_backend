@@ -276,9 +276,7 @@ def to_decimal_2places(value):
         print(f"Error converting to decimal: {e}")
         return Decimal('0.00')
 
-
-def calculate_tds(regime_type, annual_salary, join_month):
-    print(regime_type, annual_salary, join_month)
+def calculate_tds(regime_type, annual_salary, current_month, epf_value, ept_value):
 
     # Standard deductions
     standard_deduction_new = 75000
@@ -293,15 +291,18 @@ def calculate_tds(regime_type, annual_salary, join_month):
 
     cess_rate = 0.04
 
-    months_left = 13 - join_month
+    month_left = 13 - current_month
     monthly_salary = annual_salary / 12
-    salary_remaining = monthly_salary * months_left
+    salary_remaining = monthly_salary * month_left
+
+    epf_value = epf_value * month_left
+    ept_value = ept_value * month_left
 
     # Apply standard deduction based on the regime
     if regime_type == "new":
-        prorated_deduction = standard_deduction_new+24000
+        prorated_deduction = standard_deduction_new + epf_value + ept_value
     else:
-        prorated_deduction = standard_deduction_old+24000
+        prorated_deduction = standard_deduction_old + epf_value + ept_value
 
     # Calculate taxable income
     taxable_income = salary_remaining - prorated_deduction
@@ -362,11 +363,10 @@ def calculate_tds(regime_type, annual_salary, join_month):
     cess = tax_after_rebate * cess_rate
     total_tax = tax_after_rebate + cess
 
-    monthly_tds = total_tax / months_left if months_left > 0 else 0
-    
-    yearly_tds=monthly_tds*months_left
+    monthly_tds = total_tax / month_left if month_left > 0 else 0
 
-    return monthly_tds,yearly_tds
+    return monthly_tds, taxable_income
+
 
 
 def logo_upload_path(instance, filename):

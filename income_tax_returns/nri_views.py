@@ -14,7 +14,17 @@ def upsert_nri_salary_details(request):
     if not service_request_id:
         return Response({"error": "Missing service_request"}, status=status.HTTP_400_BAD_REQUEST)
 
-    data = request.data
+    doc_map = {
+        'salary_slip_files': 'SALARY_SLIP',
+        'tax_paid_certificate_board_files': 'TAX_PAID_CERTIFICATE_BOARD',
+        'bank_statement_files': 'BANK_STATEMENT',
+    }
+
+    # Check if all file inputs are empty
+    all_files_empty = all(len(request.FILES.getlist(field_name)) == 0 for field_name in doc_map)
+
+    # Choose data based on file presence
+    data = request.data.copy() if all_files_empty else request.data
 
     # Handle employment_history JSON string
     if 'employment_history' in data and isinstance(data['employment_history'], str):
@@ -33,12 +43,6 @@ def upsert_nri_salary_details(request):
 
     if serializer.is_valid():
         nri_salary = serializer.save()
-
-        doc_map = {
-            'salary_slip_files': 'SALARY_SLIP',
-            'tax_paid_certificate_board_files': 'TAX_PAID_CERTIFICATE_BOARD',
-            'bank_statement_files': 'BANK_STATEMENT',
-        }
 
         for field_name, doc_type in doc_map.items():
             files = request.FILES.getlist(field_name)

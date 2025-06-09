@@ -4,7 +4,7 @@ from django.views.decorators.http import require_http_methods
 import json
 from django.db import transaction
 from django.utils import timezone
-from .models import Module, SubscriptionPlan, Role, UserFeaturePermission
+from .models import Module, SubscriptionPlan, Role, UserFeaturePermission, PendingUserOTP, Users
 from .serializers import (
     ModuleSerializer, SubscriptionPlanSerializer, RoleSerializer,
     UserFeaturePermissionSerializer, ModuleDetailSerializer,
@@ -18,8 +18,39 @@ from distutils.util import strtobool
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from urllib.parse import urlparse
+from .helpers import generate_otp
+from .email_otp_request_service import send_otp_email
+import datetime
 
 # Module Management APIs
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def request_otp(request):
+    email = request.data.get('email')
+    if not email:
+        return Response({'error': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Check if user already exists
+    if Users.objects.filter(email=email).exists():
+        return Response(
+            {"error": "A user with this email already exists."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Generate and store OTP
+    otp_code = generate_otp()
+    expires_at = timezone.now() + datetime.timedelta(minutes=10)
+
+    obj, created = PendingUserOTP.objects.update_or_create(
+        email=email,
+        defaults={'otp_code': otp_code, 'expires_at': expires_at}
+    )
+
+    send_otp_email(email, otp_code)
+
+    return Response({'message': 'OTP sent to email'}, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])

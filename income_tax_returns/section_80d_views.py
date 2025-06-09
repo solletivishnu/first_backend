@@ -18,7 +18,7 @@ def upsert_section_80d_with_files(request):
 
     try:
         instance = Section80D.objects.get(deductions_id=deductions_id)
-        serializer = Section80DFileSerializer(instance, data=request.data, partial=True)
+        serializer = Section80DSerializer(instance, data=request.data, partial=True)
     except Section80D.DoesNotExist:
         serializer = Section80DSerializer(data=request.data)
 
@@ -84,7 +84,7 @@ def get_section_80d(request):
     except Section80D.DoesNotExist:
         return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    serializer = Section80DFileSerializer(entry)
+    serializer = Section80DSerializer(entry)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 

@@ -21,117 +21,196 @@ from botocore.exceptions import ClientError
 import logging
 from rest_framework_simplejwt.tokens import RefreshToken
 from .serializers import *
+from .get_login_data import get_login_response
+
 
 User = get_user_model()
 # Configure logging
 logger = logging.getLogger(__name__)
 
 
+# @api_view(['POST'])
+# @permission_classes([AllowAny])
+# def initial_registration(request):
+#     """
+#     Initial registration API that creates a user with email and password,
+#     and sends an activation email.
+#
+#     Expected request data:
+#     {
+#         "email": "user@example.com",
+#         "password": "securepassword"
+#     }
+#     """
+#     # Extract data from request
+#     email = request.data.get('email')
+#     submitted_otp = request.data.get('otp')
+#     password = request.data.get('password')
+#
+#     # Validate required fields
+#     if not all([email, password, submitted_otp]):
+#         return Response(
+#             {"error": "Missing required fields. Please provide email, otp and password."},
+#             status=status.HTTP_400_BAD_REQUEST
+#         )
+#     try:
+#         otp_obj = PendingUserOTP.objects.get(email=email)
+#     except PendingUserOTP.DoesNotExist:
+#         return Response({'error': 'OTP not requested for this email'}, status=status.HTTP_400_BAD_REQUEST)
+#
+#     if otp_obj.is_expired():
+#         return Response({'error': 'OTP expired'}, status=status.HTTP_400_BAD_REQUEST)
+#
+#     if otp_obj.otp_code != submitted_otp:
+#         return Response({'error': 'Invalid OTP'}, status=status.HTTP_400_BAD_REQUEST)
+#
+#     try:
+#         # Check if user already exists
+#         if User.objects.filter(email=email).exists():
+#             return Response(
+#                 {"error": "A user with this email already exists."},
+#                 status=status.HTTP_400_BAD_REQUEST
+#             )
+#
+#         # Create user
+#         user = User.objects.create(
+#             email=email,
+#             status='invited',
+#             registration_flow='standard',
+#             registration_completed='no',
+#             is_active='no',
+#             is_super_admin=False,
+#         )
+#         user.set_password(password)
+#         user.save()
+#
+#         # Generate activation token
+#         # 12. Send activation email - This is a required step
+#         token = default_token_generator.make_token(user)
+#         uid = urlsafe_base64_encode(str(user.pk).encode())
+#         activation_link = f"{FRONTEND_URL}activation?uid={uid}&token={token}"
+#
+#         # Initialize SES client
+#         ses_client = boto3.client(
+#             'ses',
+#             region_name=AWS_REGION,
+#             aws_access_key_id=AWS_ACCESS_KEY_ID,
+#             aws_secret_access_key=AWS_SECRET_ACCESS_KEY
+#         )
+#
+#         subject = "Activate your account"
+#         body_html = f"""
+#                                         <html>
+#                                         <body>
+#                                             <h1>Activate Your Account</h1>
+#                                             <p>Click the link below to activate your account:</p>
+#                                             <a href="{activation_link}">Activate Account</a>
+#                                         </body>
+#                                         </html>
+#                                         """
+#
+#         try:
+#             # Send the email
+#             response = ses_client.send_email(
+#                 Source=EMAIL_HOST_USER,
+#                 Destination={'ToAddresses': [email]},
+#                 Message={
+#                     'Subject': {'Data': subject},
+#                     'Body': {
+#                         'Html': {'Data': body_html},
+#                         'Text': {'Data': f"Activate your account using the link: {activation_link}"}
+#                     },
+#                 }
+#             )
+#             logger.info(f"Activation email sent to: {email}")
+#
+#             # Return success response
+#             return Response({
+#                 "message": "Registration successful. Please check your email to activate your account.",
+#                 "user_id": user.id,
+#                 "email": user.email
+#             }, status=status.HTTP_201_CREATED)
+#         except ClientError as e:
+#             # Log the error but don't fail the registration
+#             logger.error(f"Failed to send email via SES: {e.response['Error']['Message']}")
+#
+#             # Return success response but note the email failure
+#             return Response(
+#                 {
+#                     "message": "User registration successful, but failed to send activation email. "
+#                                "Please contact support.",
+#                     "user_id": user.id,
+#                     "activation_link": activation_link,  # Include the activation link in the response
+#                     "registration_flow": user.registration_flow
+#                 },
+#                 status=status.HTTP_201_CREATED)
+#     except Exception as e:
+#         return Response(
+#             {"error": f"Registration failed: {str(e)}"},
+#             status=status.HTTP_500_INTERNAL_SERVER_ERROR
+#         )
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def initial_registration(request):
     """
-    Initial registration API that creates a user with email and password,
-    and sends an activation email.
+    Final step of registration that creates a user after OTP verification.
 
     Expected request data:
     {
         "email": "user@example.com",
+        "otp": "123456",
         "password": "securepassword"
     }
     """
-    # Extract data from request
     email = request.data.get('email')
+    submitted_otp = request.data.get('otp')
     password = request.data.get('password')
 
-    # Validate required fields
-    if not all([email, password]):
+    if not all([email, password, submitted_otp]):
         return Response(
-            {"error": "Missing required fields. Please provide email and password."},
+            {"error": "Missing required fields. Please provide email, otp and password."},
             status=status.HTTP_400_BAD_REQUEST
         )
 
     try:
-        # Check if user already exists
-        if User.objects.filter(email=email).exists():
-            return Response(
-                {"error": "A user with this email already exists."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        otp_obj = PendingUserOTP.objects.get(email=email)
+    except PendingUserOTP.DoesNotExist:
+        return Response({'error': 'OTP not requested for this email'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Create user
+    if otp_obj.is_expired():
+        return Response({'error': 'OTP expired'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if otp_obj.otp_code != submitted_otp:
+        return Response({'error': 'Invalid OTP'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if User.objects.filter(email=email).exists():
+        return Response(
+            {"error": "A user with this email already exists."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
         user = User.objects.create(
             email=email,
-            status='invited',
+            status='active',
             registration_flow='standard',
             registration_completed='no',
-            is_active='no',
+            is_active='yes',  # Now activate the user directly
             is_super_admin=False,
         )
         user.set_password(password)
         user.save()
 
-        # Generate activation token
-        # 12. Send activation email - This is a required step
-        token = default_token_generator.make_token(user)
-        uid = urlsafe_base64_encode(str(user.pk).encode())
-        activation_link = f"{FRONTEND_URL}activation?uid={uid}&token={token}"
+        # OTP is now used; delete it
+        otp_obj.delete()
+        login_response_data = get_login_response(user)
 
-        # Initialize SES client
-        ses_client = boto3.client(
-            'ses',
-            region_name=AWS_REGION,
-            aws_access_key_id=AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=AWS_SECRET_ACCESS_KEY
-        )
+        return Response(login_response_data, status=status.HTTP_201_CREATED)
 
-        subject = "Activate your account"
-        body_html = f"""
-                                        <html>
-                                        <body>
-                                            <h1>Activate Your Account</h1>
-                                            <p>Click the link below to activate your account:</p>
-                                            <a href="{activation_link}">Activate Account</a>
-                                        </body>
-                                        </html>
-                                        """
-
-        try:
-            # Send the email
-            response = ses_client.send_email(
-                Source=EMAIL_HOST_USER,
-                Destination={'ToAddresses': [email]},
-                Message={
-                    'Subject': {'Data': subject},
-                    'Body': {
-                        'Html': {'Data': body_html},
-                        'Text': {'Data': f"Activate your account using the link: {activation_link}"}
-                    },
-                }
-            )
-            logger.info(f"Activation email sent to: {email}")
-
-            # Return success response
-            return Response({
-                "message": "Registration successful. Please check your email to activate your account.",
-                "user_id": user.id,
-                "email": user.email
-            }, status=status.HTTP_201_CREATED)
-        except ClientError as e:
-            # Log the error but don't fail the registration
-            logger.error(f"Failed to send email via SES: {e.response['Error']['Message']}")
-
-            # Return success response but note the email failure
-            return Response(
-                {
-                    "message": "User registration successful, but failed to send activation email. "
-                               "Please contact support.",
-                    "user_id": user.id,
-                    "activation_link": activation_link,  # Include the activation link in the response
-                    "registration_flow": user.registration_flow
-                },
-                status=status.HTTP_201_CREATED)
     except Exception as e:
+        logger.error(f"Error during registration: {str(e)}")
         return Response(
             {"error": f"Registration failed: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -229,7 +308,6 @@ def select_context(request):
         return Response({"error": e.message_dict if hasattr(e, 'message_dict') else str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         return Response({"error": f"Context selection failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 
 @api_view(['POST'])

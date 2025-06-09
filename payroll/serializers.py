@@ -1,7 +1,4 @@
 from rest_framework import serializers
-from .models import (PayrollOrg, WorkLocations, Departments, SalaryTemplate, PaySchedule,
-                     Designation, EPF, ESI, PT, Earnings, Benefits, Deduction, Reimbursement,
-                     HolidayManagement, LeaveManagement)
 from .models import *
 from datetime import date, datetime
 from calendar import monthrange
@@ -473,16 +470,33 @@ class EmployeeSalaryDetailsSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def update(self, instance, validated_data):
-        # This ensures updated_on is only modified during PUT/PATCH
-        instance.updated_on = datetime.now()
-        return super().update(instance, validated_data)
+        # Get old annual_ctc value
+        old_annual_ctc = instance.annual_ctc
+
+        # Perform the default update
+        instance = super().update(instance, validated_data)
+
+        # Get new annual_ctc value after update
+        new_annual_ctc = instance.annual_ctc
+
+        # If annual_ctc changed, update revised_ctc and updated_on
+        if new_annual_ctc != old_annual_ctc:
+            today = datetime.now().date()  # This gives a date object: YYYY-MM-DD
+
+            instance.previous_ctc = old_annual_ctc
+            instance.updated_on = today
+            instance.update_month = today.month
+            instance.update_year = today.year
+            instance.save(update_fields=['previous_ctc', 'updated_on', 'update_month', 'update_year'])
+
+        return instance
 
 
 class SimplifiedEmployeeSalarySerializer(serializers.ModelSerializer):
     employee_name = serializers.SerializerMethodField()
     department = serializers.SerializerMethodField()
     designation = serializers.SerializerMethodField()
-    previous_ctc = serializers.SerializerMethodField()
+    previous_ctc = serializers.DecimalField(max_digits=12, decimal_places=2)
     current_ctc = serializers.DecimalField(source='annual_ctc', max_digits=12, decimal_places=2)
     employee_id = serializers.IntegerField(source='employee.id')
     associate_id = serializers.CharField(source='employee.associate_id')  # Added based on your model
@@ -498,7 +512,7 @@ class SimplifiedEmployeeSalarySerializer(serializers.ModelSerializer):
             'designation',
             'previous_ctc',
             'current_ctc',
-            'created_on'
+            'updated_on',
         ]
 
     def get_employee_name(self, obj):
@@ -512,14 +526,6 @@ class SimplifiedEmployeeSalarySerializer(serializers.ModelSerializer):
     def get_designation(self, obj):
         return obj.employee.designation.designation_name if obj.employee.designation else None
 
-    def get_previous_ctc(self, obj):
-        previous_salary = (
-            EmployeeSalaryDetails.objects
-            .filter(employee=obj.employee, id__lt=obj.id)
-            .order_by('-id')
-            .first()
-        )
-        return previous_salary.annual_ctc if previous_salary else None
 
 
 class EmployeePersonalDetailsSerializer(serializers.ModelSerializer):
@@ -564,7 +570,6 @@ class CurrentMonthEmployeeDataSerializer(serializers.ModelSerializer):
     paid_days = serializers.SerializerMethodField()
     gross_salary = serializers.SerializerMethodField()
     annual_ctc = serializers.SerializerMethodField()
-
     designation_name = serializers.CharField(source='designation.designation_name', read_only=True)
     department_name = serializers.CharField(source='department.dept_name', read_only=True)
 
@@ -575,6 +580,7 @@ class CurrentMonthEmployeeDataSerializer(serializers.ModelSerializer):
             "employee_name",
             "department_name",
             "designation_name",
+            "associate_id",
             "doj",
             "total_days_in_month",
             "paid_days",
@@ -692,6 +698,7 @@ class BonusIncentiveSerializer(serializers.ModelSerializer):
     employee_name = serializers.SerializerMethodField()
     department = serializers.SerializerMethodField()
     designation = serializers.SerializerMethodField()
+    associate_id = serializers.CharField(source='employee.associate_id', read_only=True)
 
     class Meta:
         model = BonusIncentive
@@ -738,6 +745,7 @@ class AdvanceLoanSummarySerializer(serializers.ModelSerializer):
     designation = serializers.SerializerMethodField()
     pending_balance = serializers.SerializerMethodField()
     current_month_deduction = serializers.SerializerMethodField()
+    associate_id = serializers.CharField(source='employee.associate_id', read_only=True)
 
     class Meta:
         model = AdvanceLoan
@@ -746,6 +754,7 @@ class AdvanceLoanSummarySerializer(serializers.ModelSerializer):
             "employee_name",
             "department",
             "designation",
+            "associate_id",
             "loan_type",
             "amount",
             "emi_amount",
@@ -793,6 +802,9 @@ class EmployeeSalaryHistorySerializer(serializers.ModelSerializer):
     employee_name = serializers.SerializerMethodField()
     department = serializers.SerializerMethodField()
     designation = serializers.SerializerMethodField()
+    regime = serializers.SerializerMethodField()
+    pan = serializers.SerializerMethodField()
+    associate_id = serializers.CharField(source='employee.associate_id', read_only=True)
 
     class Meta:
         model = EmployeeSalaryHistory
@@ -809,3 +821,28 @@ class EmployeeSalaryHistorySerializer(serializers.ModelSerializer):
     def get_designation(self, obj):
         """Fetch employee's designation"""
         return obj.employee.designation.designation_name
+
+    def get_regime(self, obj):
+        """Fetch tax regime opted from salary details"""
+        try:
+            return obj.employee.employee_salary.tax_regime_opted
+        except AttributeError:
+            return None
+
+    def get_pan(self, obj):
+        """Fetch PAN from employee's personal details"""
+        try:
+            return obj.employee.employee_personal_details.pan
+        except AttributeError:
+            return None
+
+
+class EmployeeSimpleSerializer(serializers.ModelSerializer):
+    full_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EmployeeManagement
+        fields = ['id', 'associate_id', 'full_name']
+
+    def get_full_name(self, obj):
+        return f"{obj.first_name} {obj.middle_name or ''} {obj.last_name}".strip()

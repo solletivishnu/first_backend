@@ -38,3 +38,27 @@ class ServiceTask(models.Model):
     def __str__(self):
         return f"{self.service_type} - {self.category_name} (Request #{self.service_request.id})"
 
+
+
+class ServiceSubTask(models.Model):
+    STATUS_CHOICES = [
+        ('yet to be started', 'Yet to be Started'),
+        ('in progress', 'In Progress'),
+        ('completed', 'Completed'),
+        ('sent for approval', 'Sent for Approval'),
+        ('revoked', 'Revoked'),
+    ]
+
+    parent_task = models.ForeignKey(ServiceTask, on_delete=models.CASCADE, related_name='subtasks')
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='yet to be started')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Subtask: {self.title} (Parent Task ID: {self.parent_task.id})"
+
+
+
+

@@ -1,8 +1,9 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-from .models import Section80ETTATTBU
-from .serializers import Section80ETTATTBUSerializer
+from .models import Section80TTATTBU
+from .serializers import Section80TTATTBUSerializer
+
 
 @api_view(['GET', 'POST'])
 def section_80ettattbu_list(request):
@@ -12,14 +13,14 @@ def section_80ettattbu_list(request):
     """
     if request.method == 'GET':
         deductions_id = request.query_params.get('deductions')
-        qs = Section80ETTATTBU.objects.all()
+        qs = Section80TTATTBU.objects.all()
         if deductions_id:
             qs = qs.filter(deductions_id=deductions_id)
-        serializer = Section80ETTATTBUSerializer(qs, many=True)
+        serializer = Section80TTATTBUSerializer(qs, many=True)
         return Response(serializer.data)
 
     # POST
-    serializer = Section80ETTATTBUSerializer(data=request.data)
+    serializer = Section80TTATTBUSerializer(data=request.data)
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -34,16 +35,16 @@ def section_80ettattbu_detail(request, pk):
     DELETE: remove one record
     """
     try:
-        obj = Section80ETTATTBU.objects.get(pk=pk)
-    except Section80ETTATTBU.DoesNotExist:
+        obj = Section80TTATTBU.objects.get(pk=pk)
+    except Section80TTATTBU.DoesNotExist:
         return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
 
     if request.method == 'GET':
-        serializer = Section80ETTATTBUSerializer(obj)
+        serializer = Section80TTATTBUSerializer(obj)
         return Response(serializer.data)
 
     if request.method == 'PUT':
-        serializer = Section80ETTATTBUSerializer(obj, data=request.data, partial=True)
+        serializer = Section80TTATTBUSerializer(obj, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)

@@ -29,7 +29,6 @@ class TaxPaidDetailsSerializer(serializers.ModelSerializer):
     class Meta:
         model = TaxPaidDetails
         fields = '__all__'  # or list the fields explicitly
-        depth = 1  # optional, if you want nested object fields expanded
 
     def get_documents(self, obj):
         grouped = {}
@@ -81,7 +80,14 @@ class SalaryIncomeSerializer(serializers.ModelSerializer):
         return grouped
 
 
+class OtherIncomeDetailsInfoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OtherIncomeDetailsInfo
+        fields = '__all__'
+
+
 class OtherIncomeDetailsSerializer(serializers.ModelSerializer):
+    other_income_info = OtherIncomeDetailsInfoSerializer(many=True, read_only=True)
     class Meta:
         model = OtherIncomeDetails
         fields = '__all__'
@@ -102,11 +108,16 @@ class NRIEmployeeSalaryDetailsSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_foreigner_documents(self, obj):
-        doc_types = ['Salary Slip', 'TAX PAID CERTIFICATE BOARD', 'Bank Statement']  # Adjust these as per your document_type choices
+        doc_map = {
+            'salary_slip_files': 'SALARY_SLIP',
+            'tax_paid_certificate_board_files': 'TAX_PAID_CERTIFICATE_BOARD',
+            'bank_statement_files': 'BANK_STATEMENT',
+        }
+
         grouped = {}
-        for doc_type in doc_types:
+        for group_name, doc_type in doc_map.items():
             files = obj.foreigner_documents.filter(document_type=doc_type)
-            grouped[doc_type] = {
+            grouped[group_name] = {
                 "count": files.count(),
                 "files": [
                     {
@@ -120,8 +131,16 @@ class NRIEmployeeSalaryDetailsSerializer(serializers.ModelSerializer):
         return grouped
 
 
-class HousePropertyIncomeDetailsSerializer(serializers.ModelSerializer):
+class HousePropertyIncomeDetailsInfoSerializer(serializers.ModelSerializer):
     property_address = serializers.JSONField(required=False, allow_null=True)
+    class Meta:
+        model = HousePropertyIncomeDetailsInfo
+        fields = '__all__'
+
+
+class HousePropertyIncomeDetailsSerializer(serializers.ModelSerializer):
+    property_info = HousePropertyIncomeDetailsInfoSerializer(many=True, read_only=True)
+    
     class Meta:
         model = HousePropertyIncomeDetails
         fields = '__all__'
@@ -231,16 +250,34 @@ class Section80GSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class Section80ETTATTBUSerializer(serializers.ModelSerializer):
+class Section80TTATTBUSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Section80ETTATTBU
+        model = Section80TTATTBU
+        fields = '__all__'
+
+
+class Section80CDocumentsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Section80CDocuments
         fields = '__all__'
 
 
 class Section80CSerializer(serializers.ModelSerializer):
+    documents = serializers.SerializerMethodField()
+
     class Meta:
         model = Section80C
         fields = '__all__'
+
+    def get_documents(self, obj):
+        return [
+            {
+                "id": doc.id,
+                "file_url": doc.file.url if doc.file else None,
+                "uploaded_at": doc.uploaded_at
+            }
+            for doc in obj.section_80c_documents.all()
+        ]
 
 
 class Section80DFileSerializer(serializers.ModelSerializer):
@@ -257,39 +294,11 @@ class Section80DSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class DeductionsSerializer(serializers.ModelSerializer):
-    section_80g = Section80GSerializer(many=True, read_only=True)
-    section_80ettattbu = Section80ETTATTBUSerializer(read_only=True)
-    section_80c = Section80CSerializer(many=True, read_only=True)
-    section_80d = Section80DSerializer(read_only=True)
-
-    class Meta:
-        model = Deductions
-        fields = '__all__'
-
-
 class ReviewFilingCertificateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ReviewFilingCertificate
         fields = '__all__'
 
-
-class ServiceRequestTasksSerializer(serializers.Serializer):
-    personal_information = PersonalInformationSerializer(read_only=True)
-    tax_paid_details = TaxPaidDetailsSerializer(read_only=True)
-    salary_income_details = SalaryIncomeSerializer(read_only=True)
-    other_income_details = OtherIncomeDetailsSerializer(many=True, read_only=True)
-    foreign_income_details = NRIEmployeeSalaryDetailsSerializer(read_only=True)
-    house_property_details = HousePropertyIncomeDetailsSerializer(many=True, read_only=True)
-    other_income = InterestIncomeSerializer(many=True, read_only=True)
-    dividend_income = DividendIncomeSerializer(many=True, read_only=True)
-    gift_income = GiftIncomeDetailsSerializer(many=True, read_only=True)
-    family_pension_income = FamilyPensionIncomeSerializer(many=True, read_only=True)
-    foreign_income = ForeignIncomeSerializer(many=True, read_only=True)
-    winnings = WinningIncomeSerializer(many=True, read_only=True)
-    agriculture_income = AgricultureIncomeSerializer(many=True, read_only=True)
-    deductions = DeductionsSerializer(many=True, read_only=True)
-    ITR_review_filing_certificate = ReviewFilingCertificateSerializer(read_only=True)
 
 
 class ServiceTaskSerializer(serializers.ModelSerializer):
@@ -376,6 +385,7 @@ class ServiceTaskWithDataSerializer(serializers.ModelSerializer):
 
 
 class CapitalGainsPropertySerializer(serializers.ModelSerializer):
+    reinvestment_details = serializers.JSONField(required=False, allow_null=True)
     class Meta:
         model = CapitalGainsProperty
         fields = '__all__'
@@ -411,10 +421,15 @@ class OtherCapitalGainsDocumentSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class OtherCapitalGainsInfoSerializer(serializers.ModelSerializer):
+    documents = OtherCapitalGainsDocumentSerializer(many=True, read_only=True)
+    class Meta:
+        model = OtherCapitalGainsInfo
+        fields = '__all__'
+
 class OtherCapitalGainsSerializer(serializers.ModelSerializer):
     # Using the custom serializer for documents to handle multiple file uploads
-    documents = OtherCapitalGainsDocumentSerializer(many=True, read_only=True)
-
+    other_capital_gain_info = OtherCapitalGainsInfoSerializer(many=True, read_only=True)
     class Meta:
         model = OtherCapitalGains
         fields = '__all__'
@@ -426,12 +441,12 @@ class BusinessProfessionalIncomeDocumentSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class BusinessProfessionalIncomeSerializer(serializers.ModelSerializer):
+class BusinessProfessionalIncomeInfoSerializer(serializers.ModelSerializer):
     opting_data = serializers.JSONField(required=False, allow_null=True)
     documents = serializers.SerializerMethodField()
 
     class Meta:
-        model = BusinessProfessionalIncome
+        model = BusinessProfessionalIncomeInfo
         fields = '__all__'
 
     def get_documents(self, obj):
@@ -453,7 +468,187 @@ class BusinessProfessionalIncomeSerializer(serializers.ModelSerializer):
         return grouped
 
 
+class BusinessProfessionalIncomeSerializer(serializers.ModelSerializer):
+    business_professional_income_info = BusinessProfessionalIncomeInfoSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = BusinessProfessionalIncome
+        fields = '__all__'
+
+
+
 class BusinessProfessionalIncomeDocumentSerializer(serializers.ModelSerializer):
     class Meta:
         model = BusinessProfessionalIncomeDocument
         fields = ['id', 'document_type', 'file', 'uploaded_at']
+
+
+
+class Section80EDocumentsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Section80EDocuments
+        fields = ['id', 'document_type', 'file', 'uploaded_at']  # add uploaded_at if exists
+
+
+class Section80ESerializer(serializers.ModelSerializer):
+    # SerializerMethodField to group documents by type with file info
+    document_files = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Section80E
+        fields = '__all__'  # or explicitly list your fields + 'document_files'
+
+    def get_document_files(self, obj):
+        doc_map = {
+            'sanction_letter_files': 'Sanction Letter',
+            'interest_certificate_files': 'Interest Certificate',
+            'repayment_schedule_files': 'Repayment Schedule',
+            'other_files': 'Other',
+        }
+        grouped = {}
+        for group_name, doc_type in doc_map.items():
+            files = Section80EDocuments.objects.filter(section_80e=obj, document_type=doc_type)
+            grouped[group_name] = {
+                "count": files.count(),
+                "files": [
+                    {
+                        "id": f.id,
+                        "url": f.file.url if f.file else None,
+                        "uploaded_at": f.uploaded_at if hasattr(f, 'uploaded_at') else None
+                    }
+                    for f in files
+                ]
+            }
+        return grouped
+
+
+class Section80EEDocumentsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Section80EEDocuments
+        fields = ['id', 'document_type', 'file', 'uploaded_at']
+
+
+class Section80EESerializer(serializers.ModelSerializer):
+    document_files = serializers.SerializerMethodField()
+    deductions = serializers.PrimaryKeyRelatedField(queryset=Deductions.objects.all())
+
+    class Meta:
+        model = Section80EE
+        fields = ['id', 'deductions', 'loan_outstanding_as_on_31st_march', 'document_files']
+
+    def get_document_files(self, obj):
+        doc_map = {
+            'sanction_letter_files': 'Sanction Letter',
+            'interest_certificate_files': 'Interest Certificate',
+            'repayment_schedule_files': 'Repayment Schedule',
+            'other_files': 'Other',
+        }
+        grouped = {}
+        for field_key, doc_type in doc_map.items():
+            docs = obj.section_80ee_documents.filter(document_type=doc_type)
+            grouped[field_key] = {
+                "count": docs.count(),
+                "files": [
+                    {
+                        "id": d.id,
+                        "url": d.file.url if d.file else None,
+                        "uploaded_at": d.uploaded_at
+                    } for d in docs
+                ]
+            }
+        return grouped
+
+
+class Section80DDBDocumentsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Section80DDBDocuments
+        fields = '__all__'
+
+
+class Section80DDBSerializer(serializers.ModelSerializer):
+    documents = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Section80DDB
+        fields = '__all__'
+
+    def get_documents(self, obj):
+        return [
+            {
+                "id": doc.id,
+                "file_url": doc.file.url if doc.file else None,
+                "uploaded_at": doc.uploaded_at
+            }
+            for doc in obj.section_80ddb_documents.all()
+        ]
+
+
+class Section80EEBDocumentsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Section80EEBDocuments
+        fields = '__all__'
+
+
+class Section80EEBSerializer(serializers.ModelSerializer):
+    documents = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Section80EEB
+        fields = '__all__'
+
+    def get_documents(self, obj):
+        doc_map = {
+            'sanction_letter_files': 'Sanction Letter',
+            'interest_certificate_files': 'Interest Certificate',
+            'repayment_schedule_files': 'Repayment Schedule',
+            'other_files': 'Other',
+        }
+
+        grouped = {}
+        for group_name, doc_type in doc_map.items():
+            files = obj.section_80eeb_documents.filter(document_type=doc_type)
+            grouped[group_name] = {
+                "count": files.count(),
+                "files": [
+                    {
+                        "id": f.id,
+                        "url": f.file.url if f.file else None,
+                        "uploaded_at": f.uploaded_at
+                    }
+                    for f in files
+                ]
+            }
+        return grouped
+
+
+class DeductionsSerializer(serializers.ModelSerializer):
+    section_80g = Section80GSerializer(many=True, read_only=True)
+    section_80e = Section80ESerializer(read_only=True)
+    section_80ee = Section80EESerializer(many=True, read_only=True)
+    section_80eeb = Section80EEBSerializer(read_only=True)
+    section_80ettattbu = Section80TTATTBUSerializer(read_only=True)
+    section_80c = Section80CSerializer(many=True, read_only=True)
+    section_80d = Section80DSerializer(read_only=True)
+    section_80ddb = Section80DDBSerializer(read_only=True)
+
+    class Meta:
+        model = Deductions
+        fields = '__all__'
+
+
+class ServiceRequestTasksSerializer(serializers.Serializer):
+    personal_information = PersonalInformationSerializer(read_only=True)
+    tax_paid_details = TaxPaidDetailsSerializer(read_only=True)
+    salary_income_details = SalaryIncomeSerializer(read_only=True)
+    other_income_details = OtherIncomeDetailsSerializer(many=True, read_only=True)
+    foreign_income_details = NRIEmployeeSalaryDetailsSerializer(read_only=True)
+    house_property_details = HousePropertyIncomeDetailsSerializer(many=True, read_only=True)
+    other_income = InterestIncomeSerializer(many=True, read_only=True)
+    dividend_income = DividendIncomeSerializer(many=True, read_only=True)
+    gift_income = GiftIncomeDetailsSerializer(many=True, read_only=True)
+    family_pension_income = FamilyPensionIncomeSerializer(many=True, read_only=True)
+    foreign_income = ForeignIncomeSerializer(many=True, read_only=True)
+    winnings = WinningIncomeSerializer(many=True, read_only=True)
+    agriculture_income = AgricultureIncomeSerializer(many=True, read_only=True)
+    deductions = DeductionsSerializer(many=True, read_only=True)
+    ITR_review_filing_certificate = ReviewFilingCertificateSerializer(read_only=True)

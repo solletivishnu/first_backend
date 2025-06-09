@@ -20,7 +20,7 @@ def upsert_foreign_income(request):
 
     if serializer.is_valid():
         serializer.save()
-        return Response({"message": "Foreign Income saved successfully"}, status=status.HTTP_200_OK)
+        return Response(serializer.data, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -46,7 +46,7 @@ def add_foreign_income_info(request):
     serializer = ForeignIncomeInfoSerializer(data=request.data)
     if serializer.is_valid():
         serializer.save()
-        return Response({"message": "Foreign Income Info added successfully"}, status=status.HTTP_201_CREATED)
+        return Response({"message": "Foreign Income Info added successfully", "data":serializer.data}, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

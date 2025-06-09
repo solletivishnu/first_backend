@@ -416,13 +416,11 @@ class UserActivationSerializer(serializers.Serializer):
     token = serializers.CharField()
 
 
-class BusinessSerializer(serializers.ModelSerializer):
-    entityType = serializers.CharField(max_length=50, required=False)
-    pan = serializers.CharField(max_length=15, required=False, default=None)
-    headOffice = serializers.JSONField(default=dict)
+class LogoSerializer(serializers.ModelSerializer):
+    logo = serializers.FileField(allow_null=True, required=False)
 
     class Meta:
-        model = Business
+        model = BusinessLogo
         fields = '__all__'
 
     def create(self, validated_data):
@@ -442,11 +440,14 @@ class BusinessSerializer(serializers.ModelSerializer):
         return instance
 
 
-class LogoSerializer(serializers.ModelSerializer):
-    logo = serializers.FileField(allow_null=True, required=False)
+class BusinessSerializer(serializers.ModelSerializer):
+    entityType = serializers.CharField(max_length=50, required=False)
+    pan = serializers.CharField(max_length=15, required=False, default=None)
+    headOffice = serializers.JSONField(default=dict)
+    logos = LogoSerializer(read_only=True)
 
     class Meta:
-        model = BusinessLogo
+        model = Business
         fields = '__all__'
 
     def create(self, validated_data):

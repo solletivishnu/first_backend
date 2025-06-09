@@ -21,6 +21,10 @@ from . import capital_gains_views
 from . import capital_gains_funds_details_views
 from . import other_capital_gains_views
 from . import business_professional_income_views
+from . import section_80ee_views
+from . import section_80e_views
+from . import section_80ddb_views
+from . import section_80_eeb_views
 
 urlpatterns = [
     # Unified POST and PUT API for TaxPaidDetails and document uploads
@@ -63,6 +67,8 @@ urlpatterns = [
          name='other_income_details_detail'),
     path('other-income-details/by-request-or-task', other_income_views.other_income_details_by_service_request,
          name='other_income_details_by_service_request'),
+    path('other-income-details/<int:pk>/delete', other_income_views.delete_other_income_info,
+         name="delete_other_income_info"),
 
     path('other-income-documents/', other_income_views.add_other_income_document,
          name='add_other_income_document'),
@@ -76,7 +82,9 @@ urlpatterns = [
          name='get_capital_gains_details'),
     path('capital-gains/add-property/', capital_gains_views.add_capital_gains_property,
          name='add_capital_gains_property'),
-    path('capital-gains/delete-property/<int:property_id>/', capital_gains_views.delete_capital_gains_property,
+    path('capital-gains/delete-property/<str:file_type>/<int:property_id>/', capital_gains_views.delete_capital_gains_property_file,
+         name='delete_capital_gains_property_file'),
+    path('capital-gains/delete-property/<int:pk>/', capital_gains_views.delete_capital_gains_property,
          name='delete_capital_gains_property'),
 
     path('capital-gains/update-property/<int:property_id>/',capital_gains_views.update_capital_gains_property,
@@ -128,6 +136,8 @@ urlpatterns = [
     path('house-property-details/delete-file/<str:file_type>/<int:service_request_id>/',
          house_property_income_views.delete_house_property_file,
          name='delete_house_property_file'),
+    path('house-property-details/<int:pk>/delete', house_property_income_views.delete_house_property,
+         name='delete_house_property'),
 
     # InterestIncome endpoints
     path('interest-income/upsert/', interest_income_views.upsert_interest_income, name='upsert_interest_income'),
@@ -273,6 +283,8 @@ urlpatterns = [
         name='section_80c_detail'
     ),
 
+    path('section-80c-files/<int:file_id>/', section_80c_views.delete_section_80c_file, name='delete_section_80c_file'),
+
     path(
             'section-80d/full/',
             section_80d_views.upsert_section_80d_with_files,
@@ -296,6 +308,26 @@ urlpatterns = [
 
     path('service-request-section-data', views.get_service_request_section_data,
          name='get_service_request_section_data'),
+
+    path('section-80ee/upsert/', section_80ee_views.upsert_section80ee_with_files, name='upsert-section80ee'),
+    path('section-80ee/details/<int:deductions_id>/', section_80ee_views.get_section80ee_details,
+         name='get-section80ee-details'),
+    path('section-80ee/<int:deductions_id>/delete/', section_80ee_views.delete_section80ee, name='delete-section80ee'),
+
+    path('section-80e/', section_80e_views.upsert_section80e_with_files, name='upsert-section80e'),
+    path('section-80e/details/<int:deductions_id>/', section_80e_views.get_section80e_details, name='get-section80e'),
+    path('section-80e/<int:deductions_id>/delete/', section_80e_views.delete_section80e, name='delete-section80e'),
+
+
+    path('section-80ddb/upsert/', section_80ddb_views.upsert_section80ddb_with_files),
+    path('section-80ddb/details/<int:deductions_id>/', section_80ddb_views.get_section80ddb_details),
+    path('section-80ddb/<int:deductions_id>/delete/', section_80ddb_views.delete_section80ddb),
+
+    path('section-80eeb/upsert/', section_80_eeb_views.upsert_section80eeb_with_files),
+    path('section-80eeb/details/<int:deductions_id>/', section_80_eeb_views.get_section80eeb_details),
+    path('section-80eeb/<int:deductions_id>/delete/', section_80_eeb_views.delete_section80eeb),
+
+
 
 ]
 

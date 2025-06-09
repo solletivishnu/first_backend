@@ -190,7 +190,7 @@ def get_review_filing_certificate(request):
         else:
             instance = ReviewFilingCertificate.objects.get(service_task_id=service_task_id)
     except ReviewFilingCertificate.DoesNotExist:
-        return Response({"error": "No matching ReviewFilingCertificate found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(status=status.HTTP_404_NOT_FOUND)
 
     serializer = ReviewFilingCertificateSerializer(instance)
     return Response(serializer.data, status=status.HTTP_200_OK)

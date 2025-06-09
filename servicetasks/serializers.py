@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import ServiceTask
+from .models import ServiceTask, ServiceSubTask
 from datetime import date
 from usermanagement.models import Users  # Adjust the import path if necessary
 
@@ -35,4 +35,10 @@ class ServiceTaskDetailedSerializer(serializers.ModelSerializer):
 class ServiceTaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = ServiceTask
+        fields = '__all__'
+
+
+class ServiceSubTaskSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ServiceSubTask
         fields = '__all__'

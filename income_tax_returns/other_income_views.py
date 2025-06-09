@@ -15,11 +15,53 @@ def other_income_details_list(request):
         return Response(serializer.data)
 
     elif request.method == 'POST':
-        serializer = OtherIncomeDetailsSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        data = request.data.copy()
+        service_request_id = request.data.get('service_request')
+        try:
+            main_details_data = {
+                'service_request': request.data.get('service_request'),
+                'service_task': request.data.get('service_task'),
+                'status': request.data.get('status'),
+                'assignee': request.data.get('assignee'),
+                'reviewer': request.data.get('reviewer')
+            }
+            data.pop('service_request', None)
+            data.pop('service_task', None)
+            data.pop('status', None)
+            data.pop('assignee', None)
+            data.pop('reviewer', None)
+            try:
+                instance = OtherIncomeDetails.objects.get(service_request_id=service_request_id)
+                main_serializer = OtherIncomeDetailsSerializer(instance, data=main_details_data, partial=True)
+            except OtherIncomeDetails.DoesNotExist:
+                main_serializer = OtherIncomeDetailsSerializer(data=main_details_data)
+            if not main_serializer.is_valid():
+                return Response(main_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+            main_instance = main_serializer.save()
+
+
+            id = request.data.get('id')
+            if data:
+                data['other_income_details'] = main_instance.id
+                if id:
+                    try:
+                        other_income_detail = OtherIncomeDetailsInfo.objects.get(pk=id, other_income_details=main_instance)
+                        serializers = OtherIncomeDetailsInfoSerializer(other_income_detail, data=data, partial=True)
+                    except OtherIncomeDetailsInfo.DoesNotExist:
+                        serializers = OtherIncomeDetailsInfoSerializer(data=data)
+                else:
+                    serializers = OtherIncomeDetailsInfoSerializer(data=data)
+
+                if serializers.is_valid():
+                    serializers.save()
+                    return Response(main_serializer.data, status=status.HTTP_201_CREATED)
+                return Response(serializers.errors, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response({"message": "Status Updated Successfully"}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET', 'PUT', 'DELETE'])
@@ -91,3 +133,19 @@ def add_other_income_document(request, pk=None):
     elif request.method == 'DELETE':
         document.delete()
         return Response({"detail": "Document deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['DELETE'])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
+def delete_other_income_info(request, pk):
+    """
+    Delete an Other Income Document by document_id.
+    """
+    try:
+        document = OtherIncomeDetailsInfo.objects.get(pk=pk)
+        if document.file:
+            document.file.storage.delete(document.file.name)  # delete from storage
+        document.delete()
+        return Response({"detail": "Document deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+    except OtherIncomeDetailsData.DoesNotExist:
+        return Response({"error": "Document not found"}, status=status.HTTP_404_NOT_FOUND)

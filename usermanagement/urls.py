@@ -28,6 +28,7 @@ urlpatterns = [
     # path('register/complete', views.complete_registration, name='complete_registration'),
     # # New comprehensive business module registration endpoint
     # path('register/business-module', views.register_business_module, name='register_business_module'),
+    path('request-otp/', views.request_otp, name='request-otp'),
 
     # Comprehensive business registration with module subscription and feature permissions
     path('register/business-with-module/', business_registration_api.register_business,

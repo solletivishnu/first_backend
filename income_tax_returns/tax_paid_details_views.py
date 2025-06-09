@@ -22,29 +22,34 @@ def upsert_tax_paid_details(request):
     except TaxPaidDetails.DoesNotExist:
         serializer = TaxPaidDetailsSerializer(data=request.data)
 
-    if serializer.is_valid():
-        tax_paid = serializer.save()
+    try:
+
+        if serializer.is_valid():
+            tax_paid = serializer.save()
 
         # Optional: Clear old files if doing full update
         # TaxPaidDetailsFile.objects.filter(income=tax_paid).delete()
 
-        doc_map = {
-            'form26as_files': '26AS',
-            'ais_files': 'AIS',
-            'advance_tax_files': 'AdvanceTax',
-        }
+            doc_map = {
+                'form26as_files': '26AS',
+                'ais_files': 'AIS',
+                'advance_tax_files': 'AdvanceTax',
+            }
 
-        for field_name, doc_type in doc_map.items():
-            files = request.FILES.getlist(field_name)
-            for f in files:
-                TaxPaidDetailsFile.objects.create(
-                    tax_paid=tax_paid,
-                    document_type=doc_type,
-                    file=f
-                )
+            for field_name, doc_type in doc_map.items():
+                files = request.FILES.getlist(field_name)
+                for f in files:
+                    TaxPaidDetailsFile.objects.create(
+                        tax_paid=tax_paid,
+                        document_type=doc_type,
+                        file=f
+                    )
 
-        return Response({'message': 'Tax Paid Details saved successfully'}, status=status.HTTP_200_OK)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+            return Response({'message': 'Tax Paid Details saved successfully', 'data': serializer.data}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET'])

@@ -8,16 +8,16 @@ import json
 
 
 @api_view(['POST'])
-@parser_classes([MultiPartParser, FormParser])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
 def upsert_equity_mutual_fund_with_files(request):
     try:
-        request_data = request.data
+        request_data = request.data.copy()
 
         # Coerce investment_types if sent as a string
         investment_types = request_data.get('equity_mutual_fund_type')
         if isinstance(investment_types, str):
             try:
-                request_data['equity_mutual_fund_type'] = json.loads(investment_types)
+                request_data['equity_mutual_fund_type'] = json.dumps(json.loads(investment_types))
             except json.JSONDecodeError:
                 return Response({"investment_types": "Invalid JSON format"}, status=400)
         service_request = request.data.get('service_request')

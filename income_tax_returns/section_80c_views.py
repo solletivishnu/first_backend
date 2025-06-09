@@ -1,8 +1,8 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-from .models import Section80C
-from .serializers import Section80CSerializer
+from .models import Section80C, Section80CDocuments
+from .serializers import Section80CSerializer, Section80CDocumentsSerializer
 
 @api_view(['GET', 'POST'])
 def section_80c_list(request):
@@ -21,7 +21,14 @@ def section_80c_list(request):
     # POST
     serializer = Section80CSerializer(data=request.data)
     if serializer.is_valid():
-        serializer.save()
+        section_instance = serializer.save()
+        # Handle file uploads if any
+        file = request.FILES.get('file')
+        if file:
+            Section80CDocuments.objects.create(
+                section_80c=section_instance,
+                file=file
+            )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -45,10 +52,37 @@ def section_80c_detail(request, pk):
     if request.method == 'PUT':
         serializer = Section80CSerializer(obj, data=request.data, partial=True)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
+            section_instance = serializer.save()
+            # Handle file uploads if any
+            file = request.FILES.get('file')
+            if file:
+                document = Section80CDocuments.objects.get(section_80c=section_instance)
+                if document:
+                    document.file = file
+                    document.save()
+                else:
+                    Section80CDocuments.objects.create(
+                        section_80c=section_instance,
+                        file=file
+                    )
+
+            return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     # DELETE
     obj.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['DELETE'])
+def delete_section_80c_file(request, file_id):
+    """
+    Delete a single Section80CFile by its pk.
+    """
+    try:
+        doc = Section80CDocuments.objects.get(pk=file_id)
+    except Section80CDocuments.DoesNotExist:
+        return Response({"error": "File not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    doc.delete()
+    return Response({"message": "File deleted"}, status=status.HTTP_204_NO_CONTENT)
