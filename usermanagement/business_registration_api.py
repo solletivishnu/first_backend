@@ -12,10 +12,11 @@ from botocore.exceptions import ClientError
 import logging
 from Tara.settings.default import *
 import json
+from .get_login_data import get_login_response
 
 from .models import (
     Users, Context, Role, UserContextRole, Module,
-    ModuleFeature, UserFeaturePermission, SubscriptionPlan, ModuleSubscription
+    ModuleFeature, UserFeaturePermission, SubscriptionPlan, ModuleSubscription, PendingUserOTP
 )
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -43,13 +44,25 @@ def register_business(request):
     password = request.data.get('password')
     business_name = request.data.get('business_name')
     module_id = request.data.get('module_id')
+    submitted_otp = request.data.get('otp')
 
     # Validate required fields
-    if not all([email, password, business_name, module_id]):
+    if not all([email, password, business_name, module_id, submitted_otp]):
         return Response(
-            {"error": "Missing required fields. Please provide email, password, business_name, and module_id."},
+            {"error": "Missing required fields. Please provide email, password, business_name, otp and module_id."},
             status=status.HTTP_400_BAD_REQUEST
         )
+    # Check OTP
+    try:
+        otp_obj = PendingUserOTP.objects.get(email=email)
+    except PendingUserOTP.DoesNotExist:
+        return Response({'error': 'OTP not requested for this email'}, status=400)
+
+    if otp_obj.is_expired():
+        return Response({'error': 'OTP expired'}, status=400)
+
+    if otp_obj.otp_code != submitted_otp:
+        return Response({'error': 'Invalid OTP'}, status=400)
 
     # Validate user does not already exist
     if Users.objects.filter(email=email).exists():
@@ -64,7 +77,6 @@ def register_business(request):
     # # Validate business does not exist
     # if Context.objects.filter(name__iexact=business_name).exists():
     #     return Response({"error": "Business with this name already exists."}, status=400)
-
 
     # Validate trial plan exists
     trial_plan = SubscriptionPlan.objects.filter(module=module, plan_type='trial', is_active='yes').first()
@@ -86,8 +98,8 @@ def register_business(request):
                 status='active',
                 registration_flow='module',  # Set registration flow to 'module'
                 registration_completed=False,
-                is_active='no' ,
-                is_super_admin=False # Set is_active to 'yes'
+                is_active='yes',
+                is_super_admin=False  # Set is_active to 'yes'
             )
 
             # 2. Create business context
@@ -166,80 +178,86 @@ def register_business(request):
                 is_active="yes",
                 created_by=user  # Set the created_by field to the user being registered
             )
+            # Delete used OTP
+            otp_obj.delete()
 
-            # 12. Send activation email - This is a required step
-            token = default_token_generator.make_token(user)
-            uid = urlsafe_base64_encode(str(user.pk).encode())
-            activation_link = f"{FRONTEND_URL}activation?uid={uid}&token={token}"
+            login_response_data = get_login_response(user)
 
-            # Initialize SES client
-            ses_client = boto3.client(
-                'ses',
-                region_name=AWS_REGION,
-                aws_access_key_id=AWS_ACCESS_KEY_ID,
-                aws_secret_access_key=AWS_SECRET_ACCESS_KEY
-            )
+            return Response(login_response_data, status=status.HTTP_201_CREATED)
 
-            subject = "Activate your account"
-            body_html = f"""
-                                <html>
-                                <body>
-                                    <h1>Activate Your Account</h1>
-                                    <p>Click the link below to activate your account:</p>
-                                    <a href="{activation_link}">Activate Account</a>
-                                </body>
-                                </html>
-                                """
-
-            try:
-                # Send the email
-                response = ses_client.send_email(
-                    Source=EMAIL_HOST_USER,
-                    Destination={'ToAddresses': [email]},
-                    Message={
-                        'Subject': {'Data': subject},
-                        'Body': {
-                            'Html': {'Data': body_html},
-                            'Text': {'Data': f"Activate your account using the link: {activation_link}"}
-                        },
-                    }
-                )
-                logger.info(f"Activation email sent to: {email}")
-
-                # Return success response with activation information
-                return Response(
-                    {
-                        "message": "Business registration successful. Check your email for activation link.",
-                        "user_id": user.id,
-                        "context_id": context.id,
-                        "module_subscription_id": module_subscription.id,
-                        "trial_end_date": end_date,
-                        "active_context_id": user.active_context.id,
-                        "initial_selection": user.initial_selection,
-                        "registration_flow": user.registration_flow
-                    },
-                    status=status.HTTP_201_CREATED
-                )
-            except ClientError as e:
-                # Log the error but don't fail the registration
-                logger.error(f"Failed to send email via SES: {e.response['Error']['Message']}")
-
-                # Return success response but note the email failure
-                return Response(
-                    {
-                        "message": "Business registration successful, but failed to send activation email. "
-                                   "Please contact support.",
-                        "user_id": user.id,
-                        "context_id": context.id,
-                        "module_subscription_id": module_subscription.id,
-                        "trial_end_date": end_date,
-                        "activation_link": activation_link,  # Include the activation link in the response
-                        "active_context_id": user.active_context.id,
-                        "initial_selection": user.initial_selection,
-                        "registration_flow": user.registration_flow
-                    },
-                    status=status.HTTP_201_CREATED
-                )
+            # # 12. Send activation email - This is a required step
+            # token = default_token_generator.make_token(user)
+            # uid = urlsafe_base64_encode(str(user.pk).encode())
+            # activation_link = f"{FRONTEND_URL}activation?uid={uid}&token={token}"
+            #
+            # # Initialize SES client
+            # ses_client = boto3.client(
+            #     'ses',
+            #     region_name=AWS_REGION,
+            #     aws_access_key_id=AWS_ACCESS_KEY_ID,
+            #     aws_secret_access_key=AWS_SECRET_ACCESS_KEY
+            # )
+            #
+            # subject = "Activate your account"
+            # body_html = f"""
+            #                     <html>
+            #                     <body>
+            #                         <h1>Activate Your Account</h1>
+            #                         <p>Click the link below to activate your account:</p>
+            #                         <a href="{activation_link}">Activate Account</a>
+            #                     </body>
+            #                     </html>
+            #                     """
+            #
+            # try:
+            #     # Send the email
+            #     response = ses_client.send_email(
+            #         Source=EMAIL_HOST_USER,
+            #         Destination={'ToAddresses': [email]},
+            #         Message={
+            #             'Subject': {'Data': subject},
+            #             'Body': {
+            #                 'Html': {'Data': body_html},
+            #                 'Text': {'Data': f"Activate your account using the link: {activation_link}"}
+            #             },
+            #         }
+            #     )
+            #     logger.info(f"Activation email sent to: {email}")
+            #
+            #     # Return success response with activation information
+            #     return Response(
+            #         {
+            #             "message": "Business registration successful. Check your email for activation link.",
+            #             "user_id": user.id,
+            #             "context_id": context.id,
+            #             "module_subscription_id": module_subscription.id,
+            #             "trial_end_date": end_date,
+            #             "active_context_id": user.active_context.id,
+            #             "initial_selection": user.initial_selection,
+            #             "registration_flow": user.registration_flow
+            #         },
+            #         status=status.HTTP_201_CREATED
+            #     )
+            # except ClientError as e:
+            #     # Log the error but don't fail the registration
+            #     logger.error(f"Failed to send email via SES: {e.response['Error']['Message']}")
+            #
+            #     # Return success response but note the email failure
+            #     return Response(
+            #         {
+            #             "message": "Business registration successful, but failed to send activation email. "
+            #                        "Please contact support.",
+            #             "user_id": user.id,
+            #             "context_id": context.id,
+            #             "module_subscription_id": module_subscription.id,
+            #             "trial_end_date": end_date,
+            #             "activation_link": activation_link,  # Include the activation link in the response
+            #             "active_context_id": user.active_context.id,
+            #             "initial_selection": user.initial_selection,
+            #             "registration_flow": user.registration_flow
+            #         },
+            #         status=status.HTTP_201_CREATED
+            #     )
 
     except Module.DoesNotExist:
         return Response(

@@ -36,6 +36,7 @@ class PayrollOrg(models.Model):
     holiday_management = models.BooleanField(default=False)
     employee_master = models.BooleanField(default=False)
 
+
     def to_representation(self, instance):
         """Convert OrderedDict to dict before returning JSON."""
         data = super().to_representation(instance)
@@ -116,7 +117,7 @@ class Departments(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.dept_name} ({self.dept_code})"
+        return f"{self.dept_name}"
 
 
 class Designation(models.Model):
@@ -498,7 +499,10 @@ class EmployeeSalaryDetails(models.Model):
     valid_from = models.DateField(auto_now_add=True)  # Salary start date
     valid_to = models.DateField(null=True, blank=True)  # Salary end date (null = current salary)
     created_on = models.DateField(auto_now_add=True)
-    updated_on = models.DateTimeField(null=True, blank=True)
+    update_month = models.IntegerField(blank=True, null=True)
+    update_year = models.IntegerField(blank=True, null=True)
+    previous_ctc = models.IntegerField(blank=True, null=True)
+    updated_on = models.DateField(null=True, blank=True)
     created_month = models.IntegerField(editable=False)
     created_year = models.IntegerField(editable=False)
 
@@ -598,7 +602,8 @@ class EmployeePersonalDetails(BaseModel):
 
 
 class EmployeeBankDetails(BaseModel):
-    employee = models.OneToOneField('EmployeeManagement', on_delete=models.CASCADE, related_name='employee_bank_details')
+    employee = models.OneToOneField('EmployeeManagement', on_delete=models.CASCADE,
+                                    related_name='employee_bank_details')
     account_holder_name = models.CharField(max_length=150, null=False, blank=False)
     bank_name = models.CharField(max_length=150, null=False, blank=False)
     account_number = models.CharField(max_length=20, unique=True, null=False, blank=False)
@@ -684,6 +689,7 @@ class BonusIncentive(models.Model):
     month = models.IntegerField(null=False)
     year = models.IntegerField(null=False, editable=False)
     financial_year = models.CharField(max_length=10, null=False, blank=False)
+    remarks = models.TextField(null=True, blank=True, default='')
 
     def save(self, *args, **kwargs):
         try:
@@ -842,6 +848,8 @@ class EmployeeSalaryHistory(models.Model):
 
     def __str__(self):
         return f"{self.employee.associate_id} - {self.change_date}"
+
+
 
 
 

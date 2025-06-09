@@ -23,7 +23,7 @@ def upsert_interest_income(request):
 
     if serializer.is_valid():
         serializer.save()
-        return Response({"message": "Interest income saved"}, status=status.HTTP_200_OK)
+        return Response(serializer.data, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -49,7 +49,7 @@ def add_interest_income_document(request):
     serializer = InterestIncomeDocumentSerializer(data=request.data)
     if serializer.is_valid():
         serializer.save()
-        return Response({"message": "Document added successfully"}, status=status.HTTP_201_CREATED)
+        return Response({"message": "Document added successfully", 'data':serializer.data}, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -73,7 +73,7 @@ def update_interest_income_document(request, document_id):
         serializer = InterestIncomeDocumentSerializer(doc, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            return Response({"message": "Document updated"}, status=status.HTTP_200_OK)
+            return Response({"message": "Document updated", "data" : serializer.data}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     except InterestIncomeDocument.DoesNotExist:
         return Response({"error": "Document not found"}, status=status.HTTP_404_NOT_FOUND)

@@ -24,7 +24,7 @@ def upsert_deductions(request):
     if serializer.is_valid():
         serializer.save()
         return Response(
-            {"message": "Deductions saved successfully"},
+            {"data":serializer.data, "message": "Deductions saved successfully"},
             status=status.HTTP_200_OK
         )
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -8,14 +8,20 @@ from .serializers import Section80GSerializer
 # Create a new Section80G entry
 @api_view(['POST'])
 def add_section_80g(request):
-    serializer = Section80GSerializer(data=request.data)
-    if serializer.is_valid():
-        serializer.save()
+    try:
+        serializer = Section80GSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {"message": "Section 80G donation added successfully", 'data': serializer.data},
+                status=status.HTTP_201_CREATED
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
         return Response(
-            {"message": "Section 80G donation added successfully"},
-            status=status.HTTP_201_CREATED
+            {"error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Update an existing Section80G entry

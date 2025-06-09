@@ -194,14 +194,14 @@ class SalaryDocumentFile(models.Model):
 
 
 class OtherIncomeDetails(models.Model):
-    service_request = models.ForeignKey(ServiceRequest, on_delete=models.CASCADE,
+    service_request = models.OneToOneField(ServiceRequest, on_delete=models.CASCADE,
                                            related_name='other_income_details')
     service_type = models.CharField(
         max_length=20,
         default="Income Tax Returns",
         editable=False
     )
-    service_task = models.ForeignKey(ServiceTask, on_delete=models.CASCADE,
+    service_task = models.OneToOneField(ServiceTask, on_delete=models.CASCADE,
                                      related_name='service_task_other_income_details')
     status = models.CharField(max_length=20, choices=[('in progress', 'In Progress'), ('completed', 'Completed'),
                                                       ('sent for approval', 'Sent for Approval'),
@@ -221,12 +221,6 @@ class OtherIncomeDetails(models.Model):
         blank=True,
         related_name='other_income_details_reviewed'
     )
-    details = models.CharField(max_length=255, null=True, blank=True)
-    amount = models.IntegerField()
-    file = models.FileField(upload_to=outcome_income_details_file,
-                            null=True, blank=True)
-    notes = models.TextField(null=True, blank=True)
-    uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
         # Default to service_request values if not set
@@ -238,6 +232,19 @@ class OtherIncomeDetails(models.Model):
 
     def __str__(self):
         return f"{self.service_request.id} - Foreign Employee Salary Details"
+
+
+class OtherIncomeDetailsInfo(models.Model):
+    other_income_details = models.ForeignKey(OtherIncomeDetails, on_delete=models.CASCADE, related_name='other_income_info')
+    details = models.CharField(max_length=255, null=True, blank=True)
+    amount = models.IntegerField()
+    file = models.FileField(upload_to=outcome_income_details_file,
+                            null=True, blank=True)
+    notes = models.TextField(null=True, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.other_income_details.service_request.id} - {self.income_type} Details"
 
 
 class NRIEmployeeSalaryDetails(models.Model):
@@ -300,14 +307,14 @@ class ForeignEmployeeSalaryDetailsFiles(models.Model):
 
 
 class HousePropertyIncomeDetails(models.Model):
-    service_request = models.ForeignKey(ServiceRequest, on_delete=models.CASCADE,
+    service_request = models.OneToOneField(ServiceRequest, on_delete=models.CASCADE,
                                         related_name='house_property_details')
     service_type = models.CharField(
         max_length=20,
         default="Income Tax Returns",
         editable=False
     )
-    service_task = models.ForeignKey(ServiceTask, on_delete=models.CASCADE,
+    service_task = models.OneToOneField(ServiceTask, on_delete=models.CASCADE,
                                      related_name='service_task_house_property_details')
     status = models.CharField(max_length=20, choices=[('in progress', 'In Progress'), ('completed', 'Completed'),
                                                       ('sent for approval', 'Sent for Approval'),
@@ -319,7 +326,6 @@ class HousePropertyIncomeDetails(models.Model):
         blank=True,
         related_name='house_property_details_assigned'
     )
-
     reviewer = models.ForeignKey(
         Users,
         on_delete=models.SET_NULL,
@@ -327,6 +333,22 @@ class HousePropertyIncomeDetails(models.Model):
         blank=True,
         related_name='house_property_details_reviewed'
     )
+
+    def save(self, *args, **kwargs):
+        # Default to service_request values if not set
+        if not self.assignee and self.service_task.assignee:
+            self.assignee = self.service_task.assignee
+        if not self.reviewer and self.service_task.reviewer:
+            self.reviewer = self.service_task.reviewer
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.service_request.id} - House Property Details"
+
+
+class HousePropertyIncomeDetailsInfo(models.Model):
+    house_property_details = models.ForeignKey(HousePropertyIncomeDetails, on_delete=models.CASCADE,
+                                             related_name='property_info')
     type_of_property = models.CharField(max_length=255, null=True, blank=True)
     property_address = JSONField(null=True, blank=True, default=dict)
     owned_property = models.BooleanField(default=False)
@@ -344,16 +366,8 @@ class HousePropertyIncomeDetails(models.Model):
     loan_statement = models.FileField(upload_to=house_property_details_loan_statement, null=True, blank=True)
     upload_loan_interest_certificate = models.FileField(upload_to=house_property_details_loan_interest_certificate, null=True, blank=True)
 
-    def save(self, *args, **kwargs):
-        # Default to service_request values if not set
-        if not self.assignee and self.service_task.assignee:
-            self.assignee = self.service_task.assignee
-        if not self.reviewer and self.service_task.reviewer:
-            self.reviewer = self.service_task.reviewer
-        super().save(*args, **kwargs)
-
     def __str__(self):
-        return f"{self.service_request.id} - House Property Details"
+        return f"{self.house_property_details.service_request.id} - Property Info"
 
 
 class CapitalGainsApplicableDetails(models.Model):
@@ -405,12 +419,13 @@ class CapitalGainsProperty(models.Model):
     property_type = models.CharField(max_length=120, null=False, blank=False, choices=[('land', 'land'),
                                                                                        ('plot', 'plot'),
                                                                                        ('building', 'building')])
-    date_of_purchase = models.DateField()
-    purchase_cost = models.IntegerField()
-    date_of_sale = models.DateField()
-    sale_value = models.IntegerField()
+    date_of_purchase = models.DateField(null=True, blank=True)
+    purchase_cost = models.IntegerField(null=True, blank=True)
+    date_of_sale = models.DateField(null=True, blank=True)
+    sale_value = models.IntegerField(null=True, blank=True)
     purchase_doc = models.FileField(upload_to=capital_gains_property_purchase_doc, null=True, blank=True)
     sale_doc = models.FileField(upload_to=capital_gains_property_sale_doc, null=True, blank=True)
+    reinvestment_made = models.CharField(max_length=20, choices=[('yes', 'Yes'), ('no', 'No')], default='no')
     reinvestment_details = JSONField(default=dict, null=True, blank=True)
     reinvestment_details_docs = models.FileField(upload_to=capital_gains_property_reinvestment_docs,
                                                  null=True, blank=True)
@@ -466,14 +481,14 @@ class CapitalGainsEquityMutualFundDocument(models.Model):
 
 
 class OtherCapitalGains(models.Model):
-    service_request = models.ForeignKey(ServiceRequest, on_delete=models.CASCADE,
+    service_request = models.OneToOneField(ServiceRequest, on_delete=models.CASCADE,
                                         related_name='capital_gains_other_capital_gains')
     service_type = models.CharField(
         max_length=20,
         default="Income Tax Returns",
         editable=False
     )
-    service_task = models.ForeignKey(ServiceTask, on_delete=models.CASCADE,
+    service_task = models.OneToOneField(ServiceTask, on_delete=models.CASCADE,
                                      related_name='service_task_capital_gains_other_capital_gains')
     status = models.CharField(max_length=20, choices=[('in progress', 'In Progress'), ('completed', 'Completed'),
                                                       ('sent for approval', 'Sent for Approval'),
@@ -493,6 +508,15 @@ class OtherCapitalGains(models.Model):
         blank=True,
         related_name='capital_gains_other_capital_gains_reviewed'
     )
+
+    def __str__(self):
+        return f"{self.service_request.id} - Other Capital Gains Details"
+
+
+class OtherCapitalGainsInfo(models.Model):
+    other_capital_gains = models.ForeignKey(OtherCapitalGains, on_delete=models.CASCADE,
+                                            related_name='other_capital_gain_info')
+
     asset_details = models.CharField(max_length=120, null=False, blank=False)
     purchase_date = models.DateField()
     sale_date = models.DateField()
@@ -500,28 +524,28 @@ class OtherCapitalGains(models.Model):
     purchase_value = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
-        return f"{self.service_request.id} - Other Capital Gains Details"
+        return f"{self.other_capital_gains.service_request.id}"
 
 
 class OtherCapitalGainsDocument(models.Model):
-    other_capital_gains = models.ForeignKey(OtherCapitalGains, on_delete=models.CASCADE, related_name='documents')
+    other_capital_gains_info = models.ForeignKey(OtherCapitalGainsInfo, on_delete=models.CASCADE, related_name='documents')
     file = models.FileField(upload_to=other_capital_gains_file,
                             null=True, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.other_capital_gains.service_request.id} - {self.file.name}"
+        return f"{self.other_capital_gains_info.other_capital_gains.service_request.id} - {self.file.name}"
 
 
 class BusinessProfessionalIncome(models.Model):
-    service_request = models.ForeignKey(ServiceRequest, on_delete=models.CASCADE,
+    service_request = models.OneToOneField(ServiceRequest, on_delete=models.CASCADE,
                                         related_name='business_professional_income')
     service_type = models.CharField(
         max_length=20,
         default="Income Tax Returns",
         editable=False
     )
-    service_task = models.ForeignKey(ServiceTask, on_delete=models.CASCADE, related_name='service_task_business_professional_income')
+    service_task = models.OneToOneField(ServiceTask, on_delete=models.CASCADE, related_name='service_task_business_professional_income')
     status = models.CharField(max_length=20, choices=[('in progress', 'In Progress'), ('completed', 'Completed'),
                                                       ('sent for approval', 'Sent for Approval'),
                                                       ('revoked', 'Revoked')], null=False, blank=False)
@@ -540,13 +564,7 @@ class BusinessProfessionalIncome(models.Model):
         blank=True,
         related_name='business_professional_income_reviewed'
     )
-    business_name = models.CharField(max_length=255, null=False, blank=False)
-    business_type = models.CharField(max_length=255, null=False, blank=False)
-    opting_for_presumptive_taxation = models.CharField(max_length=255, null=False, blank=False,
-                                                       choices=[('yes', 'Yes'), ('no', 'No')], default='no')
-    opting_data = JSONField(default={}, null=True, blank=True)
-    gst_registered = models.CharField(max_length=255, null=False, blank=False,
-                                      choices=[('yes', 'Yes'), ('no', 'No')], default='no')
+
 
     def save(self, *args, **kwargs):
         # Default to service_request values if not set
@@ -560,14 +578,31 @@ class BusinessProfessionalIncome(models.Model):
         return f"{self.service_request.id} - Business Professional Income Details"
 
 
-class BusinessProfessionalIncomeDocument(models.Model):
+class BusinessProfessionalIncomeInfo(models.Model):
     business_professional_income = models.ForeignKey(BusinessProfessionalIncome, on_delete=models.CASCADE,
+                                                     related_name='business_professional_income_info')
+    business_name = models.CharField(max_length=255, null=False, blank=False)
+    business_type = models.CharField(max_length=255, null=False, blank=False)
+    opting_for_presumptive_taxation = models.CharField(max_length=255, null=False, blank=False,
+                                                       choices=[('yes', 'Yes'), ('no', 'No')], default='no')
+    opting_data = JSONField(default={}, null=True, blank=True)
+    gst_registered = models.CharField(max_length=255, null=False, blank=False,
+                                      choices=[('yes', 'Yes'), ('no', 'No')], default='no')
+
+    def __str__(self):
+        return f"{self.business_professional_income.service_request.id} - {self.business_name} Details"
+
+
+class BusinessProfessionalIncomeDocument(models.Model):
+    business_professional_income_info = models.ForeignKey(BusinessProfessionalIncomeInfo, on_delete=models.CASCADE,
                                                      related_name='documents')
     document_type = models.CharField(max_length=30, choices=[('26AS', '26AS'),
                                                              ('GST Returns', 'GST Returns'),
                                                              ('Bank Statements', 'Bank Statements'),
                                                              ('Other', 'Other'),
-                                                             ('AIS', 'AIS')])
+                                                             ('AIS', 'AIS'),
+                                                             ('Profit & Loss Statement', 'Profit & Loss Statement'),
+                                                             ('Balance Sheet', 'Balance Sheet')])
     file = models.FileField(upload_to=business_professional_income_file, null=True, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
@@ -847,12 +882,14 @@ class ForeignIncome(models.Model):
 class ForeignIncomeInfo(models.Model):
     foreign_income = models.ForeignKey(ForeignIncome, on_delete=models.CASCADE,
                                        related_name='foreign_income_docs')
-    type_of_income = models.CharField(max_length=30, choices=[('Divident', 'Divident'),
+    type_of_income = models.CharField(max_length=30, choices=[('Dividend', 'Dividend'),
                                                               ('Interest', 'Interest'),
                                                               ('Others', 'Others')])
     country = models.CharField(max_length=20)
     currency = models.CharField(max_length=3)
     amount = models.IntegerField()
+    tax_paid_abroad = models.CharField(max_length=20, choices=[('yes', 'Yes'), ('no', 'No')], default='No')
+    form67_file = models.FileField(upload_to=foreign_income_file, null=True, blank=True)
 
     def __str__(self):
         return f"{self.foreign_income.service_request.id}- {self.type_of_income}"
@@ -905,7 +942,7 @@ class WinningIncomeDocument(models.Model):
     winning_income = models.ForeignKey(WinningIncome, on_delete=models.CASCADE, related_name='winnings_income_docs')
     source = models.CharField(max_length=30, choices=[('Lottery', 'Lottery'),
                                                       ('Game Show', 'Game Show'),
-                                                      ('amount', 'amount')])
+                                                      ('Others', 'Others')])
     amount = models.IntegerField()
     file = models.FileField(upload_to=winning_income_file,
                             null=True, blank=True)
@@ -1025,8 +1062,8 @@ class Section80G(models.Model):
         return f"{self.deductions.service_request.id} - Section 80G Donation"
 
 
-class Section80ETTATTBU(models.Model):
-    deductions = models.OneToOneField(Deductions, on_delete=models.CASCADE, related_name='section_80ettattbu')
+class Section80E(models.Model):
+    deductions = models.OneToOneField(Deductions, on_delete=models.CASCADE, related_name='section_80e')
     amount = models.IntegerField(null=True, blank=True)
     education_of = models.CharField(max_length=50, null=True, blank=True, choices=[('self', 'self'),
                                                                                    ('spouse', 'spouse'),
@@ -1034,6 +1071,26 @@ class Section80ETTATTBU(models.Model):
                                                                                    ('dependent', 'dependent')])
     borrower_name = models.CharField(max_length=50, null=True, blank=True)
     is_it_approved_bank = models.BooleanField(default=False)
+    loan_outstanding_as_on_31st_march = models.IntegerField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.deductions.service_request.id} - Section 80E Donation"
+
+
+class Section80EDocuments(models.Model):
+    section_80e = models.ForeignKey(Section80E, on_delete=models.CASCADE, related_name='section_80e_documents')
+    document_type = models.CharField(max_length=30, choices=[('Sanction Letter', 'Sanction Letter'), ('Interest Certificate', 'Interest Certificate'),
+                                                                ('Repayment Schedule', 'Repayment Schedule'),
+                                                                ('Other', 'Other')])
+    file = models.FileField(upload_to=section_80e_file, null=True, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.section_80e.deductions.service_request.id} - {self.uploaded_at}"
+
+
+class Section80TTATTBU(models.Model):
+    deductions = models.OneToOneField(Deductions, on_delete=models.CASCADE, related_name='section_80ettattbu')
     total_saving_interest = models.IntegerField(null=True, blank=True)
     total_fd_interest = models.IntegerField(null=True, blank=True)
     nature_of_disability = models.CharField(max_length=50, null=True, blank=True,
@@ -1067,17 +1124,46 @@ class Section80ETTATTBU(models.Model):
 
 class Section80C(models.Model):
     deductions = models.ForeignKey(Deductions, on_delete=models.CASCADE, related_name='section_80c')
-    investment = models.CharField(max_length=50, null=True, blank=True,choices=[('ppf', 'ppf'),
-                                                                                ('nsc', 'nsc'),
-                                                                                ('elss', 'elss'),
-                                                                                ('life insurance', 'life insurance'),
-                                                                                ('tution fees', 'tution fees'),
-                                                                                ('others', 'others')])
+    investment = models.CharField(max_length=50, null=True, blank=True,choices=[('PPF', 'PPF'),
+                                                                                ('NSC', 'NSC'),
+                                                                                ('ELSS', 'ELSS'),
+                                                                                ('Life Insurance', 'Life Insurance'),
+                                                                                ('Tuition Fees', 'Tuition Fees'),
+                                                                                ('Others', 'Others')])
     amount = models.IntegerField(null=True, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    def __str__(self):
+        return f"{self.deductions.service_request.id} - Section 80c Donation"
+
+
+class Section80CDocuments(models.Model):
+    section_80c = models.ForeignKey(Section80C, on_delete=models.CASCADE, related_name='section_80c_documents')
+    file = models.FileField(upload_to=section_80c_file, null=True, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.deductions.service_request.id} - Section 80c Donation"
+        return f"{self.section_80c.deductions.service_request.id} - {self.uploaded_at}"
+
+
+class Section80EE(models.Model):
+    deductions = models.ForeignKey(Deductions, on_delete=models.CASCADE, related_name='section_80ee')
+    loan_outstanding_as_on_31st_march = models.IntegerField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.deductions.service_request.id} - Section 80EE Donation"
+
+
+class Section80EEDocuments(models.Model):
+    section_80ee = models.ForeignKey(Section80EE, on_delete=models.CASCADE, related_name='section_80ee_documents')
+    document_type = models.CharField(max_length=30, choices=[('Sanction Letter', 'Sanction Letter'),
+                                                             ('Interest Certificate', 'Interest Certificate'),
+                                                             ('Repayment Schedule', 'Repayment Schedule'),
+                                                             ('Other', 'Other')])
+    file = models.FileField(upload_to=section_80ee_file, null=True, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.section_80ee.deductions.service_request.id} - {self.uploaded_at}"
 
 
 class Section80D(models.Model):
@@ -1102,12 +1188,48 @@ class Section80DFile(models.Model):
         return f"{self.section_80d.deductions.service_request.id} - {self.uploaded_at}"
 
 
+class Section80DDB(models.Model):
+    deductions = models.OneToOneField(Deductions, on_delete=models.CASCADE, related_name='section_80ddb')
+    name_of_disease = models.CharField(max_length=255, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.deductions.service_request.id} - Section 80DDB Donation"
+
+
+class Section80DDBDocuments(models.Model):
+    section_80ddb = models.ForeignKey(Section80DDB, on_delete=models.CASCADE, related_name='section_80ddb_documents')
+    file = models.FileField(upload_to=section_80ddb_file, null=True, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.section_80d.deductions.service_request.id} - {self.uploaded_at}"
+
+
+class Section80EEB(models.Model):
+    deductions = models.OneToOneField(Deductions, on_delete=models.CASCADE, related_name='section_80eeb')
+    vehicle_registration_number = models.CharField(max_length=50, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.deductions.service_request.id} - Section 80EEB Donation"
+
+
+class Section80EEBDocuments(models.Model):
+    section_80eeb = models.ForeignKey(Section80EEB, on_delete=models.CASCADE, related_name='section_80eeb_documents')
+    document_type = models.CharField(max_length=30, choices=[('Sanction Letter', 'Sanction Letter'),
+                                                             ('Interest Certificate', 'Interest Certificate'),
+                                                             ('Repayment Schedule', 'Repayment Schedule'),
+                                                             ('Other', 'Other')])
+    file = models.FileField(upload_to=section_80eeb_file, null=True, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.section_80eeb.deductions.service_request.id} - {self.uploaded_at}"
+
+
 class ReviewFilingCertificate(models.Model):
-    REVIEW_STATUS_CHOICES = [
-        ('in progress', 'In Progress'),
-        ('resubmission', 'Resubmission'),
-        ('done', 'Done'),
-    ]
+    REVIEW_STATUS_CHOICES = [('in progress', 'In Progress'), ('completed', 'Completed'),
+                                                      ('sent for approval', 'Sent for Approval'),
+                                                      ('revoked', 'Revoked')]
 
     FILING_STATUS_CHOICES = [
         ('in progress', 'In Progress'),
@@ -1155,12 +1277,21 @@ class ReviewFilingCertificate(models.Model):
         default=None
     )
 
+    draft_income_file = models.FileField(upload_to=draft_filing_certificate,
+                                                null=True, blank=True)
+
     approval_status = models.CharField(
         max_length=20,
         choices=APPROVAL_STATUS_CHOICES,
         null=True,
         blank=True,
         default=None
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=[('in progress', 'In Progress'), ('completed', 'Completed'),
+                 ('sent for approval', 'Sent for Approval'), ('revoked', 'Revoked')],
+        null=True, blank=True
     )
     assignee = models.ForeignKey(Users, on_delete=models.SET_NULL, null=True, blank=True,
                                  related_name='assigned_ITR_review_filing_certificate')
@@ -1211,5 +1342,253 @@ def sync_service_task_status(sender, instance, **kwargs):
     task.save()
 
 
+@receiver(post_save, sender=TaxPaidDetails)
+def sync_service_task_status(sender, instance, **kwargs):
+    task = instance.service_task
+
+    # Sync status
+    if task.status != instance.status:
+        task.status = instance.status
+
+    # Sync completion %
+    task.completion_percentage = calculate_completion_percentage(instance)
+
+    task.save()
 
 
+@receiver(post_save, sender=SalaryIncome)
+def sync_service_task_status(sender, instance, **kwargs):
+    task = instance.service_task
+
+    # Sync status
+    if task.status != instance.status:
+        task.status = instance.status
+
+    # Sync completion %
+    task.completion_percentage = calculate_completion_percentage(instance)
+
+    task.save()
+
+
+@receiver(post_save, sender=OtherIncomeDetails)
+def sync_service_task_status(sender, instance, **kwargs):
+    task = instance.service_task
+
+    # Sync status
+    if task.status != instance.status:
+        task.status = instance.status
+
+    # Sync completion %
+    task.completion_percentage = calculate_completion_percentage(instance)
+
+    task.save()
+
+
+@receiver(post_save, sender=NRIEmployeeSalaryDetails)
+def sync_service_task_status(sender, instance, **kwargs):
+    task = instance.service_task
+
+    # Sync status
+    if task.status != instance.status:
+        task.status = instance.status
+
+    # Sync completion %
+    task.completion_percentage = calculate_completion_percentage(instance)
+
+    task.save()
+
+
+@receiver(post_save, sender=HousePropertyIncomeDetails)
+def sync_service_task_status(sender, instance, **kwargs):
+    task = instance.service_task
+
+    # Sync status
+    if task.status != instance.status:
+        task.status = instance.status
+
+    # Sync completion %
+    task.completion_percentage = calculate_completion_percentage(instance)
+
+    task.save()
+
+
+@receiver(post_save, sender=CapitalGainsApplicableDetails)
+def sync_service_task_status(sender, instance, **kwargs):
+    task = instance.service_task
+
+    # Sync status
+    if task.status != instance.status:
+        task.status = instance.status
+
+    # Sync completion %
+    task.completion_percentage = calculate_completion_percentage(instance)
+
+    task.save()
+
+
+@receiver(post_save, sender=CapitalGainsEquityMutualFund)
+def sync_service_task_status(sender, instance, **kwargs):
+    task = instance.service_task
+
+    # Sync status
+    if task.status != instance.status:
+        task.status = instance.status
+
+    # Sync completion %
+    task.completion_percentage = calculate_completion_percentage(instance)
+
+    task.save()
+
+
+@receiver(post_save, sender=OtherCapitalGains)
+def sync_service_task_status(sender, instance, **kwargs):
+    task = instance.service_task
+
+    # Sync status
+    if task.status != instance.status:
+        task.status = instance.status
+
+    # Sync completion %
+    task.completion_percentage = calculate_completion_percentage(instance)
+
+    task.save()
+
+
+@receiver(post_save, sender=DividendIncome)
+def sync_service_task_status(sender, instance, **kwargs):
+    task = instance.service_task
+
+    # Sync status
+    if task.status != instance.status:
+        task.status = instance.status
+
+    # Sync completion %
+    task.completion_percentage = calculate_completion_percentage(instance)
+
+    task.save()
+
+
+@receiver(post_save, sender=GiftIncomeDetails)
+def sync_service_task_status(sender, instance, **kwargs):
+    task = instance.service_task
+
+    # Sync status
+    if task.status != instance.status:
+        task.status = instance.status
+
+    # Sync completion %
+    task.completion_percentage = calculate_completion_percentage(instance)
+
+    task.save()
+
+
+@receiver(post_save, sender=BusinessProfessionalIncome)
+def sync_service_task_status(sender, instance, **kwargs):
+    task = instance.service_task
+
+    # Sync status
+    if task.status != instance.status:
+        task.status = instance.status
+
+    # Sync completion %
+    task.completion_percentage = calculate_completion_percentage(instance)
+
+    task.save()
+
+
+@receiver(post_save, sender=InterestIncome)
+def sync_service_task_status(sender, instance, **kwargs):
+    task = instance.service_task
+
+    # Sync status
+    if task.status != instance.status:
+        task.status = instance.status
+
+    # Sync completion %
+    task.completion_percentage = calculate_completion_percentage(instance)
+
+    task.save()
+
+
+@receiver(post_save, sender=FamilyPensionIncome)
+def sync_service_task_status(sender, instance, **kwargs):
+    task = instance.service_task
+
+    # Sync status
+    if task.status != instance.status:
+        task.status = instance.status
+
+    # Sync completion %
+    task.completion_percentage = calculate_completion_percentage(instance)
+
+    task.save()
+
+
+@receiver(post_save, sender=ForeignIncome)
+def sync_service_task_status(sender, instance, **kwargs):
+    task = instance.service_task
+
+    # Sync status
+    if task.status != instance.status:
+        task.status = instance.status
+
+    # Sync completion %
+    task.completion_percentage = calculate_completion_percentage(instance)
+
+    task.save()
+
+
+@receiver(post_save, sender=WinningIncome)
+def sync_service_task_status(sender, instance, **kwargs):
+    task = instance.service_task
+
+    # Sync status
+    if task.status != instance.status:
+        task.status = instance.status
+
+    # Sync completion %
+    task.completion_percentage = calculate_completion_percentage(instance)
+
+    task.save()
+
+
+@receiver(post_save, sender=AgricultureIncome)
+def sync_service_task_status(sender, instance, **kwargs):
+    task = instance.service_task
+
+    # Sync status
+    if task.status != instance.status:
+        task.status = instance.status
+
+    # Sync completion %
+    task.completion_percentage = calculate_completion_percentage(instance)
+
+    task.save()
+
+
+@receiver(post_save, sender=Deductions)
+def sync_service_task_status(sender, instance, **kwargs):
+    task = instance.service_task
+
+    # Sync status
+    if task.status != instance.status:
+        task.status = instance.status
+
+    # Sync completion %
+    task.completion_percentage = calculate_completion_percentage(instance)
+
+    task.save()
+
+
+@receiver(post_save, sender=ReviewFilingCertificate)
+def sync_service_task_status(sender, instance, **kwargs):
+    task = instance.service_task
+
+    # Sync status
+    if task.status != instance.status:
+        task.status = instance.status
+
+    # Sync completion %
+    task.completion_percentage = calculate_completion_percentage(instance)
+
+    task.save()

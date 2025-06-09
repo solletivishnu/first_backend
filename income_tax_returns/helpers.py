@@ -43,7 +43,7 @@ def salary_income_details_file(instance, filename):
 
 def outcome_income_details_file(instance, filename):
     # Get the name of the business, replace spaces with underscores
-    service_request_id = str(instance.service_request_id)
+    service_request_id = str(instance.other_income_details.service_request_id)
     # Construct the upload path
     return os.path.join('service_requests', 'itr', service_request_id, 'outcome_income_details_file', filename)
 
@@ -61,7 +61,7 @@ def foreign_emp_salary_details_file(instance, filename):
 
 def house_property_details_municipal_tax_receipt(instance, filename):
     # instance is of HousePropertyDetailsMunicipalTaxReceipt
-    service_request_id = str(instance.service_request_id)
+    service_request_id = str(instance.house_property_details.service_request_id)
 
     # Construct an upload path
     return os.path.join(
@@ -70,7 +70,7 @@ def house_property_details_municipal_tax_receipt(instance, filename):
 
 def house_property_details_loan_statement(instance, filename):
     # instance is of HousePropertyDetailsOwnershipDocument
-    service_request_id = str(instance.service_request_id)
+    service_request_id = str(instance.house_property_details.service_request_id)
 
     # Construct an upload path
     return os.path.join(
@@ -79,7 +79,7 @@ def house_property_details_loan_statement(instance, filename):
 
 def house_property_details_loan_interest_certificate(instance, filename):
     # instance is of HousePropertyDetailsOwnershipDocument
-    service_request_id = str(instance.service_request_id)
+    service_request_id = str(instance.house_property_details.service_request_id)
 
     # Construct an upload path
     return os.path.join(
@@ -134,18 +134,39 @@ def review_filing_certificate(instance, filename):
     return os.path.join('service_requests', 'itr', service_request_id, 'review_filing_certificate', filename)
 
 
-def section_80g_file(instance, filename):
+def draft_filing_certificate(instance, filename):
     # Get the name of the business, replace spaces with underscores
     service_request_id = str(instance.service_request_id)
+    # Construct the upload path
+    return os.path.join('service_requests', 'itr', service_request_id, 'draft_filing_certificate', filename)
+
+
+def section_80g_file(instance, filename):
+    # Get the name of the business, replace spaces with underscores
+    service_request_id = str(instance.deductions.service_request_id)
     # Construct the upload path
     return os.path.join('service_requests', 'deductions', service_request_id, 'section_80g_file', filename)
 
 
 def section_80ettattbu_file(instance, filename):
     # Get the name of the business, replace spaces with underscores
-    service_request_id = str(instance.service_request_id)
+    service_request_id = str(instance.deductions.service_request_id)
     # Construct the upload path
     return os.path.join('service_requests', 'deductions', service_request_id, 'section_80ettattbu_file', filename)
+
+
+def section_80e_file(instance, filename):
+    # Get the name of the business, replace spaces with underscores
+    service_request_id = str(instance.section_80e.deductions.service_request_id)
+    # Construct the upload path
+    return os.path.join('service_requests', 'deductions', service_request_id, 'section_80e_file', filename)
+
+
+def section_80ee_file(instance, filename):
+    # Get the name of the business, replace spaces with underscores
+    service_request_id = str(instance.section_80ee.deductions.service_request_id)
+    # Construct the upload path
+    return os.path.join('service_requests', 'deductions', service_request_id, 'section_80ee_file', filename)
 
 
 def section_80d_file(instance, filename):
@@ -153,6 +174,20 @@ def section_80d_file(instance, filename):
     service_request_id = str(instance.section_80d.deductions.service_request_id)
     # Construct the upload path
     return os.path.join('service_requests', 'deductions', service_request_id, 'section_80d_file', filename)
+
+
+def section_80ddb_file(instance, filename):
+    # Get the name of the business, replace spaces with underscores
+    service_request_id = str(instance.section_80ddb.deductions.service_request_id)
+    # Construct the upload path
+    return os.path.join('service_requests', 'deductions', service_request_id, 'section_80ddb_file', filename)
+
+
+def section_80eeb_file(instance, filename):
+    # Get the name of the business, replace spaces with underscores
+    service_request_id = str(instance.section_80eeb.deductions.service_request_id)
+    # Construct the upload path
+    return os.path.join('service_requests', 'deductions', service_request_id, 'section_80eeb_file', filename)
 
 
 def capital_gains_property_purchase_doc(instance, filename):
@@ -197,7 +232,7 @@ def capital_gains_equity_mutual_fund_file(instance, filename):
 
 def other_capital_gains_file(instance, filename):
     # instance is of OtherIncomeFile
-    service_request_id = str(instance.other_capital_gains.service_request_id)
+    service_request_id = str(instance.other_capital_gains_info.other_capital_gains.service_request_id)
 
     # Construct an upload path
     return os.path.join(
@@ -207,7 +242,7 @@ def other_capital_gains_file(instance, filename):
 
 def business_professional_income_file(instance, filename):
     # instance is of BusinessProfessionalIncomeFile
-    service_request_id = str(instance.business_professional_income.service_request_id)
+    service_request_id = str(instance.business_professional_income_info.business_professional_income.service_request_id)
     document_type = instance.document_type or "unknown_type"
 
     # Construct an upload path
@@ -216,3 +251,20 @@ def business_professional_income_file(instance, filename):
     )
 
 
+def foreign_income_file(instance, filename):
+    # instance is of ForeignIncomeFile
+    service_request_id = str(instance.foreign_income.service_request_id)
+
+
+    # Construct an upload path
+    return os.path.join(
+        'service_requests', 'itr', service_request_id, 'foreign_income_file', "form 67", filename
+    )
+
+
+def section_80c_file(instance, filename):
+    # instance is of Section80CFile
+    service_request_id = str(instance.section_80c.deductions.service_request_id)
+
+    # Construct an upload path
+    return os.path.join('service_requests', 'itr', service_request_id, 'section_80c_file', filename)

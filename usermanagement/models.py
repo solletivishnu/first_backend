@@ -27,6 +27,16 @@ YES_NO_CHOICES = [
 KEY = b'zSwtDDLJp6Qkb9CMCJnVeOzAeSJv-bA3VYNCy5zM-b4='  # Fernet key
 
 
+class PendingUserOTP(models.Model):
+    email = models.EmailField(unique=True)
+    otp_code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+
+
 class EncryptedField(models.Field):
     def __init__(self, *args, **kwargs):
         self.cipher = Fernet(KEY)

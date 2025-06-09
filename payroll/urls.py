@@ -1,5 +1,8 @@
 from django.urls import path
 from . import views
+from . import employee_management
+from . import generate_salary_upload_template
+from . import bulk_employee_upload
 
 urlpatterns = [
     # URL for listing and creating PayrollOrg instances
@@ -171,11 +174,21 @@ urlpatterns = [
 
     path('bonus-incentives/by-payroll-month', views.bonus_by_payroll_month_year, name='bonus-by-payroll'),
 
-    path('employee-salaries', views.active_employee_salaries, name='active-employee-salaries'),
+    # path('employee-salaries', views.active_employee_salaries, name='active-employee-salaries'),
     
     path("employee-tds",views.employee_tds_list,name="employee-tds-list"),
     
     path("employee-tds/<int:pk>",views.employee_tds_detail,name="employee-tds-detail"),
+
+    path("salary-revision", views.salary_revision_list, name="salary-revision-list"),
+
+    path('download-template/<int:payroll_id>/', employee_management.generate_employee_upload_template,
+         name='download_employee_template'),
+
+    path('employee-salary-template/<int:payroll_id>/',
+         generate_salary_upload_template.generate_salary_upload_template, name='salary-template'),
+
+    path('employees/upload/', bulk_employee_upload.upload_employee_excel, name='upload-employee-excel'),
 
 
 ]
