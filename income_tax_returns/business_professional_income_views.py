@@ -181,20 +181,20 @@ def get_business_professional_income(request, service_request_id):
 
 
 @api_view(['DELETE'])
-def delete_business_professional_income(request, service_request_id):
+def delete_business_professional_income(request, pk):
     try:
-        instance = BusinessProfessionalIncome.objects.get(service_request__id=service_request_id)
+        instance = BusinessProfessionalIncomeInfo.objects.get(pk=pk)
         instance.delete()
         return Response({"message": "Deleted successfully"}, status=status.HTTP_200_OK)
 
-    except BusinessProfessionalIncome.DoesNotExist:
+    except BusinessProfessionalIncomeInfo.DoesNotExist:
         return Response({"error": "Record not found"}, status=status.HTTP_404_NOT_FOUND)
 
 
 @api_view(['DELETE'])
 def delete_business_professional_income_file(request, file_id):
     try:
-        file = BusinessProfessionalIncomeInfo.objects.get(id=file_id)
+        file = BusinessProfessionalIncomeDocument.objects.get(id=file_id)
         file.delete()
         return Response({"message": "Deleted Successfully"}, status=status.HTTP_204_NO_CONTENT)
 

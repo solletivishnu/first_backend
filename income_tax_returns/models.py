@@ -7,6 +7,7 @@ from usermanagement.models import ServiceRequest, Users
 from servicetasks.models import ServiceTask
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from docwallet.models import PrivateS3Storage
 
 
 class PersonalInformation(models.Model):
@@ -24,10 +25,10 @@ class PersonalInformation(models.Model):
     last_name = models.CharField(max_length=255, null=False, blank=False)
     gender = models.CharField(max_length=255, null=False, blank=False)
     residentail_status = models.CharField(max_length=255, null=False, blank=False)
-    pan = models.FileField(upload_to=personal_information_pan, null=True, blank=True)
+    pan = models.FileField(upload_to=personal_information_pan, null=True, blank=True, storage=PrivateS3Storage())
     mobile_number = models.CharField(max_length=20, null=False, blank=False, default=None)
     email = models.EmailField(max_length=255, null=False, blank=False, default=None)
-    aadhar = models.FileField(upload_to=personal_information_aadhar, null=True, blank=True)
+    aadhar = models.FileField(upload_to=personal_information_aadhar, null=True, blank=True, storage=PrivateS3Storage())
     status = models.CharField(max_length=20, choices=[('in progress', 'In Progress'), ('completed', 'Completed'),
                                                       ('sent for approval', 'Sent for Approval'),
                                                       ('revoked', 'Revoked')], null=False, blank=False)
@@ -67,7 +68,7 @@ class PersonalInformation(models.Model):
             self.assignee = self.service_task.assignee
         if not self.reviewer and self.service_task.reviewer:
             self.reviewer = self.service_task.reviewer
-        super().save(*args, **kwargs)
+        super(PersonalInformation, self).save(*args, **kwargs)
 
     def __str__(self):
         return self.first_name
@@ -108,10 +109,10 @@ class TaxPaidDetails(models.Model):
             self.assignee = self.service_task.assignee
         if not self.reviewer and self.service_task.reviewer:
             self.reviewer = self.service_task.reviewer
-        super().save(*args, **kwargs)
+        super(TaxPaidDetails, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.service_request.id} - Tax Paid Details"
+        return "{} - Tax Paid Details".format(self.service_request.id)
 
 
 class TaxPaidDetailsFile(models.Model):
@@ -124,11 +125,11 @@ class TaxPaidDetailsFile(models.Model):
     tax_paid = models.ForeignKey(TaxPaidDetails, on_delete=models.CASCADE, related_name='tax_paid_documents')
     document_type = models.CharField(max_length=30, choices=DOCUMENT_TYPES)
     file = models.FileField(upload_to=tax_paid_details_file,
-                           null=True, blank=True)
+                           null=True, blank=True, storage=PrivateS3Storage())
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.tax_paid.service_request.id} - {self.document_type}"
+        return "{} - {}".format(self.tax_paid.service_request.id, self.document_type)
 
 
 class SalaryIncome(models.Model):
@@ -170,10 +171,10 @@ class SalaryIncome(models.Model):
             self.assignee = self.service_task.assignee
         if not self.reviewer and self.service_task.reviewer:
             self.reviewer = self.service_task.reviewer
-        super().save(*args, **kwargs)
+        super(SalaryIncome, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.service_request.id} - Tax Paid Details"
+        return "{} - Tax Paid Details".format(self.service_request.id)
 
 
 class SalaryDocumentFile(models.Model):
@@ -186,11 +187,11 @@ class SalaryDocumentFile(models.Model):
     income = models.ForeignKey(SalaryIncome, on_delete=models.CASCADE, related_name='documents')
     document_type = models.CharField(max_length=30, choices=DOCUMENT_TYPES)
     file = models.FileField(upload_to=salary_income_details_file,
-                            null=True, blank=True)
+                            null=True, blank=True, storage=PrivateS3Storage())
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.income.service_request.id} - {self.document_type}"
+        return "{} - {}".format(self.income.service_request.id, self.document_type)
 
 
 class OtherIncomeDetails(models.Model):
@@ -228,23 +229,24 @@ class OtherIncomeDetails(models.Model):
             self.assignee = self.service_task.assignee
         if not self.reviewer and self.service_task.reviewer:
             self.reviewer = self.service_task.reviewer
-        super().save(*args, **kwargs)
+        super(OtherIncomeDetails, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.service_request.id} - Foreign Employee Salary Details"
+        return "{} - Foreign Employee Salary Details".format(self.service_request.id)
 
 
 class OtherIncomeDetailsInfo(models.Model):
-    other_income_details = models.ForeignKey(OtherIncomeDetails, on_delete=models.CASCADE, related_name='other_income_info')
+    other_income_details = models.ForeignKey(OtherIncomeDetails, on_delete=models.CASCADE,
+                                             related_name='other_income_info')
     details = models.CharField(max_length=255, null=True, blank=True)
     amount = models.IntegerField()
     file = models.FileField(upload_to=outcome_income_details_file,
-                            null=True, blank=True)
+                            null=True, blank=True, storage=PrivateS3Storage())
     notes = models.TextField(null=True, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.other_income_details.service_request.id} - {self.income_type} Details"
+        return "{} - {} Details".format(self.other_income_details.service_request.id, self.income_type)
 
 
 class NRIEmployeeSalaryDetails(models.Model):
@@ -283,10 +285,10 @@ class NRIEmployeeSalaryDetails(models.Model):
             self.assignee = self.service_task.assignee
         if not self.reviewer and self.service_task.reviewer:
             self.reviewer = self.service_task.reviewer
-        super().save(*args, **kwargs)
+        super(NRIEmployeeSalaryDetails, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.service_request.id} - Foreign Employee Salary Details"
+        return "{} - Foreign Employee Salary Details".format(self.service_request.id)
 
 
 class ForeignEmployeeSalaryDetailsFiles(models.Model):
@@ -299,11 +301,11 @@ class ForeignEmployeeSalaryDetailsFiles(models.Model):
     nri = models.ForeignKey(NRIEmployeeSalaryDetails, on_delete=models.CASCADE, related_name='foreigner_documents')
     document_type = models.CharField(max_length=30, choices=DOCUMENT_TYPES)
     file = models.FileField(upload_to=foreign_emp_salary_details_file,
-                            null=True, blank=True)
+                            null=True, blank=True, storage=PrivateS3Storage())
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.income.service_request.id} - {self.document_type}"
+        return "{} - {}".format(self.income.service_request.id, self.document_type)
 
 
 class HousePropertyIncomeDetails(models.Model):
@@ -340,10 +342,10 @@ class HousePropertyIncomeDetails(models.Model):
             self.assignee = self.service_task.assignee
         if not self.reviewer and self.service_task.reviewer:
             self.reviewer = self.service_task.reviewer
-        super().save(*args, **kwargs)
+        super(HousePropertyIncomeDetails, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.service_request.id} - House Property Details"
+        return "{} - House Property Details".format(self.service_request.id)
 
 
 class HousePropertyIncomeDetailsInfo(models.Model):
@@ -359,15 +361,18 @@ class HousePropertyIncomeDetailsInfo(models.Model):
     rent_received = models.CharField(max_length=255, null=True, blank=True)
     pay_municipal_tax = models.BooleanField(default=False)
     municipal_tax_paid = models.IntegerField(null=True, blank=True)
-    municipal_tax_receipt = models.FileField(upload_to=house_property_details_municipal_tax_receipt, null=True, blank=True)
+    municipal_tax_receipt = models.FileField(upload_to=house_property_details_municipal_tax_receipt, null=True,
+                                             blank=True, storage=PrivateS3Storage())
     home_loan_on_property = models.BooleanField(default=False)
     interest_during_financial_year = models.IntegerField(null=True, blank=True)
     principal_during_financial_year = models.IntegerField(null=True, blank=True)
-    loan_statement = models.FileField(upload_to=house_property_details_loan_statement, null=True, blank=True)
-    upload_loan_interest_certificate = models.FileField(upload_to=house_property_details_loan_interest_certificate, null=True, blank=True)
+    loan_statement = models.FileField(upload_to=house_property_details_loan_statement,
+                                      null=True, blank=True, storage=PrivateS3Storage())
+    upload_loan_interest_certificate = models.FileField(upload_to=house_property_details_loan_interest_certificate,
+                                                        null=True, blank=True, storage=PrivateS3Storage())
 
     def __str__(self):
-        return f"{self.house_property_details.service_request.id} - Property Info"
+        return "{} - Property Info".format(self.house_property_details.service_request.id)
 
 
 class CapitalGainsApplicableDetails(models.Model):
@@ -407,10 +412,10 @@ class CapitalGainsApplicableDetails(models.Model):
             self.assignee = self.service_task.assignee
         if not self.reviewer and self.service_task.reviewer:
             self.reviewer = self.service_task.reviewer
-        super().save(*args, **kwargs)
+        super(CapitalGainsApplicableDetails, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.service_request.id} - Capital Gains Applicable Details"
+        return "{} - Capital Gains Applicable Details".format(self.service_request.id)
 
 
 class CapitalGainsProperty(models.Model):
@@ -423,15 +428,17 @@ class CapitalGainsProperty(models.Model):
     purchase_cost = models.IntegerField(null=True, blank=True)
     date_of_sale = models.DateField(null=True, blank=True)
     sale_value = models.IntegerField(null=True, blank=True)
-    purchase_doc = models.FileField(upload_to=capital_gains_property_purchase_doc, null=True, blank=True)
-    sale_doc = models.FileField(upload_to=capital_gains_property_sale_doc, null=True, blank=True)
+    purchase_doc = models.FileField(upload_to=capital_gains_property_purchase_doc, null=True, blank=True,
+                                    storage=PrivateS3Storage())
+    sale_doc = models.FileField(upload_to=capital_gains_property_sale_doc, null=True, blank=True,
+                                storage=PrivateS3Storage())
     reinvestment_made = models.CharField(max_length=20, choices=[('yes', 'Yes'), ('no', 'No')], default='no')
     reinvestment_details = JSONField(default=dict, null=True, blank=True)
     reinvestment_details_docs = models.FileField(upload_to=capital_gains_property_reinvestment_docs,
-                                                 null=True, blank=True)
+                                                 null=True, blank=True, storage=PrivateS3Storage())
 
     def __str__(self):
-        return f"{self.capital_gains_applicable.service_request.id} - {self.property_type} Details"
+        return "{} - {} Details".format(self.capital_gains_applicable.service_request.id, self.property_type)
 
 
 class CapitalGainsEquityMutualFund(models.Model):
@@ -467,17 +474,25 @@ class CapitalGainsEquityMutualFund(models.Model):
     sell_any_unlisted_sales = models.CharField(max_length=20, choices=[('yes', 'yes'), ('no', 'no')], default='no')
 
     def __str__(self):
-        return f"{self.service_request.id} - Equity Mutual Fund Details"
+        return "{} - Equity Mutual Fund Details".format(self.service_request.id)
+    def save(self, *args, **kwargs):
+        # Default to service_request values if not set
+        if not self.assignee and self.service_task.assignee:
+            self.assignee = self.service_task.assignee
+        if not self.reviewer and self.service_task.reviewer:
+            self.reviewer = self.service_task.reviewer
+        super(CapitalGainsEquityMutualFund, self).save(*args, **kwargs)
 
 
 class CapitalGainsEquityMutualFundDocument(models.Model):
     capital_gains_equity_mutual_fund = models.ForeignKey(CapitalGainsEquityMutualFund, on_delete=models.CASCADE,
                                                           related_name='documents')
-    file = models.FileField(upload_to=capital_gains_equity_mutual_fund_file, null=True, blank=True)
+    file = models.FileField(upload_to=capital_gains_equity_mutual_fund_file, null=True,
+                            blank=True, storage=PrivateS3Storage())
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.capital_gains_equity_mutual_fund.service_request.id} - {self.document_type}"
+        return "{} - {}".format(self.capital_gains_equity_mutual_fund.service_request.id, self.document_type)
 
 
 class OtherCapitalGains(models.Model):
@@ -509,8 +524,16 @@ class OtherCapitalGains(models.Model):
         related_name='capital_gains_other_capital_gains_reviewed'
     )
 
+    def save(self, *args, **kwargs):
+        # Default to service_request values if not set
+        if not self.assignee and self.service_task.assignee:
+            self.assignee = self.service_task.assignee
+        if not self.reviewer and self.service_task.reviewer:
+            self.reviewer = self.service_task.reviewer
+        super(OtherCapitalGains, self).save(*args, **kwargs)
+
     def __str__(self):
-        return f"{self.service_request.id} - Other Capital Gains Details"
+        return "{} - Other Capital Gains Details".format(self.service_request.id)
 
 
 class OtherCapitalGainsInfo(models.Model):
@@ -524,17 +547,17 @@ class OtherCapitalGainsInfo(models.Model):
     purchase_value = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
-        return f"{self.other_capital_gains.service_request.id}"
+        return "{}".format(self.other_capital_gains.service_request.id)
 
 
 class OtherCapitalGainsDocument(models.Model):
     other_capital_gains_info = models.ForeignKey(OtherCapitalGainsInfo, on_delete=models.CASCADE, related_name='documents')
     file = models.FileField(upload_to=other_capital_gains_file,
-                            null=True, blank=True)
+                            null=True, blank=True, storage=PrivateS3Storage())
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.other_capital_gains_info.other_capital_gains.service_request.id} - {self.file.name}"
+        return "{} - {}".format(self.other_capital_gains_info.other_capital_gains.service_request.id, self.file.name)
 
 
 class BusinessProfessionalIncome(models.Model):
@@ -545,7 +568,8 @@ class BusinessProfessionalIncome(models.Model):
         default="Income Tax Returns",
         editable=False
     )
-    service_task = models.OneToOneField(ServiceTask, on_delete=models.CASCADE, related_name='service_task_business_professional_income')
+    service_task = models.OneToOneField(ServiceTask, on_delete=models.CASCADE,
+                                        related_name='service_task_business_professional_income')
     status = models.CharField(max_length=20, choices=[('in progress', 'In Progress'), ('completed', 'Completed'),
                                                       ('sent for approval', 'Sent for Approval'),
                                                       ('revoked', 'Revoked')], null=False, blank=False)
@@ -572,10 +596,10 @@ class BusinessProfessionalIncome(models.Model):
             self.assignee = self.service_task.assignee
         if not self.reviewer and self.service_task.reviewer:
             self.reviewer = self.service_task.reviewer
-        super().save(*args, **kwargs)
+        super(BusinessProfessionalIncome, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.service_request.id} - Business Professional Income Details"
+        return "{} - Business Professional Income Details".format(self.service_request.id)
 
 
 class BusinessProfessionalIncomeInfo(models.Model):
@@ -590,7 +614,7 @@ class BusinessProfessionalIncomeInfo(models.Model):
                                       choices=[('yes', 'Yes'), ('no', 'No')], default='no')
 
     def __str__(self):
-        return f"{self.business_professional_income.service_request.id} - {self.business_name} Details"
+        return "{} - {} Details".format(self.business_professional_income.service_request.id, self.business_name)
 
 
 class BusinessProfessionalIncomeDocument(models.Model):
@@ -603,11 +627,12 @@ class BusinessProfessionalIncomeDocument(models.Model):
                                                              ('AIS', 'AIS'),
                                                              ('Profit & Loss Statement', 'Profit & Loss Statement'),
                                                              ('Balance Sheet', 'Balance Sheet')])
-    file = models.FileField(upload_to=business_professional_income_file, null=True, blank=True)
+    file = models.FileField(upload_to=business_professional_income_file,
+                            null=True, blank=True, storage=PrivateS3Storage())
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.business_professional_income.service_request.id} - {self.document_type}"
+        return "{} - {}".format(self.business_professional_income.service_request.id, self.document_type)
 
 
 class InterestIncome(models.Model):
@@ -646,10 +671,10 @@ class InterestIncome(models.Model):
             self.assignee = self.service_task.assignee
         if not self.reviewer and self.service_task.reviewer:
             self.reviewer = self.service_task.reviewer
-        super().save(*args, **kwargs)
+        super(InterestIncome, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.service_request.id} - Other Income Details"
+        return "{} - Other Income Details".format(self.service_request.id)
 
 
 class InterestIncomeDocument(models.Model):
@@ -663,11 +688,11 @@ class InterestIncomeDocument(models.Model):
     interest_earned = models.IntegerField(null=True, blank=True)
     bank_name = models.CharField(max_length=255, null=True, blank=True)
     file = models.FileField(upload_to=interest_income_details_file,
-                            null=True, blank=True)
+                            null=True, blank=True, storage=PrivateS3Storage())
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.interest_income.service_request.id} - {self.document_type}"
+        return "{} - {}".format(self.interest_income.service_request.id, self.document_type)
 
 
 class DividendIncome(models.Model):
@@ -706,10 +731,10 @@ class DividendIncome(models.Model):
             self.assignee = self.service_task.assignee
         if not self.reviewer and self.service_task.reviewer:
             self.reviewer = self.service_task.reviewer
-        super().save(*args, **kwargs)
+        super(DividendIncome, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.service_request.id} - Other Income Details"
+        return "{} - Other Income Details".format(self.service_request.id)
 
 
 class DividendIncomeDocument(models.Model):
@@ -717,11 +742,11 @@ class DividendIncomeDocument(models.Model):
     received_from = models.CharField(max_length=255, null=True, blank=True)
     dividend_received = models.IntegerField(null=True, blank=True)
     file = models.FileField(upload_to=dividend_income_file,
-                            null=True, blank=True)
+                            null=True, blank=True, storage=PrivateS3Storage())
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.dividend_income.service_request.id}- {self.received_from}"
+        return "{} - {}".format(self.dividend_income.service_request.id, self.received_from)
 
 
 class GiftIncomeDetails(models.Model):
@@ -761,10 +786,10 @@ class GiftIncomeDetails(models.Model):
             self.assignee = self.service_task.assignee
         if not self.reviewer and self.service_task.reviewer:
             self.reviewer = self.service_task.reviewer
-        super().save(*args, **kwargs)
+        super(GiftIncomeDetails, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.service_request.id} - Gift Income Details"
+        return "{} - Gift Income Details".format(self.service_request.id)
 
 
 class GiftIncomeDocument(models.Model):
@@ -778,7 +803,7 @@ class GiftIncomeDocument(models.Model):
                                                choices=[('Yes', 'Yes'), ('No', 'No')])
 
     def __str__(self):
-        return f"{self.gift_income.service_request.id}- {self.relation}"
+        return "{} - {}".format(self.gift_income.service_request.id, self.relation)
 
 
 class FamilyPensionIncome(models.Model):
@@ -818,10 +843,10 @@ class FamilyPensionIncome(models.Model):
             self.assignee = self.service_task.assignee
         if not self.reviewer and self.service_task.reviewer:
             self.reviewer = self.service_task.reviewer
-        super().save(*args, **kwargs)
+        super(FamilyPensionIncome, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.service_request.id} - Family Pension Income Details"
+        return "{} - Family Pension Income Details".format(self.service_request.id)
 
 
 class FamilyPensionIncomeInfo(models.Model):
@@ -833,7 +858,7 @@ class FamilyPensionIncomeInfo(models.Model):
     amount = models.IntegerField()
 
     def __str__(self):
-        return f"{self.family_pension.service_request.id}- {self.source}"
+        return "{} - {}".format(self.family_pension.service_request.id, self.source)
 
 
 class ForeignIncome(models.Model):
@@ -873,10 +898,10 @@ class ForeignIncome(models.Model):
             self.assignee = self.service_task.assignee
         if not self.reviewer and self.service_task.reviewer:
             self.reviewer = self.service_task.reviewer
-        super().save(*args, **kwargs)
+        super(ForeignIncome, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.service_request.id} - Family Pension Income Details"
+        return "{} - Family Pension Income Details".format(self.service_request.id)
 
 
 class ForeignIncomeInfo(models.Model):
@@ -889,10 +914,10 @@ class ForeignIncomeInfo(models.Model):
     currency = models.CharField(max_length=3)
     amount = models.IntegerField()
     tax_paid_abroad = models.CharField(max_length=20, choices=[('yes', 'Yes'), ('no', 'No')], default='No')
-    form67_file = models.FileField(upload_to=foreign_income_file, null=True, blank=True)
+    form67_file = models.FileField(upload_to=foreign_income_file, null=True, blank=True, storage=PrivateS3Storage())
 
     def __str__(self):
-        return f"{self.foreign_income.service_request.id}- {self.type_of_income}"
+        return "{} - {}".format(self.foreign_income.service_request.id, self.type_of_income)
 
 
 class WinningIncome(models.Model):
@@ -932,10 +957,10 @@ class WinningIncome(models.Model):
             self.assignee = self.service_task.assignee
         if not self.reviewer and self.service_task.reviewer:
             self.reviewer = self.service_task.reviewer
-        super().save(*args, **kwargs)
+        super(WinningIncome, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.service_request.id} - Winning Income Details"
+        return "{} - Winning Income Details".format(self.service_request.id)
 
 
 class WinningIncomeDocument(models.Model):
@@ -945,11 +970,11 @@ class WinningIncomeDocument(models.Model):
                                                       ('Others', 'Others')])
     amount = models.IntegerField()
     file = models.FileField(upload_to=winning_income_file,
-                            null=True, blank=True)
+                            null=True, blank=True, storage=PrivateS3Storage())
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.winning_income.service_request.id}- {self.received_from}"
+        return "{} - {}".format(self.winning_income.service_request.id, self.received_from)
 
 
 class AgricultureIncome(models.Model):
@@ -989,22 +1014,22 @@ class AgricultureIncome(models.Model):
             self.assignee = self.service_task.assignee
         if not self.reviewer and self.service_task.reviewer:
             self.reviewer = self.service_task.reviewer
-        super().save(*args, **kwargs)
+        super(AgricultureIncome, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.service_request.id} - Winning Income Details"
+        return "{} - Winning Income Details".format(self.service_request.id)
 
 
 class AgricultureIncomeDocument(models.Model):
-    agriculture_income = models.ForeignKey(AgricultureIncome, on_delete=models.CASCADE,
+    agriculture_income = models.OneToOneField(AgricultureIncome, on_delete=models.CASCADE,
                                        related_name='agriculture_income_docs')
     amount = models.IntegerField()
     file = models.FileField(upload_to=agriculture_income_file,
-                            null=True, blank=True)
+                            null=True, blank=True, storage=PrivateS3Storage())
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.agriculture_income.service_request.id}- {self.amount}"
+        return "{} - {}".format(self.agriculture_income.service_request.id, self.amount)
 
 
 class Deductions(models.Model):
@@ -1042,10 +1067,10 @@ class Deductions(models.Model):
             self.assignee = self.service_task.assignee
         if not self.reviewer and self.service_task.reviewer:
             self.reviewer = self.service_task.reviewer
-        super().save(*args, **kwargs)
+        super(Deductions, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.service_request.id} - Deductions Details"
+        return "{} - Deductions Details".format(self.service_request.id)
 
 
 class Section80G(models.Model):
@@ -1055,11 +1080,11 @@ class Section80G(models.Model):
     mode = models.CharField(max_length=50, null=True, blank=True,choices=[('Cash', 'Cash'),
                                                                           ('Cheque', 'Cheque'),
                                                                           ('Online Transfer', 'Online Transfer')])
-    file = models.FileField(upload_to=section_80g_file, null=True, blank=True)
+    file = models.FileField(upload_to=section_80g_file, null=True, blank=True, storage=PrivateS3Storage())
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.deductions.service_request.id} - Section 80G Donation"
+        return "{} - Section 80G Donation".format(self.deductions.service_request.id)
 
 
 class Section80E(models.Model):
@@ -1074,19 +1099,20 @@ class Section80E(models.Model):
     loan_outstanding_as_on_31st_march = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
-        return f"{self.deductions.service_request.id} - Section 80E Donation"
+        return "{} - Section 80E Donation".format(self.deductions.service_request.id)
 
 
 class Section80EDocuments(models.Model):
     section_80e = models.ForeignKey(Section80E, on_delete=models.CASCADE, related_name='section_80e_documents')
-    document_type = models.CharField(max_length=30, choices=[('Sanction Letter', 'Sanction Letter'), ('Interest Certificate', 'Interest Certificate'),
-                                                                ('Repayment Schedule', 'Repayment Schedule'),
-                                                                ('Other', 'Other')])
-    file = models.FileField(upload_to=section_80e_file, null=True, blank=True)
+    document_type = models.CharField(max_length=30, choices=[
+                            ('Sanction Letter', 'Sanction Letter'), ('Interest Certificate', 'Interest Certificate'),
+                            ('Repayment Schedule', 'Repayment Schedule'),
+                            ('Other', 'Other')])
+    file = models.FileField(upload_to=section_80e_file, null=True, blank=True, storage=PrivateS3Storage())
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.section_80e.deductions.service_request.id} - {self.uploaded_at}"
+        return "{} - {}".format(self.section_80e.deductions.service_request.id, self.uploaded_at)
 
 
 class Section80TTATTBU(models.Model):
@@ -1108,7 +1134,8 @@ class Section80TTATTBU(models.Model):
     severity = models.CharField(max_length=50, null=True, blank=True, choices=[('40-80%', '40-80%'),('>80%', '>80%')])
     deduction_amount = models.IntegerField(null=True, blank=True)
 
-    deduction_file = models.FileField(upload_to=section_80ettattbu_file, null=True, blank=True)
+    deduction_file = models.FileField(upload_to=section_80ettattbu_file, null=True,
+                                      blank=True, storage=PrivateS3Storage())
     pay_rent_without_recieving_hra = models.BooleanField(default=False)
     pay_rent_amount = models.IntegerField(null=True, blank=True)
     are_you_first_time_homebuyer = models.BooleanField(default=False)
@@ -1119,7 +1146,7 @@ class Section80TTATTBU(models.Model):
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.deductions.service_request.id} - Section 80ETTAU Donation"
+        return "{} - Section 80ETTAU Donation".format(self.deductions.service_request.id)
 
 
 class Section80C(models.Model):
@@ -1133,16 +1160,16 @@ class Section80C(models.Model):
     amount = models.IntegerField(null=True, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     def __str__(self):
-        return f"{self.deductions.service_request.id} - Section 80c Donation"
+        return "{} - Section 80c Donation".format(self.deductions.service_request.id)
 
 
 class Section80CDocuments(models.Model):
     section_80c = models.ForeignKey(Section80C, on_delete=models.CASCADE, related_name='section_80c_documents')
-    file = models.FileField(upload_to=section_80c_file, null=True, blank=True)
+    file = models.FileField(upload_to=section_80c_file, null=True, blank=True, storage=PrivateS3Storage())
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.section_80c.deductions.service_request.id} - {self.uploaded_at}"
+        return "{} - {}".format(self.section_80c.deductions.service_request.id, self.uploaded_at)
 
 
 class Section80EE(models.Model):
@@ -1150,7 +1177,7 @@ class Section80EE(models.Model):
     loan_outstanding_as_on_31st_march = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
-        return f"{self.deductions.service_request.id} - Section 80EE Donation"
+        return "{} - Section 80EE Donation".format(self.deductions.service_request.id)
 
 
 class Section80EEDocuments(models.Model):
@@ -1159,11 +1186,11 @@ class Section80EEDocuments(models.Model):
                                                              ('Interest Certificate', 'Interest Certificate'),
                                                              ('Repayment Schedule', 'Repayment Schedule'),
                                                              ('Other', 'Other')])
-    file = models.FileField(upload_to=section_80ee_file, null=True, blank=True)
+    file = models.FileField(upload_to=section_80ee_file, null=True, blank=True, storage=PrivateS3Storage())
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.section_80ee.deductions.service_request.id} - {self.uploaded_at}"
+        return "{} - {}".format(self.section_80ee.deductions.service_request.id, self.uploaded_at)
 
 
 class Section80D(models.Model):
@@ -1175,17 +1202,17 @@ class Section80D(models.Model):
     preventive_health_checkup = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
-        return f"{self.deductions.service_request.id} - Section 80c Donation"
+        return "{} - Section 80c Donation".format(self.deductions.service_request.id)
 
 
 class Section80DFile(models.Model):
 
     section_80d = models.ForeignKey(Section80D, on_delete=models.CASCADE, related_name='section_80d_documents')
-    file = models.FileField(upload_to=section_80d_file, null=True, blank=True)
+    file = models.FileField(upload_to=section_80d_file, null=True, blank=True, storage=PrivateS3Storage())
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.section_80d.deductions.service_request.id} - {self.uploaded_at}"
+        return "{} - {}".format(self.section_80d.deductions.service_request.id, self.uploaded_at)
 
 
 class Section80DDB(models.Model):
@@ -1193,16 +1220,16 @@ class Section80DDB(models.Model):
     name_of_disease = models.CharField(max_length=255, null=True, blank=True)
 
     def __str__(self):
-        return f"{self.deductions.service_request.id} - Section 80DDB Donation"
+        return "{} - Section 80DDB Donation".format(self.deductions.service_request.id)
 
 
 class Section80DDBDocuments(models.Model):
     section_80ddb = models.ForeignKey(Section80DDB, on_delete=models.CASCADE, related_name='section_80ddb_documents')
-    file = models.FileField(upload_to=section_80ddb_file, null=True, blank=True)
+    file = models.FileField(upload_to=section_80ddb_file, null=True, blank=True, storage=PrivateS3Storage())
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.section_80d.deductions.service_request.id} - {self.uploaded_at}"
+        return "{} - {}".format(self.section_80d.deductions.service_request.id, self.uploaded_at)
 
 
 class Section80EEB(models.Model):
@@ -1210,7 +1237,7 @@ class Section80EEB(models.Model):
     vehicle_registration_number = models.CharField(max_length=50, null=True, blank=True)
 
     def __str__(self):
-        return f"{self.deductions.service_request.id} - Section 80EEB Donation"
+        return "{} - Section 80EEB Donation".format(self.deductions.service_request.id)
 
 
 class Section80EEBDocuments(models.Model):
@@ -1219,11 +1246,11 @@ class Section80EEBDocuments(models.Model):
                                                              ('Interest Certificate', 'Interest Certificate'),
                                                              ('Repayment Schedule', 'Repayment Schedule'),
                                                              ('Other', 'Other')])
-    file = models.FileField(upload_to=section_80eeb_file, null=True, blank=True)
+    file = models.FileField(upload_to=section_80eeb_file, null=True, blank=True, storage=PrivateS3Storage())
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.section_80eeb.deductions.service_request.id} - {self.uploaded_at}"
+        return "{} - {}".format(self.section_80eeb.deductions.service_request.id, self.uploaded_at)
 
 
 class ReviewFilingCertificate(models.Model):
@@ -1234,12 +1261,14 @@ class ReviewFilingCertificate(models.Model):
     FILING_STATUS_CHOICES = [
         ('in progress', 'In Progress'),
         ('filed', 'Filed'),
+        ('sent for approval', 'Sent for Approval'),
         ('resubmitted', 'Resubmitted'),
     ]
 
     APPROVAL_STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('resubmission', 'Resubmission'),
+        ('sent for approval', 'Sent for Approval'),
         ('rejected', 'Rejected'),
         ('approved', 'Approved'),
     ]
@@ -1260,7 +1289,7 @@ class ReviewFilingCertificate(models.Model):
                                         related_name='service_task_ITR_review_filing_certificate')
 
     review_certificate = models.FileField(upload_to=review_filing_certificate,
-                                          null=True, blank=True)
+                                          null=True, blank=True, storage=PrivateS3Storage())
     review_certificate_status = models.CharField(
         max_length=20,
         choices=REVIEW_STATUS_CHOICES,
@@ -1278,7 +1307,7 @@ class ReviewFilingCertificate(models.Model):
     )
 
     draft_income_file = models.FileField(upload_to=draft_filing_certificate,
-                                                null=True, blank=True)
+                                                null=True, blank=True, storage=PrivateS3Storage())
 
     approval_status = models.CharField(
         max_length=20,
@@ -1304,7 +1333,7 @@ class ReviewFilingCertificate(models.Model):
             self.assignee = self.service_task.assignee
         if not self.reviewer and self.service_task.reviewer:
             self.reviewer = self.service_task.reviewer
-        super().save(*args, **kwargs)
+        super(ReviewFilingCertificate, self).save(*args, **kwargs)
 
     def __str__(self):
         return self.review_certificate_status or "No Review Status"

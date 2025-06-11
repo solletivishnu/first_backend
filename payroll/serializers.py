@@ -465,44 +465,44 @@ class EmployeeManagementSerializer(serializers.ModelSerializer):
 
 
 class EmployeeSalaryDetailsSerializer(serializers.ModelSerializer):
+    payroll_month = serializers.IntegerField(write_only=True, required=False)
+    payroll_year = serializers.IntegerField(write_only=True, required=False)
+
     class Meta:
         model = EmployeeSalaryDetails
         fields = '__all__'
 
     def update(self, instance, validated_data):
-        # Get old annual_ctc value
-        old_annual_ctc = instance.annual_ctc
+        # Extract payroll_month and payroll_year from validated_data
+        payroll_month = validated_data.pop('payroll_month', None)
+        payroll_year = validated_data.pop('payroll_year', None)
+        
+        # Attach these values to the instance for the signal to use
+        if payroll_month is not None:
+            instance.payroll_month = payroll_month
+        if payroll_year is not None:
+            instance.payroll_year = payroll_year
+            
+        # Perform the update
+        return super().update(instance, validated_data)
 
-        # Perform the default update
-        instance = super().update(instance, validated_data)
 
-        # Get new annual_ctc value after update
-        new_annual_ctc = instance.annual_ctc
-
-        # If annual_ctc changed, update revised_ctc and updated_on
-        if new_annual_ctc != old_annual_ctc:
-            today = datetime.now().date()  # This gives a date object: YYYY-MM-DD
-
-            instance.previous_ctc = old_annual_ctc
-            instance.updated_on = today
-            instance.update_month = today.month
-            instance.update_year = today.year
-            instance.save(update_fields=['previous_ctc', 'updated_on', 'update_month', 'update_year'])
-
-        return instance
+class EmployeeSalaryRevisionHistorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EmployeeSalaryRevisionHistory
+        fields = '__all__'
 
 
 class SimplifiedEmployeeSalarySerializer(serializers.ModelSerializer):
     employee_name = serializers.SerializerMethodField()
     department = serializers.SerializerMethodField()
     designation = serializers.SerializerMethodField()
-    previous_ctc = serializers.DecimalField(max_digits=12, decimal_places=2)
-    current_ctc = serializers.DecimalField(source='annual_ctc', max_digits=12, decimal_places=2)
     employee_id = serializers.IntegerField(source='employee.id')
-    associate_id = serializers.CharField(source='employee.associate_id')  # Added based on your model
+    associate_id = serializers.CharField(source='employee.associate_id')
+    revision_date = serializers.SerializerMethodField()
 
     class Meta:
-        model = EmployeeSalaryDetails
+        model = EmployeeSalaryRevisionHistory
         fields = [
             'id',
             'employee_id',
@@ -512,7 +512,7 @@ class SimplifiedEmployeeSalarySerializer(serializers.ModelSerializer):
             'designation',
             'previous_ctc',
             'current_ctc',
-            'updated_on',
+            'revision_date',
         ]
 
     def get_employee_name(self, obj):
@@ -525,6 +525,11 @@ class SimplifiedEmployeeSalarySerializer(serializers.ModelSerializer):
 
     def get_designation(self, obj):
         return obj.employee.designation.designation_name if obj.employee.designation else None
+
+    def get_revision_date(self, obj):
+        if obj.revision_date:
+            return obj.revision_date.strftime('%d-%m-%Y')
+        return None
 
 
 

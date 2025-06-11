@@ -51,4 +51,9 @@ urlpatterns = [
     # Review Filing Certificate
     path('review-filing/by-request-or-task', views.get_review_filing_certificate,
          name='review_filing_by_request_or_task'),
+
+    path('service-requests-labour-license/<int:service_request_id>/full-data/', views.get_service_request_full_data,
+         name='get_full_data_by_service_request'),
+    path('service-request-section-data', views.get_service_request_tasks_by_category,
+         name='get_service_request_section_data')
 ]

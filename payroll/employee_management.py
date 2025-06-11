@@ -98,13 +98,10 @@ def generate_employee_upload_template(request, payroll_id):
     apply_dropdown("blood_group", "Dropdowns!$G$2:$G$10")
 
     # Auto-adjust column widths
-    for column_cells in ws.columns:
-        max_length = 0
-        col_letter = get_column_letter(column_cells[0].column)
-        for cell in column_cells:
-            if cell.value:
-                max_length = max(max_length, len(str(cell.value)))
-        ws.column_dimensions[col_letter].width = max_length + 2  # Extra padding
+    for col in ws.columns:
+        max_length = max(len(str(cell.value)) if cell.value else 0 for cell in col)
+        adjusted_width = max_length + 2
+        ws.column_dimensions[get_column_letter(col[0].column)].width = adjusted_width
 
     # Finalize output
     final_output = BytesIO()
@@ -117,5 +114,3 @@ def generate_employee_upload_template(request, payroll_id):
     )
     response['Content-Disposition'] = 'attachment; filename="employee_upload_template.xlsx"'
     return response
-
-

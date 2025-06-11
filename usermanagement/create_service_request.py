@@ -250,15 +250,24 @@ def manage_service_request_assignment(request, service_request_id):
 @api_view(['GET'])
 def user_service_requests(request):
     user = request.user
+    context_id = request.query_params.get('context_id')
+
+    if not context_id:
+        context_id = user.active_context.id if hasattr(user, 'active_context') and user.active_context else None
+
+    # 1. Requests created by the user & match context
+    user_created = Q(user=user) & Q(context_id=context_id) if context_id else Q(user=user)
+
+    # 2. Requests where the user is assignee or reviewer (regardless of context)
+    assigned_or_reviewed = Q(assignee=user) | Q(reviewer=user)
 
     service_requests = ServiceRequest.objects.filter(
-        Q(user=user) |
-        Q(assignee=user) |
-        Q(reviewer=user)
+        user_created | assigned_or_reviewed
     ).distinct()
 
     serializer = ServiceRequestSerializer(service_requests, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 
 @api_view(['GET'])

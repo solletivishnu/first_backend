@@ -218,12 +218,14 @@ def principal_place_details_by_service_request(request):
         if not service_request_id:
             return Response({"error": "Missing service_request_id"}, status=status.HTTP_400_BAD_REQUEST)
 
-        objs = PrincipalPlaceDetails.objects.filter(service_request_id=service_request_id)
-        if not objs.exists():
+        try:
+            obj = PrincipalPlaceDetails.objects.get(service_request_id=service_request_id)
+        except PrincipalPlaceDetails.DoesNotExist:
             return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        serializer = PrincipalPlaceDetailsSerializer(objs)
+        serializer = PrincipalPlaceDetailsSerializer(obj)
         return Response(serializer.data)
+
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -305,21 +307,22 @@ def principal_place_details_detail(request, pk):
 @api_view(['POST'])
 @parser_classes([MultiPartParser, FormParser, JSONParser])
 def upsert_promoter_signatory_data(request):
+    service_request_id = request.data.get('service_request')
     data = request.data
-    service_request_id = data.get('service_request')
 
     if not service_request_id:
+
         return Response({"error": "Missing service_request"}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
         promoter_details_payload = {
             "service_request": service_request_id,
-            "service_task": data.get("service_task"),
-            "status": data.get("status"),
-            "assignee": data.get("assignee"),
-            "reviewer": data.get("reviewer")
+            "service_task": request.data.get("service_task"),
+            "status": request.data.get("status"),
+            "assignee": request.data.get("assignee"),
+            "reviewer": request.data.get("reviewer")
         }
-        # Upsert PromoterSignatoryDetails
+
         try:
             details_instance = PromoterSignatoryDetails.objects.get(service_request_id=service_request_id)
             details_serializer = PromoterSignatoryDetailsSerializer(details_instance, data=promoter_details_payload,
@@ -331,63 +334,53 @@ def upsert_promoter_signatory_data(request):
             return Response(details_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         details_instance = details_serializer.save()
-        promoter_info_id = data.get("id")
-        data["promoter_detail"] = details_instance.id
 
-        # Combine form data and files explicitly for info serializer
-        if promoter_info_id:
+        data['promoter_detail'] = details_instance.id
+        if data.get('name'):
             try:
-                info_instance = PromoterSignatoryInfo.objects.get(pk=promoter_info_id, promoter_detail=details_instance)
-                info_serializer = PromoterSignatoryInfoSerializer(
-                    instance=info_instance,
-                    data=data,
-                    partial=True
-                )
-            except PromoterSignatoryInfo.DoesNotExist:
-                info_serializer = PromoterSignatoryInfoSerializer(data=data)
+                serializer_info = PromoterSignatoryInfoSerializer(data=data)
+                if not serializer_info.is_valid():
+                    return Response(serializer_info.errors, status=status.HTTP_400_BAD_REQUEST)
+                try:
+                    serializer_info.save()
+                except Exception as e:
+                    return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            except Exception as e:
+                return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return  Response(details_serializer.data, status=status.HTTP_201_CREATED)
         else:
-            info_serializer = PromoterSignatoryInfoSerializer(data=data)
-
-        if not info_serializer.is_valid():
-            if not promoter_info_id:
-                details_instance.delete()
-            return Response(info_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        info_instance = info_serializer.save()
-
-        return Response({
-            "message": "PromoterSignatoryDetails and Info saved successfully",
-            "details": PromoterSignatoryDetailsSerializer(details_instance).data,
-            "info": PromoterSignatoryInfoSerializer(info_instance).data
-        }, status=status.HTTP_201_CREATED)
+            return Response({"message": "Status Updated Successfully"}, status=status.HTTP_200_OK)
 
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+@api_view(['PUT'])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
+def update_promoter_signatory_data(request, pk):
+    try:
+        info = PromoterSignatoryInfo.objects.get(pk=pk)
+    except PromoterSignatoryInfo.DoesNotExist:
+        return Response({"error": "PromoterSignatoryInfo not found"}, status=status.HTTP_404_NOT_FOUND)
+    info_serializer = PromoterSignatoryInfoSerializer(info, data=request.data, partial=True)
+    if not info_serializer.is_valid():
+        return Response(info_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    info_serializer.save()
+
+    return Response(info_serializer.data, status=status.HTTP_200_OK)
+
 @api_view(['GET'])
-def get_promoter_signatory_details(request):
-    service_request_id = request.query_params.get('service_request')
+def get_promoter_signatory_data(request):
+    service_request_id = request.query_params.get('service_request_id')
     if not service_request_id:
         return Response({"error": "Missing service_request"}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        obj = PromoterSignatoryDetails.objects.get(service_request_id=service_request_id)
-        serializer = PromoterSignatoryDetailsSerializer(obj)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        details = PromoterSignatoryDetails.objects.get(service_request_id=service_request_id)
     except PromoterSignatoryDetails.DoesNotExist:
         return Response({"error": "PromoterSignatoryDetails not found"}, status=status.HTTP_404_NOT_FOUND)
 
-
-@api_view(['GET'])
-def get_promoter_signatory_info(request):
-    service_request_id = request.query_params.get('service_request')
-    if not service_request_id:
-        return Response({"error": "Missing service_request"}, status=status.HTTP_400_BAD_REQUEST)
-
-    infos = PromoterSignatoryInfo.objects.filter(promoter_detail__service_request_id=service_request_id)
-    serializer = PromoterSignatoryInfoSerializer(infos, many=True)
+    serializer = PromoterSignatoryDetailsSerializer(details)
     return Response(serializer.data, status=status.HTTP_200_OK)
-
 
 @api_view(['DELETE'])
 @parser_classes([MultiPartParser, FormParser, JSONParser])
@@ -458,12 +451,14 @@ def gst_review_filing_certificate_by_service_request(request):
         if not service_request_id:
             return Response({"error": "Missing service_request_id"}, status=status.HTTP_400_BAD_REQUEST)
 
-        objs = GSTReviewFilingCertificate.objects.filter(service_request_id=service_request_id)
-        if not objs.exists():
+        try:
+            obj = GSTReviewFilingCertificate.objects.get(service_request_id=service_request_id)
+        except GSTReviewFilingCertificate.DoesNotExist:
             return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        serializer = GSTReviewFilingCertificateSerializer(objs, many=True)
+        serializer = GSTReviewFilingCertificateSerializer(obj)
         return Response(serializer.data)
+
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

@@ -237,7 +237,7 @@ class AgricultureIncomeDocumentSerializer(serializers.ModelSerializer):
 
 
 class AgricultureIncomeSerializer(serializers.ModelSerializer):
-    agriculture_income_docs = AgricultureIncomeDocumentSerializer(many=True, read_only=True)
+    agriculture_income_docs = AgricultureIncomeDocumentSerializer(read_only=True)
 
     class Meta:
         model = AgricultureIncome
@@ -474,14 +474,6 @@ class BusinessProfessionalIncomeSerializer(serializers.ModelSerializer):
     class Meta:
         model = BusinessProfessionalIncome
         fields = '__all__'
-
-
-
-class BusinessProfessionalIncomeDocumentSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = BusinessProfessionalIncomeDocument
-        fields = ['id', 'document_type', 'file', 'uploaded_at']
-
 
 
 class Section80EDocumentsSerializer(serializers.ModelSerializer):

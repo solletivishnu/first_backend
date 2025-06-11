@@ -35,7 +35,7 @@ from usermanagement.utils import *
 from usermanagement.decorators import *
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 from datetime import date
-
+import requests
 
 # Create loggers for general and error logs
 logger = logging.getLogger(__name__)
@@ -1330,9 +1330,7 @@ def createDocument(request, id):
         # Fetch the invoice object
         invoice = Invoice.objects.get(id=id)
         signature_base64 = ''
-        # if invoice.invoicing_profile.signature:
-        #     with open(invoice.invoicing_profile.signature.path, "rb") as image_file:
-        #         signature_base64 = base64.b64encode(image_file.read()).decode('utf-8')
+        signature_url = invoice.invoicing_profile.signature.url if invoice.invoicing_profile.signature else ""
 
         # No need to check 'if not invoice' since it's already guaranteed to be set by .get()
         contexts = []
@@ -1376,7 +1374,7 @@ def createDocument(request, id):
             'ifsc_code': getattr(invoice.invoicing_profile, 'ifsc_code', ''),
             'invoice_format': getattr(invoice.invoicing_profile, 'ifsc_code', ''),
             'swift_code': getattr(invoice.invoicing_profile, 'ifsc_code', ''),
-            'signature': signature_base64,
+            'image_url': signature_url,
             # Invoice data fields (only for the selected invoice)
             'customer_name': getattr(invoice, 'customer', ''),
             'terms': getattr(invoice, 'terms', ''),

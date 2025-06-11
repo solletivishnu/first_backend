@@ -6,6 +6,7 @@ from django.core.validators import FileExtensionValidator
 from usermanagement.models import ServiceRequest, Users
 from servicetasks.models import ServiceTask
 from .helpers import upload_bank_statement_or_cancelled_cheque_path, upload_official_address_proof_path
+from docwallet.models import PrivateS3Storage
 
 #MSME_Registration = ["BusinessIdentity", "BusinessClassificationInputs", "TurnoverAndInvestmentDeclaration", "RegisteredAddress", "MsmeReviewFilingCertificate"]
 
@@ -26,8 +27,10 @@ class BusinessIdentity(models.Model):
                                         related_name='service_task_msme_business_identity')
     organisation_type = models.CharField(max_length=100, blank=False)
     business_name = models.CharField(max_length=255, null=False, blank=False)
-    pan_of_business_or_COI = models.FileField(upload_to= upload_pan_path, null=True, blank=True)
-    aadhar_of_signatory = models.FileField(upload_to= upload_aadhar_path, null=True, blank=True)
+    pan_of_business_or_COI = models.FileField(upload_to= upload_pan_path, null=True,
+                                              blank=True, storage=PrivateS3Storage())
+    aadhar_of_signatory = models.FileField(upload_to= upload_aadhar_path, null=True,
+                                           blank=True, storage=PrivateS3Storage())
     mobile_number = models.CharField(max_length=15, blank=True)
     email_id = models.EmailField(max_length=255, blank=True)
     Are_you_previously_registered_UAM = models.CharField(max_length=20, choices=YES_NO_CHOICES, default='no', blank=True)
@@ -113,7 +116,8 @@ class TurnoverAndInvestmentDeclaration(models.Model):
     have_you_filed_itr_previous_year = models.CharField(max_length=20,choices=YES_NO_CHOICES,blank=True)
     are_you_registered_under_gst = models.CharField(max_length=10,choices=GST_REGISTRATION_CHOICES,
                                             blank=True,null=True)
-    gst_certificate = models.FileField(upload_to=upload_gst_certificate_path, blank=True, null=True)
+    gst_certificate = models.FileField(upload_to=upload_gst_certificate_path, blank=True,
+                                       null=True, storage=PrivateS3Storage())
     status = models.CharField(max_length=20, choices=[('in progress', 'In Progress'), ('completed', 'Completed'),
                                         ('sent for approval', 'Sent for Approval'),('revoked', 'Revoked')],
                                          null=False, blank=False,default="in progress")
@@ -140,8 +144,10 @@ class RegisteredAddress(models.Model):
     service_type = models.CharField(max_length=20, default="MSME Registration", editable=False)
     service_task = models.ForeignKey(ServiceTask, on_delete=models.CASCADE, related_name='service_task_registered_address_details')
     official_address_of_enterprise = models.JSONField(null=True, blank=True)
-    bank_statement_or_cancelled_cheque = models.FileField(upload_to=upload_bank_statement_or_cancelled_cheque_path, blank=True, null=True)
-    official_address_of_proof = models.FileField(upload_to=upload_official_address_proof_path, blank=True, null=True)
+    bank_statement_or_cancelled_cheque = models.FileField(upload_to=upload_bank_statement_or_cancelled_cheque_path,
+                                                          blank=True, null=True, storage=PrivateS3Storage())
+    official_address_of_proof = models.FileField(upload_to=upload_official_address_proof_path,
+                                                 blank=True, null=True, storage=PrivateS3Storage())
     location_of_plant = models.CharField(max_length=3, choices=[('yes', 'YES'), ('no', 'No')],
                                         null=False, blank=False, default='no')
     status = models.CharField(max_length=20, choices=[('in progress', 'In Progress'), ('completed', 'Completed'),
@@ -196,7 +202,8 @@ class MsmeReviewFilingCertificate(models.Model):
         ('rejected', 'Rejected'),
         ('approved', 'Approved'),
     ]
-    review_certificate = models.FileField(upload_to=review_filing_certificate_path, null=True, blank=True)
+    review_certificate = models.FileField(upload_to=review_filing_certificate_path, null=True,
+                                          blank=True, storage=PrivateS3Storage())
     review_certificate_status = models.CharField(max_length=20,choices=REVIEW_STATUS_CHOICES,
                                                  null=False, blank=False,default=None)
     filing_status = models.CharField(

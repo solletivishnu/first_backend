@@ -9,35 +9,40 @@ class BusinessIdentitySerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-    def create(self, validated_data):
-        print("VALIDATED DATA:", validated_data)  # Debugging
-        return super().create(validated_data)
-
-
 class ApplicantDetailsSerializer(serializers.ModelSerializer):
     class Meta:
         model = ApplicantDetails
         fields = '__all__'
 
 
+class SignatoryInfoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SignatoryInfo
+        fields = '__all__'
+
+
 class SignatoryDetailsSerializer(serializers.ModelSerializer):
+    signatory_info = SignatoryInfoSerializer(many=True, required=False)
     class Meta:
         model = SignatoryDetails
         fields = '__all__'
-
-
-class BusinessLocationSerializer(serializers.ModelSerializer):
-    address = serializers.JSONField()
-    class Meta:
-        model = BusinessLocation
-        fields = '__all__'
-
 
 class AdditionalSpaceBusinessSerializer(serializers.ModelSerializer):
     address = serializers.JSONField()
     class Meta:
         model = AdditionalSpaceBusiness
         fields = '__all__'
+
+
+class BusinessLocationSerializer(serializers.ModelSerializer):
+    address = serializers.JSONField()
+    additional_address_details = AdditionalSpaceBusinessSerializer(many=True, required=False)
+    class Meta:
+        model = BusinessLocation
+        fields = '__all__'
+
+
+
 
 
 class TradeLicenseDetailsSerializer(serializers.ModelSerializer):

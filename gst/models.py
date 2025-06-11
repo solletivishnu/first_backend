@@ -5,6 +5,7 @@ from .helpers import *
 from usermanagement.models import *
 from django.db import models
 from servicetasks.models import ServiceTask
+from docwallet.models import PrivateS3Storage
 
 
 class BasicBusinessInfo(models.Model):
@@ -16,12 +17,12 @@ class BasicBusinessInfo(models.Model):
     legal_name_of_business = models.CharField(max_length=255, blank=True)
     trade_name_of_business = models.CharField(max_length=255, blank=True)
 
-    business_pan = models.FileField(upload_to=upload_business_pan, blank=True, null=True)
+    business_pan = models.FileField(upload_to=upload_business_pan, blank=True, null=True, storage=PrivateS3Storage())
     constitution_of_business = models.CharField(max_length=255, blank=True, null=True)
 
     certificate_of_incorporation = models.FileField(upload_to=upload_certificate_of_incorporation, blank=True,
-                                                    null=True)
-    MOA_AOA = models.FileField(upload_to=upload_moa_aoa, blank=True, null=True)
+                                                    null=True, storage=PrivateS3Storage())
+    MOA_AOA = models.FileField(upload_to=upload_moa_aoa, blank=True, null=True, storage=PrivateS3Storage())
 
     business_commencement_date = models.DateField()
     nature_of_business = models.TextField(blank=True, null=True)
@@ -95,8 +96,9 @@ class RegistrationInfo(models.Model):
     registration_number = models.CharField(max_length=100, blank=True, null=True)
     date_of_registration = models.DateField(blank=True, null=True)
     status = models.CharField(max_length=20, choices=[('in progress', 'In Progress'), ('completed', 'Completed'),
-                                                      ('sent for approval', 'Sent for Approval'),
-                                                      ('revoked', 'Revoked')],default='in progress', null=False, blank=False)
+                                            ('sent for approval', 'Sent for Approval'),
+                                            ('revoked', 'Revoked')],
+                                            default='in progress', null=False, blank=False)
     assignee = models.ForeignKey(Users, on_delete=models.SET_NULL, null=True, blank=True,
                                  related_name='assigned_registration_info')
     reviewer = models.ForeignKey(Users, on_delete=models.SET_NULL, null=True, blank=True,
@@ -115,7 +117,8 @@ class RegistrationInfo(models.Model):
 
 
 class PrincipalPlaceDetails(models.Model):
-    service_request = models.OneToOneField(ServiceRequest, on_delete=models.CASCADE, related_name='principal_place_details')
+    service_request = models.OneToOneField(ServiceRequest, on_delete=models.CASCADE,
+                                           related_name='principal_place_details')
     service_type = models.CharField(max_length=20, default="GST", editable=False)
     service_task = models.OneToOneField(ServiceTask, on_delete=models.CASCADE,
                                      related_name='service_task_principal_place_details')
@@ -130,14 +133,19 @@ class PrincipalPlaceDetails(models.Model):
         ('lease', 'Lease'),
     ]
     principal_place = JSONField(default=dict, blank=True, null=True)
-    nature_of_possession_of_premise = models.CharField(max_length=255,choices=OWNERSHIP_TYPE_CHOICES, blank=True, null=True)
+    nature_of_possession_of_premise = models.CharField(max_length=255,
+                                                       choices=OWNERSHIP_TYPE_CHOICES, blank=True, null=True)
     address_proof = models.CharField(max_length=255, choices=ADDRESS_DOCUMENT_CHOICES,blank=True, null=True)
-    address_proof_file = models.FileField(upload_to=upload_address_proof_file, blank=True, null=True)
-    rental_agreement_or_noc = models.FileField(upload_to=upload_rental_agreement, blank=True, null=True)
-    bank_statement_or_cancelled_cheque = models.FileField(upload_to=upload_bank_statement, blank=True, null=True)
-    status = models.CharField(max_length=20, choices=[('in progress', 'In Progress'), ('completed', 'Completed'),
-                                                      ('sent for approval', 'Sent for Approval'),
-                                                      ('revoked', 'Revoked')], default='in progress',null=False, blank=False)
+    address_proof_file = models.FileField(upload_to=upload_address_proof_file,
+                                          blank=True, null=True, storage=PrivateS3Storage())
+    rental_agreement_or_noc = models.FileField(upload_to=upload_rental_agreement, blank=True,
+                                               null=True, storage=PrivateS3Storage())
+    bank_statement_or_cancelled_cheque = models.FileField(upload_to=upload_bank_statement,
+                                                        blank=True, null=True, storage=PrivateS3Storage())
+    status = models.CharField(max_length=20,
+                              choices=[('in progress', 'In Progress'), ('completed', 'Completed'),
+                                        ('sent for approval', 'Sent for Approval'),
+                                        ('revoked', 'Revoked')], default='in progress',null=False, blank=False)
     assignee = models.ForeignKey(Users, on_delete=models.SET_NULL, null=True, blank=True,
                                  related_name='assigned_principal_place_details')
     reviewer = models.ForeignKey(Users, on_delete=models.SET_NULL, null=True, blank=True,
@@ -206,9 +214,9 @@ class PromoterSignatoryInfo(models.Model):
     )
     mobile = models.CharField(max_length=15, blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
-    pan = models.FileField(upload_to=upload_promoter_pan, blank=True, null=True)
-    aadhaar = models.FileField(upload_to=upload_promoter_aadhaar, blank=True, null=True)
-    photo = models.FileField(upload_to=upload_promoter_photo, blank=True, null=True)
+    pan = models.FileField(upload_to=upload_promoter_pan, blank=True, null=True, storage=PrivateS3Storage())
+    aadhaar = models.FileField(upload_to=upload_promoter_aadhaar, blank=True, null=True, storage=PrivateS3Storage())
+    photo = models.FileField(upload_to=upload_promoter_photo, blank=True, null=True, storage=PrivateS3Storage())
     designation = models.CharField(max_length=255, blank=True, null=True)
     residential_same_as_aadhaar_address = models.CharField(
         max_length=3,
@@ -225,7 +233,8 @@ class GSTReviewFilingCertificate(models.Model):
     service_type = models.CharField(max_length=20, default="GST", editable=False)
     service_request = models.OneToOneField(ServiceRequest, on_delete=models.CASCADE,
                                             related_name='GST_review_filing_certificate')
-    service_task = models.OneToOneField(ServiceTask, on_delete=models.CASCADE, related_name='ServiceTask_GST_review_filing_certificate')
+    service_task = models.OneToOneField(ServiceTask, on_delete=models.CASCADE,
+                                        related_name='ServiceTask_GST_review_filing_certificate')
 
     FILING_STATUS_CHOICES = [
         ('in progress', 'In Progress'),
@@ -238,7 +247,8 @@ class GSTReviewFilingCertificate(models.Model):
         ('rejected', 'Rejected'),
         ('approved', 'Approved'),
     ]
-    review_certificate = models.FileField(upload_to=review_filing_certificate, null=True, blank=True)
+    review_certificate = models.FileField(upload_to=review_filing_certificate, null=True, blank=True,
+                                          storage=PrivateS3Storage())
     status = models.CharField(max_length=20, choices=[('in progress', 'In Progress'), ('completed', 'Completed'),
                                         ('sent for approval', 'Sent for Approval'),('revoked', 'Revoked')],
                                          default='in progress', null=False,blank=False)

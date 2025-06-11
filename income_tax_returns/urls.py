@@ -54,7 +54,7 @@ urlpatterns = [
          name='salary_income_list_create'),
     path('salary-income/<int:pk>/', salary_income_views.salary_income_detail,
          name='salary_income_detail_update'),
-    path('salary-documents/<int:pk>/', salary_income_views.delete_salary_document,
+    path('salary-documents/files/<int:pk>/delete/', salary_income_views.delete_salary_document,
          name='delete_salary_document_file'),
     path('salary-documents-count/<int:income_id>/', salary_income_views.salary_document_summary,
          name='salary_document_summary'),
@@ -82,12 +82,13 @@ urlpatterns = [
          name='get_capital_gains_details'),
     path('capital-gains/add-property/', capital_gains_views.add_capital_gains_property,
          name='add_capital_gains_property'),
-    path('capital-gains/delete-property/<str:file_type>/<int:property_id>/', capital_gains_views.delete_capital_gains_property_file,
+    path('capital-gains/delete-property/<str:file_type>/<int:property_id>/',
+         capital_gains_views.delete_capital_gains_property_file,
          name='delete_capital_gains_property_file'),
     path('capital-gains/delete-property/<int:pk>/', capital_gains_views.delete_capital_gains_property,
          name='delete_capital_gains_property'),
 
-    path('capital-gains/update-property/<int:property_id>/',capital_gains_views.update_capital_gains_property,
+    path('capital-gains/update-property/<int:property_id>/', capital_gains_views.update_capital_gains_property,
          name='update_capital_gains_property'),
 
     # Capital Gains Equity Mutual Fund
@@ -98,7 +99,7 @@ urlpatterns = [
          capital_gains_funds_details_views.get_equity_mutual_fund_details, name='get_equity_mutual_fund_details'),
     path('capital-gains/equity-mutual-fund/<int:service_request_id>/delete/',
          capital_gains_funds_details_views.delete_equity_mutual_fund, name='delete_equity_mutual_fund'),
-    path('capital-gains/equity-mutual-fund/file/<int:file_id>/delete/',
+    path('capital-gains-equity-mutual-fund/files/<int:file_id>/delete/',
          capital_gains_funds_details_views.delete_equity_mutual_fund_file, name='delete_equity_mutual_fund_file'),
 
     # Business Professional Income
@@ -107,10 +108,10 @@ urlpatterns = [
     path('business-professional-income/<int:service_request_id>/',
          business_professional_income_views.get_business_professional_income,
          name='get_business_professional_income'),
-    path('business-professional-income/<int:service_request_id>/delete/',
+    path('business-professional-income/<int:pk>/delete/',
          business_professional_income_views.delete_business_professional_income,
          name='delete_business_professional_income'),
-    path('business-professional-income/document/<int:file_id>/delete/',
+    path('business-professional-income/files/<int:file_id>/delete/',
          business_professional_income_views.delete_business_professional_income_file,
          name='delete_business_professional_income_file'),
 
@@ -126,14 +127,15 @@ urlpatterns = [
          name='delete_other_capital_gains'),
 
     # Delete a specific document by file ID
-    path('other-capital-gains/document/<int:file_id>/delete/', other_capital_gains_views.delete_other_capital_gains_file,
+    path('other-capital-gains/document/<int:file_id>/delete/',
+         other_capital_gains_views.delete_other_capital_gains_file,
          name='delete_other_capital_gains_file'),
 
     path('house-property-details/upsert/', house_property_income_views.upsert_house_property_details,
          name='upsert_house_property_details'),
     path('house-property-details/view/', house_property_income_views.house_property_details_view,
          name='house_property_details_view'),
-    path('house-property-details/delete-file/<str:file_type>/<int:service_request_id>/',
+    path('house-property-details/<str:file_type>/<int:service_request_id>/delete/',
          house_property_income_views.delete_house_property_file,
          name='delete_house_property_file'),
     path('house-property-details/<int:pk>/delete', house_property_income_views.delete_house_property,
@@ -146,7 +148,7 @@ urlpatterns = [
     # InterestIncomeDocument endpoints
     path('interest-income-doc/add/', interest_income_views.add_interest_income_document,
          name='add_interest_income_document'),
-    path('interest-income-doc/<int:document_id>/delete/', interest_income_views.delete_interest_income_document,
+    path('interest-income-doc/files/<int:document_id>/delete/', interest_income_views.delete_interest_income_document,
          name='delete_interest_income_document'),
     path('interest-income-doc/<int:document_id>/update/', interest_income_views.update_interest_income_document,
          name='update_interest_income_document'),
@@ -164,7 +166,7 @@ urlpatterns = [
          name='add_gift_income_document'),  # POST add doc
     path('gift-income-document/<int:document_id>/update/', gift_income_views.update_gift_income_document,
          name='update_gift_income_document'),  # PUT update doc
-    path('gift-income-document/<int:document_id>/delete/', gift_income_views.delete_gift_income_document,
+    path('gift-income-document/files/<int:document_id>/delete/', gift_income_views.delete_gift_income_document,
          name='delete_gift_income_document'),  # DELETE doc
     path('gift-income-document/view/', gift_income_views.get_gift_income_documents,
          name='get_gift_income_document'),  # GET by service_request
@@ -180,7 +182,7 @@ urlpatterns = [
          name='add_dividend_income_document'),  # POST add doc
     path('dividend-income-document/<int:document_id>/update/', dividend_views.update_dividend_income_document,
          name='update_dividend_income_document'),  # PUT update doc
-    path('dividend-income-document/<int:document_id>/delete/', dividend_views.delete_dividend_income_document,
+    path('dividend-income-document/files/<int:document_id>/delete/', dividend_views.delete_dividend_income_document,
          name='delete_dividend_income_document'),  # DELETE doc
     path('dividend-income-document/view/', dividend_views.list_dividend_income_documents,
          name='list_dividend_income_document'),  # GET by service_request
@@ -196,7 +198,7 @@ urlpatterns = [
     path('family-pension-income-documents/<int:document_id>/',
          family_pension_views.update_family_pension_income_document,
          name='update_family_pension_income_document'),  # PUT (update)
-    path('family-pension-income-documents/<int:document_id>/delete/',
+    path('family-pension-income-documents/files/<int:document_id>/delete/',
          family_pension_views.delete_family_pension_income_document,
          name='delete_family_pension_income_document'),  # DELETE
     path('family-pension-income-documents/view/', family_pension_views.get_family_pension_income_documents,
@@ -296,14 +298,14 @@ urlpatterns = [
 
     # List & Delete Section80D files
     path('section-80d-files/', section_80d_views.list_section_80d_files, name='list_section_80d_files'),
-    path('section-80d-files/<int:file_id>/', section_80d_views.delete_section_80d_file, name='delete_section_80d_file'),
+    path('section-80d/files/<int:file_id>/delete/', section_80d_views.delete_section_80d_file, name='delete_section_80d_file'),
 
     path('service-requests-itr/<int:service_request_id>/full-data/', views.get_service_request_full_data,
          name='get_service_request_full_data'),
 
     path('nri-salary-details/upsert/', nri_views.upsert_nri_salary_details, name='upsert-nri-salary-details'),
     path('nri-salary-details/view/', nri_views.nri_salary_details_view, name='view-nri-salary-details'),
-    path('nri-salary-details/file/<int:file_id>/delete/', nri_views.delete_nri_salary_file,
+    path('nri-salary-details/files/<int:file_id>/delete/', nri_views.delete_nri_salary_file,
          name='delete-nri-salary-file'),
 
     path('service-request-section-data', views.get_service_request_section_data,
@@ -313,21 +315,24 @@ urlpatterns = [
     path('section-80ee/details/<int:deductions_id>/', section_80ee_views.get_section80ee_details,
          name='get-section80ee-details'),
     path('section-80ee/<int:deductions_id>/delete/', section_80ee_views.delete_section80ee, name='delete-section80ee'),
+    path('section-80ee/files/<int:document_id>/delete/', section_80ee_views.delete_section80ee_document,
+         name='delete_section80ee_document'),
 
     path('section-80e/', section_80e_views.upsert_section80e_with_files, name='upsert-section80e'),
     path('section-80e/details/<int:deductions_id>/', section_80e_views.get_section80e_details, name='get-section80e'),
     path('section-80e/<int:deductions_id>/delete/', section_80e_views.delete_section80e, name='delete-section80e'),
-
+    path('section-80e/files/<int:document_id>/delete/', section_80e_views.delete_section80e_document,
+         name='delete-section80e-documents'),
 
     path('section-80ddb/upsert/', section_80ddb_views.upsert_section80ddb_with_files),
     path('section-80ddb/details/<int:deductions_id>/', section_80ddb_views.get_section80ddb_details),
     path('section-80ddb/<int:deductions_id>/delete/', section_80ddb_views.delete_section80ddb),
+    path('section-80ddb/files/<int:file_id>/delete/', section_80ddb_views.delete_section80ddb_file),
 
     path('section-80eeb/upsert/', section_80_eeb_views.upsert_section80eeb_with_files),
     path('section-80eeb/details/<int:deductions_id>/', section_80_eeb_views.get_section80eeb_details),
     path('section-80eeb/<int:deductions_id>/delete/', section_80_eeb_views.delete_section80eeb),
-
-
+    path('section-80eeb/files/<int:file_id>/delete/', section_80_eeb_views.delete_section80eeb_file),
 
 ]
 
