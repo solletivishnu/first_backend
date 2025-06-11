@@ -82,7 +82,7 @@ def business_identity_structure_pan(instance, filename):
 
 def signatory_details_aadhar_image(instance, filename):
     # Get the name of the business, replace spaces with underscores
-    service_request_id = str(instance.service_request.id)
+    service_request_id = str(instance.signatory_details.service_request.id)
     # Construct the upload path
     return os.path.join('service_requests', 'Labour License', service_request_id, 'signatory_details_aadhar_image',
                         filename)
@@ -90,7 +90,7 @@ def signatory_details_aadhar_image(instance, filename):
 
 def signatory_details_pan_image(instance, filename):
     # Get the name of the business, replace spaces with underscores
-    service_request_id = str(instance.service_request.id)
+    service_request_id = str(instance.signatory_details.service_request.id)
     # Construct the upload path
     return os.path.join('service_requests', 'Labour License', service_request_id, 'signatory_details_pan_image',
                         filename)
@@ -98,7 +98,7 @@ def signatory_details_pan_image(instance, filename):
 
 def signatory_details_photo_image(instance, filename):
     # Get the name of the business, replace spaces with underscores
-    service_request_id = str(instance.service_request.id)
+    service_request_id = str(instance.signatory_details.service_request.id)
     # Construct the upload path
     return os.path.join('service_requests', 'Labour License', service_request_id, 'signatory_details_photo_image',
                         filename)

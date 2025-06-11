@@ -11,7 +11,11 @@ import json
 @parser_classes([MultiPartParser, FormParser, JSONParser])
 def upsert_equity_mutual_fund_with_files(request):
     try:
-        request_data = request.data.copy()
+        # Check if request contains files
+        if request.FILES:
+            request_data = request.data
+        else:
+            request_data = request.data.copy()
 
         # Coerce investment_types if sent as a string
         investment_types = request_data.get('equity_mutual_fund_type')

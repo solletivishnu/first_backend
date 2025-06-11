@@ -31,6 +31,8 @@ from django.db.models import OuterRef, Subquery, Q
 from datetime import datetime
 import io
 from rest_framework.permissions import AllowAny
+from django.utils.dateparse import parse_date
+
 
 def upload_to_s3(pdf_data, bucket_name, object_key):
     try:
@@ -1382,11 +1384,6 @@ def salary_template_list_create(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from rest_framework import status
-
-
 def safe_sum(values):
     """Safely sum a list of values, treating strings like 'NA' as 0."""
     total = 0
@@ -1398,185 +1395,224 @@ def safe_sum(values):
     return total
 
 
+def get_statutory_settings(employee):
+    if not employee:
+        return None
+    statutory = (
+        json.loads(employee.statutory_components)
+        if isinstance(employee.statutory_components, str)
+        else employee.statutory_components
+    )
+    return {
+        "epf_enabled": statutory.get("epf_enabled", False),
+        "esi_enabled": statutory.get("esi_enabled", False),
+        "pt_enabled": statutory.get("professional_tax", False)
+    }
+
+
+def calculate_pf_contributions(pf_wage, basic_monthly):
+    benefits = {
+        "EPF Employer Contribution": {
+            "monthly": 0.12 * pf_wage / 12,
+            "annually": 0.12 * pf_wage,
+            "calculation_type": "Percentage (12%) of PF wage"
+        }
+    }
+
+    if basic_monthly <= 15000:
+        for name in ["EDLI Employer Contribution", "EPF admin charges"]:
+            benefits[name] = {
+                "monthly": 0.005 * pf_wage / 12,
+                "annually": 0.005 * pf_wage,
+                "calculation_type": "Percentage (0.5%) of PF wage"
+            }
+    else:
+        for name in ["EDLI Employer Contribution", "EPF admin charges"]:
+            benefits[name] = {
+                "monthly": 75,
+                "annually": 900,
+                "calculation_type": "Fixed Amount"
+            }
+    return benefits
+
+
+def calculate_esi_contributions(pf_wage, basic_monthly, esi_enabled):
+    if not esi_enabled:
+        return {"monthly": "NA", "annually": "NA", "calculation_type": "Not Applicable"}
+
+    if basic_monthly <= 21000:
+        return {
+            "monthly": 0.0325 * pf_wage / 12,
+            "annually": 0.0325 * pf_wage,
+            "calculation_type": "Percentage (3.25%) of PF wage"
+        }
+    return {
+        "monthly": 0,
+        "annually": 0,
+        "calculation_type": "Not Applicable"
+    }
+
+
+def calculate_employee_deductions(pf_wage, basic_monthly, epf_enabled, esi_enabled, pt_enabled):
+    deductions = {}
+
+    # EPF Employee Contribution
+    deductions["EPF Employee Contribution"] = {
+        "monthly": 0.12 * pf_wage / 12,
+        "annually": 0.12 * pf_wage,
+        "calculation_type": "Percentage (12%) of PF wage"
+    } if epf_enabled else {"monthly": "NA", "annually": "NA", "calculation_type": "Not Applicable"}
+
+    # ESI Employee Contribution
+    deductions["ESI Employee Contribution"] = {
+        "monthly": 0.0075 * pf_wage / 12,
+        "annually": 0.0075 * pf_wage,
+        "calculation_type": "Percentage (0.75%) of PF wage"
+    } if esi_enabled and basic_monthly <= 21000 else (
+        {"monthly": 0, "annually": 0, "calculation_type": "Not Applicable"}
+        if esi_enabled else {"monthly": "NA", "annually": "NA", "calculation_type": "Not Applicable"}
+    )
+
+    # Professional Tax
+    deductions["PT"] = {
+        "monthly": 200,
+        "annually": 2400,
+        "calculation_type": "Fixed Amount (₹200)"
+    } if pt_enabled else {"monthly": "NA", "annually": "NA", "calculation_type": "Not Applicable"}
+
+    return deductions
+
+
+def calculate_loan_deductions(employee_id):
+    today = date.today().replace(day=1)
+    loan_deductions = AdvanceLoan.objects.filter(employee_id=employee_id)
+    loan_emi_total = sum(
+        loan.emi_amount for loan in loan_deductions
+        if loan.start_month <= today <= loan.end_month
+    )
+    return loan_emi_total if loan_emi_total else "NA"
+
+
+def format_deductions(deductions):
+    return [
+        {
+            "component_name": k,
+            **({"monthly": v, "annually": v, "calculation_type": "Fixed EMI"}
+               if not isinstance(v, dict) else v)
+        }
+        for k, v in deductions.items()
+    ]
+
+
 @api_view(['POST'])
 def calculate_payroll(request):
     try:
-        today = date.today()
         data = request.data
         annual_ctc = float(data["annual_ctc"])
-
-        # Extract Earnings
         earnings = data["earnings"]
-        basic_salary = next((item for item in earnings if item["component_name"] == "Basic"), None)
+        employee_id = data.get("employee")
 
+        # Validate basic salary component
+        basic_salary = next((item for item in earnings if item["component_name"] == "Basic"), None)
         if not basic_salary:
             return Response({"errorMessage": "Basic component is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         basic_annual = basic_salary["annually"]
         basic_monthly = basic_annual / 12
-        pf_restricted_wage = min(basic_annual, 180000)  # Max PF restricted wage = 15000 per month (180000 per year)
+        pf_wage = min(basic_annual, 180000)
 
-        # Get Payroll Org details (assuming the payroll info is part of the request data)
-        payroll_id = data.get("payroll")
-        payroll = PayrollOrg.objects.get(id=payroll_id)
+        # Get employee and statutory settings
+        employee = EmployeeManagement.objects.filter(id=employee_id).first() if employee_id else None
+        statutory = get_statutory_settings(employee)
 
-        # Check if EPF, ESI, PT are enabled for the payroll org
-        epf_enabled = False
-        if hasattr(payroll, 'epf_details') and payroll.epf_details:
-            epf_enabled = not payroll.epf_details.is_disabled
+        if statutory:
+            epf_enabled, esi_enabled, pt_enabled = statutory.values()
+        else:
+            payroll = PayrollOrg.objects.get(id=data.get("payroll"))
+            epf_enabled = hasattr(payroll,
+                                  'epf_details') and payroll.epf_details and not payroll.epf_details.is_disabled
+            esi_enabled = hasattr(payroll,
+                                  'esi_details') and payroll.esi_details and not payroll.esi_details.is_disabled
+            pt_enabled = False
 
-        esi_enabled = False
-        if hasattr(payroll, 'esi_details') and payroll.esi_details:
-            esi_enabled = not payroll.esi_details.is_disabled
-        # pt_enabled = payroll.pt_details.exists()  # Simply check if PT records exist
+        # Case 1: Basic salary < 15,000 and no statutory components
+        if basic_monthly < 15000 and not (epf_enabled or esi_enabled or pt_enabled):
+            total_earnings = safe_sum(item["annually"] for item in earnings if item["component_name"] == "Basic")
+            fixed_allowance = annual_ctc - total_earnings
 
-        # Initialize Benefits dictionary
-        benefits = {}
+            for earning in earnings:
+                if earning["component_name"] == "Fixed Allowance":
+                    earning.update({
+                        "annually": fixed_allowance,
+                        "monthly": fixed_allowance / 12
+                    })
+                elif earning["component_name"] != "Basic":
+                    earning.update({
+                        "annually": 0,
+                        "monthly": 0
+                    })
 
-        # EPF Benefits
-        if epf_enabled:
-            benefits["EPF Employer Contribution"] = {
-                "monthly": 0.12 * pf_restricted_wage / 12,
-                "annually": 0.12 * pf_restricted_wage,
-                "calculation_type": "Percentage (12%) of PF wage"
+            benefits = {
+                name: {"monthly": "NA", "annually": "NA", "calculation_type": "Not Applicable"}
+                for name in ["EPF Employer Contribution", "EDLI Employer Contribution",
+                             "EPF admin charges", "ESI Employer Contribution"]
             }
 
-            # EDLI & Admin Charges
-            if basic_monthly <= 15000:
-                benefits["EDLI Employer Contribution"] = {
-                    "monthly": 0.005 * pf_restricted_wage / 12,
-                    "annually": 0.005 * pf_restricted_wage,
-                    "calculation_type": "Percentage (0.5%) of PF wage"
-                }
-                benefits["EPF admin charges"] = {
-                    "monthly": 0.005 * pf_restricted_wage / 12,
-                    "annually": 0.005 * pf_restricted_wage,
-                    "calculation_type": "Percentage (0.5%) of PF wage"
-                }
-            else:
-                benefits["EDLI Employer Contribution"] = {
-                    "monthly": 75,
-                    "annually": 900,
-                    "calculation_type": "Fixed Amount"
-                }
-                benefits["EPF admin charges"] = {
-                    "monthly": 75,
-                    "annually": 900,
-                    "calculation_type": "Fixed Amount"
-                }
-        else:
-            benefits["EPF Employer Contribution"] = {"monthly": "NA", "annually": "NA", "calculation_type": "Not Applicable"}
-            benefits["EDLI Employer Contribution"] = {"monthly": "NA", "annually": "NA", "calculation_type": "Not Applicable"}
-            benefits["EPF admin charges"] = {"monthly": "NA", "annually": "NA", "calculation_type": "Not Applicable"}
-
-        # ESI Benefits
-        if esi_enabled:
-            if basic_monthly <= 21000:
-                benefits["ESI Employer Contribution"] = {
-                    "monthly": 0.0325 * pf_restricted_wage / 12,
-                    "annually": 0.0325 * pf_restricted_wage,
-                    "calculation_type": "Percentage (3.25%) of PF wage"
-                }
-            else:
-                benefits["ESI Employer Contribution"] = {
-                    "monthly": 0,
-                    "annually": 0,
-                    "calculation_type": "Not Applicable"
-                }
-        else:
-            benefits["ESI Employer Contribution"] = {"monthly": "NA", "annually": "NA", "calculation_type": "Not Applicable"}
-
-        total_benefits = safe_sum(item["annually"] for item in benefits.values())
-
-        # Adjust Fixed Allowance so that Gross Salary = Annual CTC - Benefits
-        total_earnings = safe_sum(item["annually"] for item in earnings if item["component_name"] != "Fixed Allowance")
-        print(total_earnings)
-        print(total_benefits)
-        print(annual_ctc)
-        fixed_allowance = (annual_ctc - total_benefits - total_earnings)
-
-        for earning in earnings:
-            if earning["component_name"] == "Fixed Allowance":
-                earning["annually"] = fixed_allowance
-                earning["monthly"] = fixed_allowance / 12
-
-        gross_salary = safe_sum(item["annually"] for item in earnings)
-
-        # Initialize Deductions dictionary
-        deductions = {}
-
-        # EPF Deductions
-        if epf_enabled:
-            deductions["EPF Employee Contribution"] = {
-                "monthly": 0.12 * pf_restricted_wage / 12,
-                "annually": 0.12 * pf_restricted_wage,
-                "calculation_type": "Percentage (12%) of PF wage"
+            deductions = {
+                name: {"monthly": "NA", "annually": "NA", "calculation_type": "Not Applicable"}
+                for name in ["EPF Employee Contribution", "ESI Employee Contribution", "PT"]
             }
-        else:
-            deductions["EPF Employee Contribution"] = {"monthly": "NA", "annually": "NA", "calculation_type": "Not Applicable"}
+            deductions["loan_emi"] = "NA"
 
-        # ESI Deductions
-        if esi_enabled:
-            deductions["ESI Employee Contribution"] = {
-                "monthly": (0.0075 * pf_restricted_wage / 12) if basic_monthly <= 21000 else 0,
-                "annually": (0.0075 * pf_restricted_wage) if basic_monthly <= 21000 else 0,
-                "calculation_type": "Percentage (0.75%) of PF wage" if basic_monthly <= 21000 else "Not Applicable"
+            gross_salary = safe_sum(item["annually"] for item in earnings)
+            net_salary = gross_salary
+            total_ctc = annual_ctc
+        else:
+            # Case 2: Regular calculation with statutory components
+            benefits = calculate_pf_contributions(pf_wage, basic_monthly) if epf_enabled else {
+                name: {"monthly": "NA", "annually": "NA", "calculation_type": "Not Applicable"}
+                for name in ["EPF Employer Contribution", "EDLI Employer Contribution", "EPF admin charges"]
             }
-        else:
-            deductions["ESI Employee Contribution"] = {"monthly": "NA", "annually": "NA", "calculation_type": "Not Applicable"}
 
-        # PT Deduction (Fixed ₹200)
-        pt_deduction = 0
-        if epf_enabled and esi_enabled:
-            pt_deduction = 200  # Fixed PT Deduction as ₹200
-            deductions["PT"] = {
-                "monthly": pt_deduction,
-                "annually": pt_deduction * 12,
-                "calculation_type": "Fixed Amount (₹200)"
-            }
-        else:
-            deductions["PT"] = {"monthly": "NA", "annually": "NA", "calculation_type": "Not Applicable"}
+            benefits["ESI Employer Contribution"] = calculate_esi_contributions(pf_wage, basic_monthly, esi_enabled)
+            total_benefits = safe_sum(item["annually"] for item in benefits.values() if isinstance(item, dict))
 
-        total_deductions = safe_sum(item["annually"] for item in deductions.values())
+            total_earnings = safe_sum(
+                item["annually"] for item in earnings if item["component_name"] != "Fixed Allowance")
+            fixed_allowance = annual_ctc - total_earnings - total_benefits
 
-        # Check for Advance Loan and Add EMI Deduction if Applicable
-        loan_deductions = AdvanceLoan.objects.filter(employee_id=data.get('employee_id'))
-        loan_deduction_total = 0
-        for loan in loan_deductions:
-            # Check if the current month is within the loan start and end period
-            if loan.start_month <= today.replace(day=1) <= loan.end_month:
-                loan_deduction_total += loan.emi_amount  # Add EMI amount for loan to the total deduction
-                # Add EMI Deduction to Total Deductions
-                deductions["loan_emi"] = loan_deduction_total
+            for earning in earnings:
+                if earning["component_name"] == "Fixed Allowance":
+                    earning.update({
+                        "annually": fixed_allowance,
+                        "monthly": fixed_allowance / 12
+                    })
 
-        total_deductions += loan_deduction_total
+            gross_salary = safe_sum(item["annually"] for item in earnings)
 
-        # Calculate Net Salary
-        net_salary = gross_salary - total_deductions
+            deductions = calculate_employee_deductions(pf_wage, basic_monthly, epf_enabled, esi_enabled, pt_enabled)
+            deductions["loan_emi"] = calculate_loan_deductions(employee_id) if employee_id else "NA"
 
-        # Compute Total CTC
-        total_ctc = gross_salary + total_benefits
+            total_deductions = safe_sum(
+                item["annually"] for item in deductions.values()
+                if isinstance(item, dict) and isinstance(item["annually"], (int, float)))
 
-        # Prepare Response Data
-        response_data = {
+            net_salary = gross_salary - total_deductions
+            total_ctc = gross_salary + total_benefits
+
+        return Response({
             "payroll": data.get('payroll', ''),
             "template_name": data["template_name"],
             "description": data["description"],
             "annual_ctc": annual_ctc,
             "earnings": earnings,
             "gross_salary": {"monthly": gross_salary / 12, "annually": gross_salary},
-            "benefits": [
-                {"component_name": key, **value} for key, value in benefits.items()
-            ],
+            "benefits": [{"component_name": k, **v} for k, v in benefits.items()],
             "total_ctc": {"monthly": total_ctc / 12, "annually": total_ctc},
-            "deductions": [
-                {"component_name": key, **value} for key, value in deductions.items()
-            ],
+            "deductions": format_deductions(deductions),
             "net_salary": {"monthly": net_salary / 12, "annually": net_salary},
             "errorMessage": ""
-        }
-
-        return Response(response_data, status=status.HTTP_200_OK)
+        }, status=status.HTTP_200_OK)
 
     except Exception as e:
         return Response({"errorMessage": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -3801,10 +3837,16 @@ def bonus_by_payroll_month_year(request):
             results.append({
                 'id': current_bonus.id,
                 'employee_id': employee.id,
+                'associate_id': employee.associate_id,
+                'department': employee.department.dept_name if employee.department else '',
+                'designation': employee.designation.designation_name if employee.designation else '',
+                'type': current_bonus.bonus_type,
                 'employee_name': employee.first_name,
                 'current_bonus': current_bonus.amount,
                 'committed_bonus': committed_bonus,
                 'ytd_bonus_paid': ytd_bonus,
+                'month': current_bonus.month,
+                'financial_year': current_bonus.financial_year,
                 'remarks': current_bonus.remarks or ''
             })
 
@@ -4107,16 +4149,11 @@ def salary_revision_list(request):
                 {"error": "Missing required query parameters: payroll_id, year, and month."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        revised_salaries = EmployeeSalaryDetails.objects.filter(
+        revised_salaries = EmployeeSalaryRevisionHistory.objects.filter(
             employee__payroll_id=payroll_id,
-            update_year=year,
-            update_month=month
+            revision_year=year,
+            revision_month=month
         ).select_related('employee')
-        if not revised_salaries.exists():
-            return Response(
-                {"message": "No revised salary records found for the given payroll ID, year, and month."},
-                status=status.HTTP_404_NOT_FOUND
-            )
         serializer = SimplifiedEmployeeSalarySerializer(revised_salaries, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     except Exception as e:

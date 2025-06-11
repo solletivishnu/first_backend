@@ -34,7 +34,7 @@ def signatory_details_passport(instance, filename):
 
 def promoter_or_directors_aadhaar(instance, filename):
     # Get the name of the business, replace spaces with underscores
-    service_request_id = str(instance.service_request.id)
+    service_request_id = str(instance.signatory_details.service_request.id)
     # Construct the upload path
     return os.path.join('service_requests', 'Trade License', service_request_id, 'promoter_or_directors_aadhaar',
                         filename)
@@ -42,7 +42,7 @@ def promoter_or_directors_aadhaar(instance, filename):
 
 def promoter_or_directors_pan(instance, filename):
     # Get the name of the business, replace spaces with underscores
-    service_request_id = str(instance.service_request.id)
+    service_request_id = str(instance.signatory_details.service_request.id)
     # Construct the upload path
     return os.path.join('service_requests', 'Trade License', service_request_id, 'promoter_or_directors_pan',
                         filename)
@@ -50,7 +50,7 @@ def promoter_or_directors_pan(instance, filename):
 
 def promoter_or_directors_passport_photo(instance, filename):
     # Get the name of the business, replace spaces with underscores
-    service_request_id = str(instance.service_request.id)
+    service_request_id = str(instance.signatory_details.service_request.id)
     # Construct the upload path
     return os.path.join('service_requests', 'Trade License', service_request_id, 'promoter_or_directors_passport_photo',
                         filename)

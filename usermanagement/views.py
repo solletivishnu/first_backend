@@ -1,27 +1,40 @@
+# Standard library imports
+from datetime import timedelta
+from distutils.util import strtobool
+from urllib.parse import urlparse
+
+# Third-party imports
+from django.db import transaction
 from django.http import JsonResponse
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
-import json
-from django.db import transaction
-from django.utils import timezone
-from .models import Module, SubscriptionPlan, Role, UserFeaturePermission, PendingUserOTP, Users
-from .serializers import (
-    ModuleSerializer, SubscriptionPlanSerializer, RoleSerializer,
-    UserFeaturePermissionSerializer, ModuleDetailSerializer,
-    SubscriptionPlanSerializer, RoleDetailSerializer,
-    UserFeaturePermissionSerializer
-)
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
 from rest_framework import status
-from distutils.util import strtobool
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
-from urllib.parse import urlparse
-from .helpers import generate_otp
-from .email_otp_request_service import send_otp_email
-import datetime
+from rest_framework.response import Response
 
+# Local application imports
+from .email_otp_request_service import send_otp_email
+from .helpers import generate_otp
+from .models import (
+    Module,
+    PendingUserOTP,
+    Role,
+    SubscriptionPlan,
+    UserFeaturePermission,
+    Users
+)
+from .serializers import (
+    ModuleDetailSerializer,
+    ModuleSerializer,
+    RoleDetailSerializer,
+    RoleSerializer,
+    SubscriptionPlanSerializer,
+    UserFeaturePermissionSerializer
+)
+import json
+import datetime
 # Module Management APIs
 
 
@@ -34,8 +47,12 @@ def request_otp(request):
 
     # Check if user already exists
     if Users.objects.filter(email=email).exists():
+        # Before
+        return Response({'error': 'A user with this email already exists.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # After
         return Response(
-            {"error": "A user with this email already exists."},
+            {'error': 'A user with this email already exists.'},
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -43,7 +60,7 @@ def request_otp(request):
     otp_code = generate_otp()
     expires_at = timezone.now() + datetime.timedelta(minutes=10)
 
-    obj, created = PendingUserOTP.objects.update_or_create(
+    pending_otp, created = PendingUserOTP.objects.update_or_create(
         email=email,
         defaults={'otp_code': otp_code, 'expires_at': expires_at}
     )
@@ -55,8 +72,8 @@ def request_otp(request):
 
 @api_view(['POST'])
 def create_module(request):
-    """
-    API endpoint for creating a new module
+    """Create a new module.
+
     Expected JSON payload:
     {
         "name": "Payroll",
@@ -416,5 +433,14 @@ def delete_module_permission(request, permission_id):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def happy_coder(request):
-    return Response({"message": "Happy Coder"})
+    """Return a simple success message."""
+    return Response({"message": "Happy Coder"}, status=status.HTTP_200_OK)
 
+
+"""Views for user management functionality.
+
+This module contains views for handling user-related operations including:
+- OTP management
+- Module management
+- Role management
+"""

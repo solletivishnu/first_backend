@@ -94,3 +94,15 @@ def delete_section80e(request, deductions_id):
         return Response({"message": "Section 80E entry and documents deleted successfully"}, status=204)
     except Section80E.DoesNotExist:
         return Response({"error": "Record not found"}, status=404)
+
+
+@api_view(['DELETE'])
+def delete_section80e_document(request, document_id):
+    try:
+        document = Section80EDocuments.objects.get(id=document_id)
+        if document.file:
+            document.file.delete(save=False)  # Delete the file from storage
+        document.delete()
+        return Response({"message": "Document deleted successfully"}, status=204)
+    except Section80EDocuments.DoesNotExist:
+        return Response({"error": "Document not found"}, status=404)

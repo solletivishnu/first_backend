@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import (
-    BusinessIdentityStructure, SignatoryDetails, BusinessLocationProofs,
+    BusinessIdentityStructure, SignatoryDetails, signatoryDetailsInfo, BusinessLocationProofs,
     AdditionalSpaceBusiness, BusinessRegistrationDocuments, ReviewFilingCertificate
 )
 
@@ -11,17 +11,16 @@ class BusinessIdentityStructureSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class SignatoryDetailsSerializer(serializers.ModelSerializer):
+class signatoryDetailsInfoSerializer(serializers.ModelSerializer):
     class Meta:
-        model = SignatoryDetails
+        model = signatoryDetailsInfo
         fields = '__all__'
 
 
-class BusinessLocationProofsSerializer(serializers.ModelSerializer):
-    principal_place_of_business = serializers.JSONField()
-
+class SignatoryDetailsSerializer(serializers.ModelSerializer):
+    signatory_details_info = signatoryDetailsInfoSerializer(many=True, required=False)
     class Meta:
-        model = BusinessLocationProofs
+        model = SignatoryDetails
         fields = '__all__'
 
 
@@ -30,6 +29,14 @@ class AdditionalSpaceBusinessSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AdditionalSpaceBusiness
+        fields = '__all__'
+
+
+class BusinessLocationProofsSerializer(serializers.ModelSerializer):
+    principal_place_of_business = serializers.JSONField()
+    additional_space_business = AdditionalSpaceBusinessSerializer(required=False)
+    class Meta:
+        model = BusinessLocationProofs
         fields = '__all__'
 
 
