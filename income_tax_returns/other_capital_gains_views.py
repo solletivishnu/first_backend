@@ -12,7 +12,10 @@ def upsert_other_capital_gains_with_files(request):
     try:
         service_request = request.data.get('service_request')
         service_task = request.data.get('service_task')
-        data = request.data.copy()
+        if request.FILES:
+            data = request.data
+        else:
+            data = request.data.copy()
         main_details_data = {
             'service_request': request.data.get('service_request'),
             'service_task': request.data.get('service_task'),
@@ -86,13 +89,13 @@ def get_other_capital_gains_details(request, service_request_id):
 
 
 @api_view(['DELETE'])
-def delete_other_capital_gains(request, service_request_id):
+def delete_other_capital_gains(request, pk):
     try:
-        gain = OtherCapitalGains.objects.get(service_request__id=service_request_id)
+        gain = OtherCapitalGainsInfo.objects.get(pk=pk)
         gain.delete()
         return Response({"message": "Deleted successfully"})
 
-    except OtherCapitalGains.DoesNotExist:
+    except OtherCapitalGainsInfo.DoesNotExist:
         return Response({"error": "Record not found"}, status=404)
 
 

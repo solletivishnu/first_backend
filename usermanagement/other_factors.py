@@ -2285,7 +2285,43 @@ def list_contacts_by_date(request):
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-def send_email_notification(to_email, consultation):
+def generate_teams_meeting(start_datetime, end_datetime, subject="Consultation Meeting"):
+    object_id =None
+    tenant_id =None
+    client_id = None
+    client_secret = None
+    token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+    token_data = {
+        "grant_type": "client_credentials",
+        "client_id": {client_id},
+        "client_secret": {client_secret},
+        "scope": "https://graph.microsoft.com/.default",
+    }
+
+    token_resp = requests.post(token_url, data=token_data)
+    access_token = token_resp.json().get("access_token")
+
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+
+    body = {
+        "startDateTime": start_datetime.isoformat(),
+        "endDateTime": end_datetime.isoformat(),
+        "subject": subject
+    }
+
+    meeting_resp = requests.post(
+        f"https://graph.microsoft.com/v1.0/users/{object_id}/onlineMeetings",
+        headers=headers,
+        json=body
+    )
+
+    return meeting_resp.json().get("joinUrl")
+
+
+def send_customer_notification(consultation, join_url):
     # Initialize S3 client
     ses_client = boto3.client(
         'ses',
@@ -2313,7 +2349,7 @@ def send_email_notification(to_email, consultation):
 
     response = ses_client.send_email(
         Source="admin@tarafirst.com",  # Must be verified in AWS SES
-        Destination={"ToAddresses": [to_email]},
+        Destination={"ToAddresses": [consultation.email]},
         Message={
             "Subject": {"Data": subject},
             "Body": {"Text": {"Data": body}},
@@ -2322,7 +2358,10 @@ def send_email_notification(to_email, consultation):
     return response
 
 
-def send_admin_notification(consultation):
+#     🔗 Microsoft Teams Meeting Link:
+# {join_url}
+
+def send_admin_notification(consultation, join_url):
     # Initialize SES client
     ses_client = boto3.client(
         'ses',
@@ -2343,6 +2382,7 @@ def send_admin_notification(consultation):
     📞 Mobile: {consultation.mobile_number}
     📅 Date: {consultation.date}
     ⏰ Time: {consultation.time}
+
 
     Please follow up with the customer as required.
 
@@ -2369,14 +2409,18 @@ def create_consultation(request):
 
     if serializer.is_valid():
         consultation = serializer.save()
+        start_time = datetime.combine(consultation.date, consultation.time).replace(tzinfo=timezone.utc)
+        end_time = start_time + timedelta(minutes=30)
+        # join_url = generate_teams_meeting(start_time, end_time)
         # Send email notification
-        send_email_notification(consultation.email, consultation)
-        send_admin_notification(consultation)
+        join_url = None
+        send_customer_notification(consultation, join_url)
+        send_admin_notification(consultation, join_url)
+
         return Response({"message": "Consultation booked successfully! Email sent."},
                         status=status.HTTP_201_CREATED)
 
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
@@ -2389,6 +2433,40 @@ def list_consultation(request):
     except Exception as e:
         return Response(
             {"error": f"An error occurred while retrieving contacts: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def booked_time_slots(request):
+    date_param = request.query_params.get('date', None)
+
+    if not date_param:
+        return Response(
+            {"error": "Date parameter (YYYY-MM-DD) is required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        # Filter by date and get only time slots
+        booked_slots = Consultation.objects.filter(
+            date=date_param,
+            status__in=['pending', 'reviewed', 'resolved']  # Only count active bookings
+        ).values_list('time', flat=True)  # Get only time values
+
+        # Format times as strings (e.g., "14:30")
+        booked_times = [slot.strftime("%H:%M") for slot in booked_slots]
+
+        return Response({
+            "date": date_param,
+            "booked_times": booked_times,
+            "count": len(booked_times)
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response(
+            {"error": "Invalid date or server error", "details": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 

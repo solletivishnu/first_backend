@@ -228,6 +228,8 @@ urlpatterns = [
 
     path("list-consultations/", other_factors.list_consultation, name="list-consultations"),
 
+    path("booked-consultations/", other_factors.booked_time_slots, name="booked-time-slots"),
+
     path("consultations", other_factors.list_consultations, name="list-consultations-by-date"),
 
     path("consultation/<int:pk>", other_factors.consultation_detail, name="get-consultation-by-id"),

@@ -110,7 +110,10 @@ def update_capital_gains_property(request, property_id):
     except CapitalGainsProperty.DoesNotExist:
         return Response({'error': 'CapitalGainsProperty not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    request_data = request.data
+    # Check if request contains any files
+    has_files = any(request.FILES)
+    request_data = request.data.copy() if not has_files else request.data
+
     reinvestment = request_data.get('reinvestment_details')
     if isinstance(reinvestment, str):
         try:

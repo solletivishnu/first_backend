@@ -123,11 +123,11 @@ urlpatterns = [
          name='get_other_capital_gains_details'),
 
     # Delete entire Other Capital Gains record by service_request ID
-    path('other-capital-gains/delete/<int:service_request_id>/', other_capital_gains_views.delete_other_capital_gains,
+    path('other-capital-gains/delete/<int:pk>/', other_capital_gains_views.delete_other_capital_gains,
          name='delete_other_capital_gains'),
 
     # Delete a specific document by file ID
-    path('other-capital-gains/document/<int:file_id>/delete/',
+    path('other-capital-gains/files/<int:file_id>/delete/',
          other_capital_gains_views.delete_other_capital_gains_file,
          name='delete_other_capital_gains_file'),
 
@@ -148,7 +148,7 @@ urlpatterns = [
     # InterestIncomeDocument endpoints
     path('interest-income-doc/add/', interest_income_views.add_interest_income_document,
          name='add_interest_income_document'),
-    path('interest-income-doc/files/<int:document_id>/delete/', interest_income_views.delete_interest_income_document,
+    path('interest-income-doc/<int:document_id>/delete/', interest_income_views.delete_interest_income_document,
          name='delete_interest_income_document'),
     path('interest-income-doc/<int:document_id>/update/', interest_income_views.update_interest_income_document,
          name='update_interest_income_document'),
@@ -166,7 +166,7 @@ urlpatterns = [
          name='add_gift_income_document'),  # POST add doc
     path('gift-income-document/<int:document_id>/update/', gift_income_views.update_gift_income_document,
          name='update_gift_income_document'),  # PUT update doc
-    path('gift-income-document/files/<int:document_id>/delete/', gift_income_views.delete_gift_income_document,
+    path('gift-income-document/<int:document_id>/delete/', gift_income_views.delete_gift_income_document,
          name='delete_gift_income_document'),  # DELETE doc
     path('gift-income-document/view/', gift_income_views.get_gift_income_documents,
          name='get_gift_income_document'),  # GET by service_request
@@ -182,7 +182,7 @@ urlpatterns = [
          name='add_dividend_income_document'),  # POST add doc
     path('dividend-income-document/<int:document_id>/update/', dividend_views.update_dividend_income_document,
          name='update_dividend_income_document'),  # PUT update doc
-    path('dividend-income-document/files/<int:document_id>/delete/', dividend_views.delete_dividend_income_document,
+    path('dividend-income-document/<int:document_id>/delete/', dividend_views.delete_dividend_income_document,
          name='delete_dividend_income_document'),  # DELETE doc
     path('dividend-income-document/view/', dividend_views.list_dividend_income_documents,
          name='list_dividend_income_document'),  # GET by service_request

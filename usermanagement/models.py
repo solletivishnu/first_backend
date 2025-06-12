@@ -1384,7 +1384,7 @@ def sync_business_name_with_context(sender, instance, **kwargs):
 
 class GSTDetails(BaseModel):
     business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name='gst_details')
-    gstin = models.CharField(max_length=120, unique=True, null=True, blank=True)
+    gstin = models.CharField(max_length=120, null=True, blank=True)
     legal_name = models.CharField(max_length=120, null=True, blank=True)
     trade_name = models.CharField(max_length=120, null=True, blank=True)
     gst_username = models.CharField(max_length=60, null=True, blank=True)
@@ -1401,6 +1401,9 @@ class GSTDetails(BaseModel):
     lut_reg_no = models.CharField(max_length=100, blank=True)
     dob = models.DateField(null=True, blank=True)
     financial_year = models.CharField(max_length=20, blank=True)
+
+    class Meta:
+        unique_together = ("business", "gstin")
 
     def __str__(self):
         return f"GST Details for {self.business.nameOfBusiness}"

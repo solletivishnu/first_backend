@@ -16,7 +16,7 @@ def other_income_details_list(request):
 
     elif request.method == 'POST':
 
-        data = request.data.copy()
+        data = request.data
         service_request_id = request.data.get('service_request')
         try:
             main_details_data = {
@@ -55,8 +55,11 @@ def other_income_details_list(request):
                     serializers = OtherIncomeDetailsInfoSerializer(data=data)
 
                 if serializers.is_valid():
-                    serializers.save()
-                    return Response(main_serializer.data, status=status.HTTP_201_CREATED)
+                    try:
+                        serializers.save()
+                        return Response(main_serializer.data, status=status.HTTP_201_CREATED)
+                    except Exception as e:
+                        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
                 return Response(serializers.errors, status=status.HTTP_400_BAD_REQUEST)
             else:
                 return Response({"message": "Status Updated Successfully"}, status=status.HTTP_200_OK)
@@ -103,36 +106,36 @@ def other_income_details_by_service_request(request):
         return Response({"error": "No records found for the given service request"}, status=status.HTTP_404_NOT_FOUND)
 
 
-@api_view(['POST', 'PUT', 'DELETE'])
-@parser_classes([MultiPartParser, FormParser, JSONParser])
-def add_other_income_document(request, pk=None):
-    """
-    - POST: Create a new OtherIncomeDetailFile
-    - PUT: Update an existing OtherIncomeDetailFile by pk
-    - DELETE: Delete an OtherIncomeDetailFile by pk
-    """
-    if request.method == 'POST':
-        serializer = OtherIncomeDetailFileSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    try:
-        document = OtherIncomeDetailsData.objects.get(pk=pk)
-    except OtherIncomeDetailsData.DoesNotExist:
-        return Response({"error": "Document not found"}, status=status.HTTP_404_NOT_FOUND)
-
-    if request.method == 'PUT':
-        serializer = OtherIncomeDetailFileSerializer(document, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    elif request.method == 'DELETE':
-        document.delete()
-        return Response({"detail": "Document deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+# @api_view(['POST', 'PUT', 'DELETE'])
+# @parser_classes([MultiPartParser, FormParser, JSONParser])
+# def add_other_income_document(request, pk=None):
+#     """
+#     - POST: Create a new OtherIncomeDetailFile
+#     - PUT: Update an existing OtherIncomeDetailFile by pk
+#     - DELETE: Delete an OtherIncomeDetailFile by pk
+#     """
+#     if request.method == 'POST':
+#         serializer = OtherIncomeDetailFileSerializer(data=request.data)
+#         if serializer.is_valid():
+#             serializer.save()
+#             return Response(serializer.data, status=status.HTTP_201_CREATED)
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+#
+#     try:
+#         document = OtherIncomeDetailsData.objects.get(pk=pk)
+#     except OtherIncomeDetailsData.DoesNotExist:
+#         return Response({"error": "Document not found"}, status=status.HTTP_404_NOT_FOUND)
+#
+#     if request.method == 'PUT':
+#         serializer = OtherIncomeDetailFileSerializer(document, data=request.data, partial=True)
+#         if serializer.is_valid():
+#             serializer.save()
+#             return Response(serializer.data)
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+#
+#     elif request.method == 'DELETE':
+#         document.delete()
+#         return Response({"detail": "Document deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
 
 
 @api_view(['DELETE'])
@@ -147,5 +150,5 @@ def delete_other_income_info(request, pk):
             document.file.storage.delete(document.file.name)  # delete from storage
         document.delete()
         return Response({"detail": "Document deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
-    except OtherIncomeDetailsData.DoesNotExist:
+    except OtherIncomeDetailsInfo.DoesNotExist:
         return Response({"error": "Document not found"}, status=status.HTTP_404_NOT_FOUND)

@@ -2,6 +2,9 @@ from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework import status
 import json
+
+from unicodedata import category
+
 from .models import *
 from .serializers import *
 
@@ -494,3 +497,106 @@ def gst_review_filing_certificate_detail(request, pk):
         return Response({"error": "Invalid request method"}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+Task_Model_Serializer_Map = {
+    'Basic Business Info':(BasicBusinessInfo, BasicBusinessInfoSerializer),
+    'Registration Info':(RegistrationInfo, RegistrationInfoSerializer),
+    'Principal Place Details':(PrincipalPlaceDetails, PrincipalPlaceDetailsSerializer),
+    'Promoter Signatory Details':(PromoterSignatoryDetails, PromoterSignatoryDetailsSerializer),
+    'GST Review Filing Certificate':(GSTReviewFilingCertificate, GSTReviewFilingCertificateSerializer)
+}
+@api_view(['GET'])
+def get_service_request_full_details(request, service_request_id):
+    try:
+        service_request = ServiceRequest.objects.get(id=service_request_id)
+    except ServiceRequest.DoesNotExist:
+        return Response({"error": "Service request not found"}, status=status.HTTP_404_NOT_FOUND)
+    data = {}
+    tasks = service_request.service_tasks.all()
+    for task in tasks:
+        category_name = task.category_name.strip()
+        config = Task_Model_Serializer_Map.get(category_name)
+
+        task_info = {
+            "task_id": task.id,
+            "category_name": category_name,
+            "status": task.status,
+            "priority": task.priority,
+            "due_date": task.due_date,
+            "assignee": task.assignee.id if task.assignee else None,
+            "reviewer": task.reviewer.id if task.reviewer else None,
+            "data": None
+        }
+        if config:
+            model, serializer_class = config
+            try:
+                instance = model.objects.get(service_request_id=service_request_id)
+                serializer = serializer_class(instance)
+                task_info["data"] = serializer.data
+            except model.DoesNotExist:
+                task_info["data"] = None
+        else:
+            task_info["data"] = "No model/serializer mapping defined"
+        data[category_name] = task_info
+    return Response({
+        "service_request_id": service_request.id,
+        "client": service_request.user.id if service_request.user else None,
+        "task_data": data
+    }, status=status.HTTP_200_OK)
+
+Category_Task_Map = {
+    "business_details": ["Basic Business Info","Registration Info","Principal Place Details"],
+    "director_promoter_details": ["Promoter Signatory Details"],
+    "review_filing_certificate": ["GST Review Filing Certificate"]
+}
+
+@api_view(['GET'])
+def get_service_request_tasks_by_category(request):
+    """
+    Retrieve tasks for a service request by category.
+    """
+    service_request_id = request.query_params.get('service_request_id')
+    section_key = request.query_params.get('section')
+
+    try:
+        service_request = ServiceRequest.objects.get(id=service_request_id)
+    except ServiceRequest.DoesNotExist:
+        return Response({"error": "Service request not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    section_tasks = Category_Task_Map.get(section_key)
+
+    if not section_tasks:
+        return Response({"error": "Invalid section key"}, status=status.HTTP_400_BAD_REQUEST)
+
+    tasks = service_request.service_tasks.filter(category_name__in=section_tasks)
+    data = {}
+    for task in tasks:
+        category_name = task.category_name.strip()
+        config = Task_Model_Serializer_Map.get(category_name)
+        task_info = {
+                "task_id": task.id,
+                "status": task.status,
+                "priority": task.priority,
+                "due_date": task.due_date,
+                "assignee": task.assignee.id if task.assignee else None,
+                "reviewer": task.reviewer.id if task.reviewer else None,
+                "data": None
+            }
+        if config:
+            model, serializer_class = config
+            try:
+                instance = model.objects.get(service_task=task, service_request=service_request)
+                serializer = serializer_class(instance)
+                task_info["data"] = serializer.data
+            except model.DoesNotExist:
+                task_info["data"] = None
+        else:
+            task_info["data"] = "No model/serializer mapping defined"
+
+        data[category_name] = task_info
+
+    return Response({
+        "service_request_id": service_request.id,
+        "client": service_request.user.id if service_request.user else None,
+        "task_data": data
+    }, status=status.HTTP_200_OK)

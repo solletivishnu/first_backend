@@ -132,4 +132,22 @@ def delete_subtask(request, subtask_id):
     except ServiceSubTask.DoesNotExist:
         return Response({"error": "Subtask not found"}, status=404)
 
+@api_view(['GET'])
+def subtask_list(request):
+    user = request.user
+    if getattr(user, 'is_super_admin', False):
+        # If the user is a super admin, retrieve all subtasks
+        subtasks = ServiceSubTask.objects.all()
+    else:
+        # If the user is not a super admin, filter subtasks by the user's tasks
+        subtasks = ServiceSubTask.objects.filter(
+            models.Q(parent_task__assignee=user) |
+            models.Q(parent_task__reviewer=user) |
+            models.Q(parent_task__client=user)
+        ).distinct()
+
+    # Retrieve all subtasks
+    subtasks = ServiceSubTask.objects.all()
+    serializer = ServiceSubTaskSerializer(subtasks, many=True)
+    return Response(serializer.data)
 

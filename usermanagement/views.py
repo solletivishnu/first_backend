@@ -1,5 +1,5 @@
 # Standard library imports
-from datetime import timedelta
+from datetime import datetime
 from distutils.util import strtobool
 from urllib.parse import urlparse
 
@@ -34,7 +34,7 @@ from .serializers import (
     UserFeaturePermissionSerializer
 )
 import json
-import datetime
+
 # Module Management APIs
 
 
@@ -140,6 +140,7 @@ def list_modules(request):
 @api_view(['GET', 'PUT'])
 def update_module(request, module_id):
     """
+    API endpoint for updating a module
     Expected JSON payload:
     {
         "name": "Updated Payroll",
@@ -195,6 +196,9 @@ def delete_module(request, module_id):
         'success': True,
         'message': 'Module deleted successfully'
     })
+
+
+# Subscription Plan Management APIs
 
 
 # Role Management APIs
