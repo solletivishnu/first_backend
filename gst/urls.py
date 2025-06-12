@@ -43,4 +43,11 @@ urlpatterns = [
          name='gst_review_filing_certificate_by_service_request'),
     path('gst-review-filing-certificate/<int:pk>/', views.gst_review_filing_certificate_detail,
          name='gst_review_filing_certificate_detail'),
+
+    # Service Request Full Data
+    path('service-requests-gst/<int:service_request_id>/full-data/', views.get_service_request_full_details,
+         name='get_full_data_by_service_request'),
+    # Service Request Tasks by Category
+    path('service-request-section-data', views.get_service_request_tasks_by_category,
+         name='get_service_request_section_data')
 ]

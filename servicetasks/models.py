@@ -42,17 +42,15 @@ class ServiceTask(models.Model):
 
 class ServiceSubTask(models.Model):
     STATUS_CHOICES = [
-        ('yet to be started', 'Yet to be Started'),
-        ('in progress', 'In Progress'),
+        ('pending', 'Pending'),
+        ('rejected', 'Rejected'),
         ('completed', 'Completed'),
-        ('sent for approval', 'Sent for Approval'),
-        ('revoked', 'Revoked'),
     ]
 
     parent_task = models.ForeignKey(ServiceTask, on_delete=models.CASCADE, related_name='subtasks')
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='yet to be started')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -57,6 +57,13 @@ SERVICE_TASK_MAP = {
         "Deductions",
         "Review Filing Certificate"
     ],
+    "registration": [
+        "Basic Business Info",
+        "Registration Info",
+        "Principal Place Details",
+        "Promoter Signatory Details",
+        "GST Review Filing Certificate"
+    ],
 }
 
 

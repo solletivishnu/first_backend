@@ -37,7 +37,8 @@ def handle_dynamic_tasks(personal_info_instance):
     # Salary Income-related
     if personal_info_instance.salary_income == 'yes':
         create_task_if_not_exists("Salary Income")
-        create_task_if_not_exists("NRI Employee Salary")  # Assumes NRI if flagged separately
+        create_task_if_not_exists("NRI Employee Salary") # Assumes NRI if flagged separately
+        create_task_if_not_exists("Other Income")
 
     # House Property Income
     if personal_info_instance.house_property_income == 'yes':

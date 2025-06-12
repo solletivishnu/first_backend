@@ -306,7 +306,7 @@ def calculate_completion_percentage(instance, exclude_fields=None):
     return round((filled_fields / total_fields) * 100)
 
 @receiver(post_save, sender=BasicBusinessInfo)
-def sync_service_task_status(sender, instance, **kwargs):
+def sync_business_info_service_task_status(sender, instance, **kwargs):
     task = instance.service_task
 
     # Sync status
@@ -320,7 +320,7 @@ def sync_service_task_status(sender, instance, **kwargs):
 
 
 @receiver(post_save, sender=RegistrationInfo)
-def sync_service_task_status(sender, instance, **kwargs):
+def sync_registration_info_service_task_status(sender, instance, **kwargs):
     task = instance.service_task
 
     # Sync status
@@ -334,7 +334,7 @@ def sync_service_task_status(sender, instance, **kwargs):
 
 
 @receiver(post_save, sender=PrincipalPlaceDetails)
-def sync_service_task_status(sender, instance, **kwargs):
+def sync_principal_place_service_task_status(sender, instance, **kwargs):
     task = instance.service_task
 
     # Sync status
@@ -348,7 +348,7 @@ def sync_service_task_status(sender, instance, **kwargs):
 
 
 @receiver(post_save, sender=PromoterSignatoryDetails)
-def sync_service_task_status(sender, instance, **kwargs):
+def sync_promoter_service_task_status(sender, instance, **kwargs):
     task = instance.service_task
 
     # Sync status
@@ -362,7 +362,7 @@ def sync_service_task_status(sender, instance, **kwargs):
 
 
 @receiver(post_save, sender=GSTReviewFilingCertificate)
-def sync_service_task_status(sender, instance, **kwargs):
+def sync_gst_review_service_task_status(sender, instance, **kwargs):
     task = instance.service_task
 
     # Sync status

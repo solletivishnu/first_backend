@@ -119,7 +119,7 @@ def winning_income_file(instance, filename):
 
 def agriculture_income_file(instance, filename):
     # instance is of DividendIncomeFile
-    service_request_id = str(instance.winning_income.service_request_id)
+    service_request_id = str(instance.agriculture_income.service_request_id)
 
     # Construct an upload path
     return os.path.join(
