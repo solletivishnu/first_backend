@@ -269,7 +269,6 @@ def user_service_requests(request):
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-
 @api_view(['GET'])
 def superadmin_service_requests(request):
     user = request.user
