@@ -70,10 +70,10 @@ urlpatterns = [
     path('other-income-details/<int:pk>/delete', other_income_views.delete_other_income_info,
          name="delete_other_income_info"),
 
-    path('other-income-documents/', other_income_views.add_other_income_document,
-         name='add_other_income_document'),
-    path('other-income-document/<int:pk>/', other_income_views.add_other_income_document,
-         name='update_or_delete_other_income_document'),
+    # path('other-income-documents/', other_income_views.add_other_income_document,
+    #      name='add_other_income_document'),
+    # path('other-income-document/<int:pk>/', other_income_views.add_other_income_document,
+    #      name='update_or_delete_other_income_document'),
 
     # Capital Gains
     path('capital-gains/upsert/', capital_gains_views.upsert_capital_gains_details,
