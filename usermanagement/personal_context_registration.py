@@ -87,7 +87,7 @@ def create_personal_context(request):
                 )
 
             # Check if user is active
-            if user.is_active != 'yes':
+            if not user.is_active:
                 return Response(
                     {"error": "User account is not active. Please activate your account first."},
                     status=status.HTTP_403_FORBIDDEN

@@ -324,7 +324,6 @@ def list_context_roles(request):
 
     except Exception as e:
         import traceback
-        logger.exception("Unexpected error in list_context_roles")
         return Response({
             'status': 'error',
             'message': 'Something went wrong.',

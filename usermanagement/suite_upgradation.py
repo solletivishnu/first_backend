@@ -8,7 +8,6 @@ from .serializers import *
 from .serializers import SubscriptionPlanSerializer
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError
-from distutils.util import strtobool
 
 
 @api_view(['POST'])

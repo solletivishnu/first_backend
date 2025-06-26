@@ -79,7 +79,7 @@ def register_business(request):
     #     return Response({"error": "Business with this name already exists."}, status=400)
 
     # Validate trial plan exists
-    trial_plan = SubscriptionPlan.objects.filter(module=module, plan_type='trial', is_active='yes').first()
+    trial_plan = SubscriptionPlan.objects.filter(module=module, plan_type='trial', is_active=True).first()
     if not trial_plan:
         return Response({"error": "No active trial plan found for the selected module."}, status=400)
 
@@ -98,7 +98,7 @@ def register_business(request):
                 status='active',
                 registration_flow='module',  # Set registration flow to 'module'
                 registration_completed=False,
-                is_active='yes',
+                is_active=True,
                 is_super_admin=False  # Set is_active to 'yes'
             )
 
@@ -142,7 +142,7 @@ def register_business(request):
             trial_plan, created = SubscriptionPlan.objects.get_or_create(
                 module=module,
                 plan_type="trial",
-                is_active="yes"
+                is_active=True
 
             )
 
@@ -155,7 +155,7 @@ def register_business(request):
                 status='trial',
                 start_date=timezone.now(),
                 end_date=end_date,
-                auto_renew='no',  # Don't auto-renew trial
+                auto_renew=False,  # Don't auto-renew trial
                 added_by=user  # Set the added_by field to the user being registered
             )
 
@@ -175,7 +175,7 @@ def register_business(request):
                 user_context_role=user_context_role,
                 module=module,
                 actions=all_actions,  # All service.action combinations
-                is_active="yes",
+                is_active=True,
                 created_by=user  # Set the created_by field to the user being registered
             )
             # Delete used OTP
@@ -364,7 +364,7 @@ def add_another_context(request):
                 subscription_plan, created = SubscriptionPlan.objects.get_or_create(
                     module=module,
                     plan_type="trial",
-                    is_active="yes"
+                    is_active=True
                 )
                 subscription_type = 'trial'
                 auto_renew = False
@@ -404,7 +404,7 @@ def add_another_context(request):
                 user_context_role=user_context_role,
                 module=module,
                 actions=all_actions,  # All service.action combinations
-                is_active="yes",
+                is_active=True,
                 created_by=authenticated_user  # The user who is performing the action
             )
 
@@ -492,7 +492,7 @@ def get_user_permissions(request):
             permission = UserFeaturePermission.objects.get(
                 user_context_role=user_context_role,
                 module=module,
-                is_active='yes'
+                is_active=True
             )
 
             # Parse actions from JSON string if needed
@@ -521,7 +521,7 @@ def get_user_permissions(request):
                 "user_context_role_id": user_context_role_id,
                 "module_id": module_id,
                 "actions": [],
-                "is_active": "no",
+                "is_active": False,
                 "created_at": None,
                 "updated_at": None
             }, status=status.HTTP_200_OK)

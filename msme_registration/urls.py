@@ -42,6 +42,12 @@ urlpatterns = [
     path('review-filing-certificate/by-service-request/', views.get_review_filing_certificate,
          name='review_filing_certificate_by_service_request'),
 
-    path('service-request-msme/<int:service_request_id>/full-data',views.get_msme_data_by_service_request, name='msme-data'),
+    path('service-request-msme/<int:service_request_id>/full-data',views.get_msme_data_by_service_request,
+         name='msme-data'),
+
+    path('service-requests-msme-registration/<int:service_request_id>/full-data/',
+         views.get_msme_full_data_by_service_request, name='get_full_data_by_service_request'),
+
+    path('service-request-section-data',views.get_msme_tasks_using_section_name, name='get_msme_section_data'),
 
 ]

@@ -1,10 +1,11 @@
+from importlib import import_module
+
 from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework import status
 import json
-
+from django.db import transaction
 from unicodedata import category
-
 from .models import *
 from .serializers import *
 
@@ -325,34 +326,34 @@ def upsert_promoter_signatory_data(request):
             "assignee": request.data.get("assignee"),
             "reviewer": request.data.get("reviewer")
         }
-
-        try:
-            details_instance = PromoterSignatoryDetails.objects.get(service_request_id=service_request_id)
-            details_serializer = PromoterSignatoryDetailsSerializer(details_instance, data=promoter_details_payload,
-                                                                    partial=True)
-        except PromoterSignatoryDetails.DoesNotExist:
-            details_serializer = PromoterSignatoryDetailsSerializer(data=promoter_details_payload)
-
-        if not details_serializer.is_valid():
-            return Response(details_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        details_instance = details_serializer.save()
-
-        data['promoter_detail'] = details_instance.id
-        if data.get('name'):
+        with transaction.atomic():
             try:
-                serializer_info = PromoterSignatoryInfoSerializer(data=data)
-                if not serializer_info.is_valid():
-                    return Response(serializer_info.errors, status=status.HTTP_400_BAD_REQUEST)
+                details_instance = PromoterSignatoryDetails.objects.get(service_request_id=service_request_id)
+                details_serializer = PromoterSignatoryDetailsSerializer(details_instance, data=promoter_details_payload,
+                                                                        partial=True)
+            except PromoterSignatoryDetails.DoesNotExist:
+                details_serializer = PromoterSignatoryDetailsSerializer(data=promoter_details_payload)
+
+            if not details_serializer.is_valid():
+                return Response(details_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+            details_instance = details_serializer.save()
+
+            data['promoter_detail'] = details_instance.id
+            if data.get('name'):
                 try:
-                    serializer_info.save()
+                    serializer_info = PromoterSignatoryInfoSerializer(data=data)
+                    if not serializer_info.is_valid():
+                        return Response(serializer_info.errors, status=status.HTTP_400_BAD_REQUEST)
+                    try:
+                        serializer_info.save()
+                    except Exception as e:
+                        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
                 except Exception as e:
                     return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            except Exception as e:
-                return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            return  Response(details_serializer.data, status=status.HTTP_201_CREATED)
-        else:
-            return Response({"message": "Status Updated Successfully"}, status=status.HTTP_200_OK)
+                return  Response(details_serializer.data, status=status.HTTP_201_CREATED)
+            else:
+                return Response({"message": "Status Updated Successfully"}, status=status.HTTP_200_OK)
 
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

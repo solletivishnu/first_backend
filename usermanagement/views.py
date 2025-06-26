@@ -1,6 +1,5 @@
 # Standard library imports
-from datetime import datetime
-from distutils.util import strtobool
+import datetime
 from urllib.parse import urlparse
 
 # Third-party imports
@@ -49,12 +48,6 @@ def request_otp(request):
     if Users.objects.filter(email=email).exists():
         # Before
         return Response({'error': 'A user with this email already exists.'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # After
-        return Response(
-            {'error': 'A user with this email already exists.'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
 
     # Generate and store OTP
     otp_code = generate_otp()
@@ -438,7 +431,8 @@ def delete_module_permission(request, permission_id):
 @permission_classes([AllowAny])
 def happy_coder(request):
     """Return a simple success message."""
-    return Response({"message": "Happy Coder"}, status=status.HTTP_200_OK)
+    return Response({"message": "Happy Coder, My Job is to be Consistent and Discipline"},
+                    status=status.HTTP_200_OK)
 
 
 """Views for user management functionality.

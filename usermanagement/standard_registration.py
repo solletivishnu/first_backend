@@ -196,8 +196,8 @@ def initial_registration(request):
             email=email,
             status='active',
             registration_flow='standard',
-            registration_completed='no',
-            is_active='yes',  # Now activate the user directly
+            registration_completed=False,
+            is_active=True,  # Now activate the user directly
             is_super_admin=False,
         )
         user.set_password(password)
@@ -233,7 +233,7 @@ def select_context(request):
 
     try:
         user = User.objects.get(id=user_id)
-        if user.is_active != 'yes':
+        if not user.is_active:
             return Response({"error": "User is not active."}, status=status.HTTP_403_FORBIDDEN)
 
         if context_type == 'personal':
@@ -290,7 +290,7 @@ def select_context(request):
 
         # Assign role and make this the active context
         role = Role.objects.get(name='Owner', context=context)
-        UserContextRole.objects.create(user=user, context=context, role=role, status='active')
+        UserContextRole.objects.create(user=user, context=context, role=role, status='active', added_by=user)
         user.active_context = context
         user.save()
 
@@ -434,7 +434,7 @@ def subscribe_business_suite(request):
                 start_date=timezone.now(),
                 end_date=timezone.now() + timezone.timedelta(days=30 if subscription_type == 'monthly' else 365),
                 auto_renew=auto_renew,
-                via_suite="yes",
+                via_suite=True,
                 suite_subscription=context_suite
             )
             module_subscriptions.append(module_subscription)
@@ -453,7 +453,7 @@ def subscribe_business_suite(request):
                 user_context_role=user_context_role,
                 module=module,
                 actions=all_actions,  # All service.action combinations
-                is_active="yes",
+                is_active=True,
                 created_by=user  # Set the created_by field to the user being registered
             )
 
@@ -553,7 +553,7 @@ def subscribe_to_module(request):
             user_context_role=user_context_role,
             module=module,
             actions=all_actions,
-            is_active="yes",
+            is_active=True,
             created_by=user
         )
 

@@ -10,8 +10,8 @@ from django.contrib.auth import get_user_model
 from botocore.exceptions import ClientError
 import boto3
 import logging
-
-from .models import Context, Role, UserContextRole, Service, ServiceRequest
+from .get_login_data import get_login_response
+from .models import Context, Role, UserContextRole, Service, ServiceRequest, PendingUserOTP
 from Tara.settings.default import *
 
 logger = logging.getLogger(__name__)
@@ -25,41 +25,53 @@ def register_user_with_service(request):
     password = request.data.get('password')
     name = request.data.get('name')
     service_id = request.data.get('service_id')
-    account_type = request.data.get('account_type', 'business')  # Default to business if not specified
+    otp = request.data.get('otp')
+    account_type = request.data.get('account_type', 'business')
 
-    # ✅ Step 1: Validate input presence
-    if not all([email, password, name, service_id]):
+    # Step 1: Validate required fields
+    if not all([email, password, name, service_id, otp]):
         return Response(
-            {"error": "All fields are required: email, password, name, service_id"},
+            {"error": "All fields are required: email, password, name, service_id, otp"},
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # ✅ Step 2: Validate account_type
+    # Step 2: Validate account_type
     if account_type not in ['personal', 'business']:
         return Response(
-            {"error": "Invalid account_type. Must be either 'personal' or 'business'"},
+            {"error": "Invalid account_type. Must be 'personal' or 'business'"},
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # ✅ Step 3: Validate user does not already exist
+    # Step 3: Validate user doesn't already exist
     if User.objects.filter(email=email).exists():
         return Response({"error": "User already exists with this email."}, status=status.HTTP_400_BAD_REQUEST)
 
-    # ✅ Step 4: Validate service
+    # Step 4: Validate OTP
+    try:
+        otp_obj = PendingUserOTP.objects.get(email=email)
+    except PendingUserOTP.DoesNotExist:
+        return Response({"error": "OTP not requested for this email."}, status=status.HTTP_400_BAD_REQUEST)
+
+    if otp_obj.is_expired():
+        return Response({"error": "OTP expired."}, status=status.HTTP_400_BAD_REQUEST)
+
+    if otp_obj.otp_code != otp:
+        return Response({"error": "Invalid OTP."}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Step 5: Validate service
     try:
         service = Service.objects.get(id=service_id)
     except Service.DoesNotExist:
         return Response({"error": "Invalid service ID."}, status=status.HTTP_400_BAD_REQUEST)
 
-    # ✅ Step 5: Validate context name uniqueness based on account_type
-    if account_type == 'business':
-        if Context.objects.filter(name=name, context_type='business').exists():
-            return Response({"error": "Business context with this name already exists."}, status=status.HTTP_400_BAD_REQUEST)
-    else:  # personal
-        if Context.objects.filter(name=name, context_type='personal').exists():
-            return Response({"error": "Personal context with this name already exists."}, status=status.HTTP_400_BAD_REQUEST)
+    # Step 6: Validate context name uniqueness
+    if Context.objects.filter(name=name, context_type=account_type).exists():
+        return Response(
+            {"error": f"{account_type.capitalize()} context with this name already exists."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
-    # ✅ Step 6: Validate role exists based on account_type
+    # Step 7: Get system role
     role_name = 'Owner'
     role_qs = Role.objects.filter(name=role_name, context_type=account_type, is_system_role=True)
     if not role_qs.exists():
@@ -67,21 +79,23 @@ def register_user_with_service(request):
             {"error": f"System role '{role_name}' for {account_type} context not found."},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+    system_role = role_qs.first()
 
-    # ✅ All validation passed — now safely
+    # ✅ All validation passed
     try:
         with transaction.atomic():
+            # 1. Create user
             user = User.objects.create_user(
                 email=email,
                 password=password,
-                is_active='no',
+                is_active=True,  # No email activation needed
                 registration_flow='service',
                 registration_completed=False,
                 status='active',
                 is_super_admin=False,
             )
 
-            # Create context based on account_type
+            # 2. Create context
             context = Context.objects.create(
                 name=name,
                 context_type=account_type,
@@ -94,10 +108,16 @@ def register_user_with_service(request):
             user.active_context = context
             user.save()
 
-            # Get appropriate role based on account_type
-            role = Role.objects.get(name=role_name, context=context)
-            UserContextRole.objects.create(user=user, context=context, role=role, status='active', added_by=user)
+            # 3. Assign role
+            UserContextRole.objects.create(
+                user=user,
+                context=context,
+                role=system_role,
+                status='active',
+                added_by=user
+            )
 
+            # 4. Create service request
             ServiceRequest.objects.create(
                 user=user,
                 context=context,
@@ -105,43 +125,18 @@ def register_user_with_service(request):
                 status='initiated'
             )
 
-            # ✅ Send activation email (optional)
-            token = default_token_generator.make_token(user)
-            uid = urlsafe_base64_encode(str(user.pk).encode())
-            activation_link = f"{FRONTEND_URL}activation?uid={uid}&token={token}"
+            # 5. Delete OTP after use
+            otp_obj.delete()
 
-            try:
-                ses_client = boto3.client(
-                    'ses',
-                    region_name=AWS_REGION,
-                    aws_access_key_id=AWS_ACCESS_KEY_ID,
-                    aws_secret_access_key=AWS_SECRET_ACCESS_KEY
-                )
-                ses_client.send_email(
-                    Source=EMAIL_HOST_USER,
-                    Destination={'ToAddresses': [email]},
-                    Message={
-                        'Subject': {'Data': "Activate your account"},
-                        'Body': {
-                            'Html': {'Data': f"<p>Click "
-                                             f"<a href='{activation_link}'>here</a> to activate your account.</p>"},
-                            'Text': {'Data': f"Activate your account: {activation_link}"}
-                        },
-                    }
-                )
-            except ClientError as e:
-                logger.error(f"SES email error: {e.response['Error']['Message']}")
+            login_response_data = get_login_response(user)
 
-            return Response({
-                "message": "Registration successful. Activation email sent.",
-                "user_id": user.id,
-                "context_id": context.id,
-                "service_id": service.id,
-                "account_type": account_type,
-                "activation_link": activation_link
-            }, status=status.HTTP_201_CREATED)
+            return Response(login_response_data, status=status.HTTP_201_CREATED)
 
     except Exception as e:
         logger.exception("Registration failed")
-        return Response({"error": f"Registration failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(
+            {"error": f"Registration failed: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
 

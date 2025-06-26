@@ -8,7 +8,8 @@ from servicetasks.models import ServiceTask
 from .helpers import upload_bank_statement_or_cancelled_cheque_path, upload_official_address_proof_path
 from docwallet.models import PrivateS3Storage
 
-#MSME_Registration = ["BusinessIdentity", "BusinessClassificationInputs", "TurnoverAndInvestmentDeclaration", "RegisteredAddress", "MsmeReviewFilingCertificate"]
+#MSME_Registration = ["BusinessIdentity", "BusinessClassificationInputs", "TurnoverAndInvestmentDeclaration",
+# "RegisteredAddress", "MsmeReviewFilingCertificate"]
 
 # Yes/No/N/A choices
 YES_NO_CHOICES = [
@@ -20,7 +21,7 @@ YES_NO_CHOICES = [
 ]
 
 class BusinessIdentity(models.Model):
-    service_request = models.ForeignKey(ServiceRequest, on_delete=models.CASCADE,
+    service_request = models.OneToOneField(ServiceRequest, on_delete=models.CASCADE,
                                         related_name='msme_business_identity_details')
     service_type = models.CharField(max_length=20,default="MSME Registration",editable=False)
     service_task = models.OneToOneField(ServiceTask, on_delete=models.CASCADE,
@@ -33,7 +34,8 @@ class BusinessIdentity(models.Model):
                                            blank=True, storage=PrivateS3Storage())
     mobile_number = models.CharField(max_length=15, blank=True)
     email_id = models.EmailField(max_length=255, blank=True)
-    Are_you_previously_registered_UAM = models.CharField(max_length=20, choices=YES_NO_CHOICES, default='no', blank=True)
+    Are_you_previously_registered_UAM = models.CharField(max_length=20, choices=YES_NO_CHOICES,
+                                                         default='no', blank=True)
     UAM_number = models.CharField(max_length=50, blank=True, null=True)
     has_business_commenced = models.CharField(max_length=20, choices=YES_NO_CHOICES,blank=True, default='no')
     date_of_commencement = models.DateField(null=True, blank=True)
@@ -52,17 +54,17 @@ class BusinessIdentity(models.Model):
             self.assignee = self.service_task.assignee
         if not self.reviewer and self.service_task.reviewer:
             self.reviewer = self.service_task.reviewer
-        super().save(*args, **kwargs)
+        super(BusinessIdentity, self).save(*args, **kwargs)
 
     def __str__(self):
         return self.business_name
 
 
 class BusinessClassificationInputs(models.Model):
-    service_request = models.ForeignKey(ServiceRequest, on_delete=models.CASCADE,
+    service_request = models.OneToOneField(ServiceRequest, on_delete=models.CASCADE,
                                         related_name='business_classification_details')
     service_type = models.CharField(max_length=20,default="MSME Registration",editable=False)
-    service_task = models.ForeignKey(ServiceTask, on_delete=models.CASCADE,
+    service_task = models.OneToOneField(ServiceTask, on_delete=models.CASCADE,
                                      related_name='service_task_business_classification_details')
     MAJOR_ACTIVITY_CHOICES = [
         ('MANUFACTURING', 'Manufacturing'),
@@ -79,7 +81,8 @@ class BusinessClassificationInputs(models.Model):
     number_of_persons_employed = models.JSONField(default=dict, blank=True, null=True)
     status = models.CharField(max_length=20, choices=[('in progress', 'In Progress'), ('completed', 'Completed'),
                                                       ('sent for approval', 'Sent for Approval'),
-                                                      ('revoked', 'Revoked')], null=False, blank=False,default="in progress")
+                                                      ('revoked', 'Revoked')],
+                              null=False, blank=False,default="in progress")
     assignee = models.ForeignKey(Users, on_delete=models.SET_NULL, null=True, blank=True,
                                  related_name='assigned_business_classification')
     reviewer = models.ForeignKey(Users, on_delete=models.SET_NULL, null=True, blank=True,
@@ -91,11 +94,11 @@ class BusinessClassificationInputs(models.Model):
             self.assignee = self.service_task.assignee
         if not self.reviewer and self.service_task.reviewer:
             self.reviewer = self.service_task.reviewer
-        super().save(*args, **kwargs)
+        super(BusinessClassificationInputs, self).save(*args, **kwargs)
 
 
     def __str__(self):
-        return f"{self.major_activity} - {self.nature_of_business}"
+        return "{} - {}".format(self.major_activity, self.nature_of_business)
 
 
 #Turnover and Investment Declaration
@@ -105,11 +108,13 @@ GST_REGISTRATION_CHOICES = [
     ('exempted', 'Exempted'),
     ('upload', 'Upload GST Certificate'),
 ]
+
+
 class TurnoverAndInvestmentDeclaration(models.Model):
-    service_request = models.ForeignKey(ServiceRequest, on_delete=models.CASCADE,
+    service_request = models.OneToOneField(ServiceRequest, on_delete=models.CASCADE,
                                     related_name='turnover_details')
     service_type = models.CharField(max_length=20,default="MSME Registration",editable=False)
-    service_task = models.ForeignKey(ServiceTask, on_delete=models.CASCADE,
+    service_task = models.OneToOneField(ServiceTask, on_delete=models.CASCADE,
                                      related_name='service_task_turnover_details')
     turnover_in_inr = models.JSONField(default=dict, blank=True, null=True)
     investment_in_plant_and_machinery = models.IntegerField(blank=True, null=True)
@@ -132,17 +137,19 @@ class TurnoverAndInvestmentDeclaration(models.Model):
             self.assignee = self.service_task.assignee
         if not self.reviewer and self.service_task.reviewer:
             self.reviewer = self.service_task.reviewer
-        super().save(*args, **kwargs)
+        super(TurnoverAndInvestmentDeclaration, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f"Turnover and Investment Declaration #{self.id}"
+        return "Turnover and Investment Declaration #{}".format(self.id)
 
 
 # Registered Address
 class RegisteredAddress(models.Model):
-    service_request = models.ForeignKey(ServiceRequest, on_delete=models.CASCADE, related_name='registered_address_details')
+    service_request = models.OneToOneField(ServiceRequest, on_delete=models.CASCADE,
+                                           related_name='registered_address_details')
     service_type = models.CharField(max_length=20, default="MSME Registration", editable=False)
-    service_task = models.ForeignKey(ServiceTask, on_delete=models.CASCADE, related_name='service_task_registered_address_details')
+    service_task = models.OneToOneField(ServiceTask, on_delete=models.CASCADE,
+                                        related_name='service_task_registered_address_details')
     official_address_of_enterprise = models.JSONField(null=True, blank=True)
     bank_statement_or_cancelled_cheque = models.FileField(upload_to=upload_bank_statement_or_cancelled_cheque_path,
                                                           blank=True, null=True, storage=PrivateS3Storage())
@@ -153,23 +160,26 @@ class RegisteredAddress(models.Model):
     status = models.CharField(max_length=20, choices=[('in progress', 'In Progress'), ('completed', 'Completed'),
                                     ('sent for approval', 'Sent for Approval'),('revoked', 'Revoked')],
                                     null=False, blank=False, default="in progress")
-    assignee = models.ForeignKey(Users, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_registered_address')
-    reviewer = models.ForeignKey(Users, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_registered_address')
+    assignee = models.ForeignKey(Users, on_delete=models.SET_NULL, null=True, blank=True,
+                                 related_name='assigned_registered_address')
+    reviewer = models.ForeignKey(Users, on_delete=models.SET_NULL, null=True, blank=True,
+                                 related_name='reviewed_registered_address')
 
     def save(self, *args, **kwargs):
         if not self.assignee and self.service_task.assignee:
             self.assignee = self.service_task.assignee
         if not self.reviewer and self.service_task.reviewer:
             self.reviewer = self.service_task.reviewer
-        super().save(*args, **kwargs)
+        super(RegisteredAddress, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f"Enterprise Address #{self.id}"
+        return "Enterprise Address #{}".format(self.id)
 
 
 # Unit/plant address
 class LocationOfPlantOrUnit(models.Model):
-    registered_address = models.ForeignKey(RegisteredAddress, on_delete=models.CASCADE, related_name='location_of_plant_or_unit')
+    registered_address = models.ForeignKey(RegisteredAddress, on_delete=models.CASCADE,
+                                           related_name='location_of_plant_or_unit')
     unit_details = models.JSONField(null=True, blank=True)
 
     def __str__(self):
@@ -182,30 +192,33 @@ class LocationOfPlantOrUnit(models.Model):
 # Review and Filing Certificate
 class MsmeReviewFilingCertificate(models.Model):
     service_type = models.CharField(max_length=20, default="MSME Registration", editable=False)
-    service_request = models.ForeignKey(ServiceRequest, on_delete=models.CASCADE,
+    service_request = models.OneToOneField(ServiceRequest, on_delete=models.CASCADE,
                                             related_name='msme_review_certificates')
-    service_task = models.ForeignKey(ServiceTask, on_delete=models.CASCADE, related_name='msme_review_tasks')
+    service_task = models.OneToOneField(ServiceTask, on_delete=models.CASCADE, related_name='msme_review_tasks')
 
-    REVIEW_STATUS_CHOICES = [
-        ('in progress', 'In Progress'),
-        ('resubmission', 'Resubmission'),
-        ('done', 'Done'),
-    ]
+    REVIEW_STATUS_CHOICES = [('in progress', 'In Progress'), ('completed', 'Completed'),
+                             ('sent for approval', 'Sent for Approval'),
+                             ('revoked', 'Revoked')]
     FILING_STATUS_CHOICES = [
         ('in progress', 'In Progress'),
         ('filed', 'Filed'),
+        ('sent for approval', 'Sent for Approval'),
         ('resubmitted', 'Resubmitted'),
     ]
     APPROVAL_STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('resubmission', 'Resubmission'),
+        ('sent for approval', 'Sent for Approval'),
         ('rejected', 'Rejected'),
         ('approved', 'Approved'),
     ]
     review_certificate = models.FileField(upload_to=review_filing_certificate_path, null=True,
                                           blank=True, storage=PrivateS3Storage())
     review_certificate_status = models.CharField(max_length=20,choices=REVIEW_STATUS_CHOICES,
-                                                 null=False, blank=False,default=None)
+                                                 null=True, blank=True,default=None)
+
+    draft_income_file = models.FileField(upload_to=draft_filing_certificate,
+                                         null=True, blank=True, storage=PrivateS3Storage())
     filing_status = models.CharField(
         max_length=20,
         choices=FILING_STATUS_CHOICES,
@@ -228,13 +241,115 @@ class MsmeReviewFilingCertificate(models.Model):
         Users, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='msme_reviewfc_reviewer'
     )
+
+    status = models.CharField(
+        max_length=20,
+        choices=[('in progress', 'In Progress'), ('completed', 'Completed'),
+                 ('sent for approval', 'Sent for Approval'), ('revoked', 'Revoked')],
+        null=False, blank=False, default="in progress"
+    )
+
     def save(self, *args, **kwargs):
         # Default to service_request values if not set
         if not self.assignee and self.service_task.assignee:
             self.assignee = self.service_task.assignee
         if not self.reviewer and self.service_task.reviewer:
             self.reviewer = self.service_task.reviewer
-        super().save(*args, **kwargs)
+        super(MsmeReviewFilingCertificate, self).save(*args, **kwargs)
 
     def __str__(self):
         return self.review_certificate_status or "No Review Status"
+
+
+def calculate_completion_percentage(instance, exclude_fields=None):
+    exclude_fields = exclude_fields or ['id', 'created_at', 'updated_at', 'service_request', 'service_task']
+    total_fields = 0
+    filled_fields = 0
+
+    for field in instance._meta.fields:
+        if field.name in exclude_fields:
+            continue
+        total_fields += 1
+        value = getattr(instance, field.name)
+        if value not in [None, '', []]:
+            filled_fields += 1
+
+    if total_fields == 0:
+        return 0
+    return round((filled_fields / total_fields) * 100)
+
+
+@receiver(post_save, sender=BusinessIdentity)
+def sync_msme_business_identity_task_status(sender, instance, **kwargs):
+    task = instance.service_task
+
+    # Sync status
+    if task.status != instance.status:
+        task.status = instance.status
+
+    # Sync completion %
+    task.completion_percentage = calculate_completion_percentage(instance)
+
+    task.save()
+
+
+@receiver(post_save, sender=BusinessClassificationInputs)
+def sync_msme_business_classification_task_status(sender, instance, **kwargs):
+    task = instance.service_task
+
+    # Sync status
+    if task.status != instance.status:
+        task.status = instance.status
+
+    # Sync completion %
+    task.completion_percentage = calculate_completion_percentage(instance)
+
+    task.save()
+
+
+@receiver(post_save, sender=TurnoverAndInvestmentDeclaration)
+def sync_msme_turnover_investment_task_status(sender, instance, **kwargs):
+    task = instance.service_task
+
+    # Sync status
+    if task.status != instance.status:
+        task.status = instance.status
+
+    # Sync completion %
+    task.completion_percentage = calculate_completion_percentage(instance)
+
+    task.save()
+
+
+@receiver(post_save, sender=RegisteredAddress)
+def sync_msme_registered_address_task_status(sender, instance, **kwargs):
+    task = instance.service_task
+
+    # Sync status
+    if task.status != instance.status:
+        task.status = instance.status
+
+    # Sync completion %
+    task.completion_percentage = calculate_completion_percentage(instance)
+
+    task.save()
+
+
+@receiver(post_save, sender=MsmeReviewFilingCertificate)
+def sync_msme_review_filing_certificate_task_status(sender, instance, **kwargs):
+    task = instance.service_task
+
+    # Sync status
+    if task.status != instance.status:
+        task.status = instance.status
+
+    # Sync completion %
+    task.completion_percentage = calculate_completion_percentage(instance)
+
+    task.save()
+
+
+@receiver(post_save, sender=LocationOfPlantOrUnit)
+def sync_registered_address_status(sender, instance, **kwargs):
+    instance.registered_address.status = "in progress"
+    instance.registered_address.save()

@@ -12,11 +12,20 @@ from django.utils import timezone
 from django.db import transaction
 from decimal import Decimal
 from cryptography.fernet import Fernet
-from djongo.models import ArrayField, EmbeddedField, JSONField
+from django.contrib.postgres.fields import ArrayField
+from django.db.models import JSONField
 from .helpers import *
 from django.core.validators import RegexValidator
 from decimal import Decimal, InvalidOperation
 from decimal import Decimal, ROUND_HALF_UP
+from storages.backends.s3boto3 import S3Boto3Storage
+from Tara.settings.default import AWS_PRIVATE_BUCKET_NAME
+
+
+class PrivateS3Storage(S3Boto3Storage):
+    bucket_name = AWS_PRIVATE_BUCKET_NAME
+    custom_domain = f"{AWS_PRIVATE_BUCKET_NAME}.s3.amazonaws.com"  # Default S3 domain or your custom domain
+    file_overwrite = True  # Allow file overwrite (optional)
 
 YES_NO_CHOICES = [
         ('yes', 'Yes'),
@@ -25,6 +34,7 @@ YES_NO_CHOICES = [
     ]
 
 KEY = b'zSwtDDLJp6Qkb9CMCJnVeOzAeSJv-bA3VYNCy5zM-b4='  # Fernet key
+cipher = Fernet(KEY)
 
 
 class PendingUserOTP(models.Model):
@@ -37,34 +47,40 @@ class PendingUserOTP(models.Model):
         return timezone.now() > self.expires_at
 
 
-class EncryptedField(models.Field):
-    def __init__(self, *args, **kwargs):
-        self.cipher = Fernet(KEY)
-        super().__init__(*args, **kwargs)
+class EncryptedField(models.TextField):  # Inherit from TextField to map to varchar/text
+    description = "Field that encrypts/decrypts data"
 
     def get_prep_value(self, value):
-        """Override to encrypt data before saving to the database"""
         if value is None:
             return None
         try:
-            # Encrypt and decode to ensure it's a string
-            encrypted_value = self.cipher.encrypt(value.encode()).decode()
-            return encrypted_value
+            return cipher.encrypt(value.encode()).decode()
         except Exception as e:
-            print(f"Encryption failed with error: {str(e)}")
+            print(f"[Encryption Error] {str(e)}")
             return None
 
     def from_db_value(self, value, expression, connection):
-        """Override to decrypt data when retrieving from the database"""
         if value is None:
             return None
         try:
-            # Decrypt the value before returning it
-            decrypted_value = self.cipher.decrypt(value.encode()).decode()
-            return decrypted_value
+            return cipher.decrypt(value.encode()).decode()
         except Exception as e:
-            print(f"Decryption failed with error: {str(e)}")
+            print(f"[Decryption Error] {str(e)}")
             return None
+
+    def to_python(self, value):
+        """Decrypt for forms/admin/etc"""
+        if value is None:
+            return None
+        try:
+            return cipher.decrypt(value.encode()).decode()
+        except Exception:
+            return value  # already decrypted (e.g. admin form)
+
+    def deconstruct(self):
+        name, path, args, kwargs = super().deconstruct()
+        # Include any special arguments here
+        return name, path, args, kwargs
 
 
 class CustomAccountManager(BaseUserManager):
@@ -318,20 +334,10 @@ class Users(AbstractBaseUser):
         help_text="The initial module or service the user selected during registration"
     )
     # Add registration completion status
-    registration_completed = models.CharField(
-        max_length=3,
-        choices=[
-                ('yes', 'Yes'),
-                ('no', 'No'),
-            ],
-        default='no',
-        help_text="Indicates if the user has completed the registration process"
-    )
-    is_active = models.CharField(
-        max_length=3,
-        choices=YES_NO_CHOICES,
-        default='no'
-    )
+    registration_completed = models.BooleanField(default=False,
+                                                 help_text="Indicates if the user has"
+                                                           " completed the registration process")
+    is_active = models.BooleanField(default=False, help_text="Indicates if the user account is active")
     first_name = models.CharField(max_length=40, null=True, blank=True, default=None)
     last_name = models.CharField(max_length=40, null=True, blank=True, default=None)
     is_super_admin = models.BooleanField(default=False, editable=False)
@@ -363,11 +369,7 @@ class Module(models.Model):
     )
 
     # Replace BooleanField with CharField
-    is_active = models.CharField(
-        max_length=3,
-        choices=YES_NO_CHOICES,
-        default='yes'
-    )
+    is_active = models.BooleanField(default=False, help_text="Indicates if the module is active")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -379,11 +381,7 @@ class Service(models.Model):  # Use singular 'Service'
     group_key = models.CharField(max_length=255, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     type = models.CharField(max_length=30, null=True, blank=True)
-    is_active = models.CharField(
-        max_length=3,
-        choices=YES_NO_CHOICES,
-        default='yes'
-    )
+    is_active = models.BooleanField(default=False, help_text="Indicates if the service is active")
     label = models.CharField(max_length=100, null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -483,18 +481,10 @@ class ServicePaymentInfo(models.Model):
 
     status = models.CharField(max_length=20, choices=PAYMENT_STATUS, default='initiated')
     method = models.CharField(max_length=50, null=True, blank=True)
-    captured = models.CharField(
-        max_length=3,
-        choices=YES_NO_CHOICES,
-        default='no'
-    )
+    captured = models.BooleanField(default=False, help_text="Indicates if the payment has been captured")
     failure_reason = models.TextField(null=True, blank=True)
 
-    is_latest = models.CharField(
-        max_length=3,
-        choices=YES_NO_CHOICES,
-        default='yes'
-    )  # ✅ New field to track active order
+    is_latest = models.BooleanField(default=True)  # ✅ New field to track active order
     paid_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -682,11 +672,7 @@ class UserFeaturePermission(models.Model):
     actions = models.JSONField(default=list)  # List of service.action combinations
     created_by = models.ForeignKey(Users, on_delete=models.SET_NULL, null=True,
                                    related_name='created_feature_permissions')
-    is_active = models.CharField(
-        max_length=3,
-        choices=YES_NO_CHOICES,
-        default='yes'
-    )
+    is_active = models.BooleanField(default=True, help_text="Indicates if the permission is currently active")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -749,11 +735,7 @@ class SubscriptionPlan(models.Model):
     billing_cycle_days = models.IntegerField(default=30,
                                              help_text="Number of days in billing cycle")
     features_enabled = models.JSONField(default=dict)
-    is_active = models.CharField(
-        max_length=3,
-        choices=YES_NO_CHOICES,
-        default='yes'
-    )
+    is_active = models.BooleanField(default=True, help_text="Indicates if the plan is active")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -795,14 +777,7 @@ class ContextSuiteSubscription(models.Model):
     )
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()
-    auto_renew = models.CharField(
-        max_length=3,
-        choices=[
-                ('yes', 'Yes'),
-                ('no', 'No'),
-            ],
-        default='no'
-    )
+    auto_renew = models.BooleanField(default=False, help_text="Indicates if the subscription will auto-renew")
     # New fields for proration
     original_price = models.DecimalField(max_digits=10, decimal_places=2)
     applied_credit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -903,21 +878,10 @@ class ModuleSubscription(models.Model):
     )
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()
-    auto_renew = models.CharField(
-        max_length=3,
-        choices=[
-                ('yes', 'Yes'),
-                ('no', 'No'),
-            ],
-        default='no'
-    )
+    auto_renew = models.BooleanField(default=False, help_text="Indicates if the subscription will auto-renew")
 
     # New field to track if this subscription is part of a suite
-    via_suite = models.CharField(
-        max_length=3,
-        choices=YES_NO_CHOICES,
-        default='no'
-    )
+    via_suite = models.BooleanField(default=False, help_text="Indicates if this subscription is part of a suite")
     suite_subscription = models.ForeignKey(
         ContextSuiteSubscription,
         on_delete=models.SET_NULL,
@@ -952,14 +916,7 @@ class SubscriptionCycle(models.Model):
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()
     amount = models.FloatField()
-    is_paid = models.CharField(
-        max_length=3,
-        choices=[
-            ('yes', 'Yes'),
-            ('no', 'No'),
-        ],
-        default='no',
-    )
+    is_paid = models.BooleanField(default=False, help_text="Indicates if this cycle has been paid")
     payment_id = models.CharField(max_length=100, null=True, blank=True)
     feature_usage = models.JSONField(
         default=dict,
@@ -1008,7 +965,7 @@ def handle_payment_success(sender, instance, created, **kwargs):
                         'status': 'active',
                         'start_date': timezone.now(),
                         'end_date': timezone.now() + timedelta(days=instance.plan.billing_cycle_days),
-                        'auto_renew': 'no',  # Default to no auto-renewal
+                        'auto_renew': False,  # Default to no auto-renewal
                         'added_by': instance.added_by
                     }
                 )
@@ -1037,7 +994,7 @@ def handle_payment_success(sender, instance, created, **kwargs):
                     start_date=subscription.start_date,
                     end_date=subscription.end_date,
                     amount=round(float(instance.amount), 2),
-                    is_paid='yes',
+                    is_paid=True,
                     payment_id=instance.razorpay_payment_id,
                     feature_usage={}  # Initialize empty feature usage
                 )
@@ -1096,13 +1053,13 @@ def create_initial_subscription_cycle(sender, instance, created, **kwargs):
             # Determine amount
             if instance.status == 'trial':
                 amount = 0.00
-                is_paid = 'yes'
+                is_paid = True
             else:
                 try:
                     amount = round(float(instance.plan.base_price), 2)
                 except (TypeError, ValueError):
                     amount = 0.00
-                is_paid = 'no'
+                is_paid = False
 
             # Create the initial subscription cycle
             cycle = SubscriptionCycle.objects.create(
@@ -1166,8 +1123,24 @@ def create_usage_cycles(sender, instance, created, **kwargs):
 class UserKYC(models.Model):
     user = models.OneToOneField(Users, on_delete=models.CASCADE, related_name='userkyc')  # `related_name='userkyc'`
     name = models.CharField(max_length=40, blank=False, null=False)
-    pan_number = EncryptedField(max_length=20, blank=True, null=True)
-    aadhaar_number = EncryptedField(max_length=20, blank=True, null=True)
+    pan_number = models.CharField(
+        max_length=20, blank=True, null=True,
+        validators=[
+            RegexValidator(
+                regex=r'^[A-Z]{5}[0-9]{4}[A-Z]$',
+                message='Enter a valid PAN number (e.g., ABCDE1234F)'
+            )
+        ]
+    )
+    aadhaar_number = models.CharField(
+        max_length=20, blank=True, null=True,
+        validators=[
+            RegexValidator(
+                regex=r'^\d{12}$',
+                message='Enter a valid 12-digit Aadhaar number'
+            )
+        ]
+    )
     date = models.DateField(null=True, blank=True)
     icai_number = models.CharField(max_length=15, blank=True, null=True)
     address = models.JSONField(default=dict, null=True, blank=True)
@@ -1309,7 +1282,7 @@ class Business(BaseModel):
     mobile_number = models.CharField(max_length=15, null=True, blank=True, default=None)
     email = models.EmailField(null=True, blank=True, default=None)
     dob_or_incorp_date = models.DateField(null=True, blank=True, default=None)
-    is_msme_registered = models.CharField(max_length=5, choices=YES_NO_CHOICES, default='no')
+    is_msme_registered = models.BooleanField(default=False, help_text="Is the business MSME registered?")
     msme_registration_type = models.CharField(max_length=100, null=True, blank=True)
     msme_registration_number = models.CharField(max_length=100, null=True, blank=True)
 
@@ -1318,7 +1291,7 @@ class Business(BaseModel):
         super().clean()
 
         # Check if MSME is registered but no registration number provided
-        if (self.is_msme_registered == 'yes' or self.is_msme_registered == 'Yes') and not self.msme_registration_number:
+        if (self.is_msme_registered == True or self.is_msme_registered == True) and not self.msme_registration_number:
             raise ValidationError({
                 'msme_registration_number': 'MSME registration number is required when business is MSME registered.'
             })
@@ -1394,13 +1367,16 @@ class GSTDetails(BaseModel):
     branch_name = models.CharField(max_length=60, null=True, blank=True, default=None)
     state = models.CharField(max_length=60, null=True, blank=True, default=None)
     authorized_signatory_pan = models.CharField(max_length=60, null=True, blank=True, default=None)
-    gst_document = models.FileField(upload_to=gst_document_upload_path, null=True, blank=True)
-    is_composition_scheme = models.CharField(max_length=3, choices=YES_NO_CHOICES, default='no')
-    composition_scheme_percent = models.CharField(max_length=10, null=True, blank=True)
-    is_export_sez = models.CharField(max_length=3, choices=YES_NO_CHOICES, default='no')
+    gst_document = models.FileField(upload_to=gst_document_upload_path, null=True, blank=True,
+                                    storage=PrivateS3Storage())
+    is_composition_scheme = models.BooleanField(default=False,
+                                                help_text="Is the business registered under composition scheme?")
+    composition_scheme_percent = models.CharField(max_length=200, null=True, blank=True)
+    is_export_sez = models.BooleanField(default=False, help_text="Is the business registered for export under SEZ?")
     lut_reg_no = models.CharField(max_length=100, blank=True)
     dob = models.DateField(null=True, blank=True)
     financial_year = models.CharField(max_length=20, blank=True)
+    lut_letter = models.FileField(upload_to=lut_letter_upload_path, null=True, blank=True, storage=PrivateS3Storage())
 
     class Meta:
         unique_together = ("business", "gstin")
@@ -1439,7 +1415,8 @@ class LicenseDetails(models.Model):
     location = models.CharField(max_length=100, null=True, blank=True)
     date_of_issue = models.DateField(null=True, blank=True)
     date_of_expiry = models.DateField(null=True, blank=True)
-    license_document = models.FileField(upload_to=license_document_upload_path, null=True, blank=True)
+    license_document = models.FileField(upload_to=license_document_upload_path, null=True, blank=True,
+                                        storage=PrivateS3Storage())
 
     def __str__(self):
         return f"License Details for {self.business.nameOfBusiness}"

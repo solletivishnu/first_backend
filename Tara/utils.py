@@ -14,6 +14,10 @@ from user_management.serializers import *
 from rest_framework.fields import CharField
 from django.contrib.auth.hashers import check_password
 from django.db.models import Q
+from rest_framework.views import exception_handler
+from django.db import IntegrityError
+from rest_framework.response import Response
+from rest_framework import status
 
 
 User = get_user_model()  # Fetch the custom user model
@@ -167,3 +171,12 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
         # Return the validated data along with tokens
         return Response(serializer.validated_data, status=status.HTTP_200_OK)
+
+
+def custom_exception_handler(exc, context):
+    if isinstance(exc, IntegrityError):
+        return Response(
+            {"error": "A database integrity error occurred.", "details": str(exc)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    return exception_handler(exc, context)

@@ -16,7 +16,10 @@ def other_income_details_list(request):
 
     elif request.method == 'POST':
 
-        data = request.data
+        if request.FILES:
+            data = request.data
+        else:
+            data = request.data.copy()
         service_request_id = request.data.get('service_request')
         try:
             main_details_data = {

@@ -78,7 +78,7 @@ def get_login_response(user):
 
             _ = UserFeaturePermission.objects.filter(
                 user_context_role=user_context_role,
-                is_active="yes"
+                is_active=True
             )
 
         except UserContextRole.DoesNotExist:

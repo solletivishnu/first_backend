@@ -3068,6 +3068,7 @@ def calculate_employee_monthly_salary(request):
 
     return Response(salaries, status=status.HTTP_200_OK)
 
+
 import traceback
 @api_view(['GET'])
 def detail_employee_monthly_salary(request):
@@ -3503,6 +3504,7 @@ def format_with_commas(number):
 
 
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def employee_monthly_salary_template(request):
     try:
         today = date.today()
@@ -3601,14 +3603,18 @@ def employee_monthly_salary_template(request):
 
         # Add EPF Deduction to Total Deduction only if EPF object exists and is enabled
         if EPF.objects.filter(payroll=salary_record.employee.payroll).exists() and \
-           not EPF.objects.filter(payroll=salary_record.employee.payroll).first().is_disabled:
-            epf_deduction = deduction_values.get("epf_employee_contribution", 0)
+           not EPF.objects.filter(payroll=salary_record.employee.payroll).first().is_disabled and \
+        salary_record.employee.statutory_components.get('employee_provident_fund', {}).get('epf_employee_contribution'):
+            epf_deduction = deduction_values.get("epf_employee_contribution", 0) \
+            if deduction_values.get("esi_employee_contribution") != 'NA' else 0
             total_deduction += epf_deduction
 
         # Add ESI Deduction to Total Deduction only if ESI object exists and is enabled
         if ESI.objects.filter(payroll=salary_record.employee.payroll).exists() and \
-           not ESI.objects.filter(payroll=salary_record.employee.payroll).first().is_disabled:
-            esi_deduction = deduction_values.get("esi_employee_contribution", 0)
+           not ESI.objects.filter(payroll=salary_record.employee.payroll).first().is_disabled and \
+        salary_record.employee.statutory_components.get('employee_provident_fund', {}).get('esi_employee_contribution'):
+            esi_deduction = deduction_values.get("esi_employee_contribution", 0) \
+                if deduction_values.get("esi_employee_contribution") != 'NA' else 0
             total_deduction += esi_deduction
 
         # Initialize PT Deduction (Fixed ₹200)
@@ -3637,7 +3643,7 @@ def employee_monthly_salary_template(request):
 
         # Calculate Net Pay
         net_pay = earned_salary - total_deduction
-        total_in_words = num2words(net_pay)
+        total_in_words = num2words(round(net_pay))
         total_in_words = total_in_words.capitalize()
         total_in_words = total_in_words.replace("<br/>", ' ')
         total_in_words = total_in_words.title() + ' ' + 'Rupees Only'
@@ -3686,7 +3692,8 @@ def employee_monthly_salary_template(request):
 
             # Individual Deductions
             "epf": EPF.objects.filter(payroll=getattr(salary_record.employee,"payroll_id","")).exists(),
-            "epf_contribution": format_with_commas(deduction_values.get("epf_employee_contribution", 0)),
+            "epf_contribution": format_with_commas(deduction_values.get("epf_employee_contribution", 0))
+            if deduction_values.get("epf_employee_contribution") != 'NA' else 0,
             "pt": pt_deduction > 0,  # PT is included if enabled
             "professional_tax": format_with_commas(deduction_values.get("pt", 0)),
             "income_tax": format_with_commas(deduction_values.get("income_tax", 0)),
@@ -3703,7 +3710,8 @@ def employee_monthly_salary_template(request):
             # Advance Loan Details in Context
             "loan_emi": format_with_commas(loan_deduction_total),  # Add EMI to context
             "loan_details": [
-                {"loan_type": loan.loan_type, "emi_amount": loan.emi_amount, "start_month": loan.start_month, "end_month": loan.end_month}
+                {"loan_type": loan.loan_type, "emi_amount": loan.emi_amount,
+                 "start_month": loan.start_month, "end_month": loan.end_month}
                 for loan in loan_deductions
             ]
         }

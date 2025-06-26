@@ -25,19 +25,20 @@ class TurnoverAndInvestmentDeclarationSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class RegisteredAddressSerializer(serializers.ModelSerializer):
-    official_address_of_enterprise = serializers.JSONField(required=False, allow_null=True)
-
-    class Meta:
-        model = RegisteredAddress
-        fields = '__all__'
-
-
 class LocationOfPlantOrUnitSerializer(serializers.ModelSerializer):
     unit_details = serializers.JSONField(required=False, allow_null=True)
 
     class Meta:
         model = LocationOfPlantOrUnit
+        fields = '__all__'
+
+
+class RegisteredAddressSerializer(serializers.ModelSerializer):
+    official_address_of_enterprise = serializers.JSONField(required=False, allow_null=True)
+    location_of_plant_or_unit = LocationOfPlantOrUnitSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = RegisteredAddress
         fields = '__all__'
 
 

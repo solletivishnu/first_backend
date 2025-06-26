@@ -77,7 +77,7 @@ def create_business_context(request):
                 )
 
             # Check if user is active
-            if user.is_active != 'yes':
+            if not user.is_active:
                 return Response(
                     {"error": "User account is not active. Please activate your account first."},
                     status=status.HTTP_403_FORBIDDEN
@@ -252,7 +252,7 @@ def add_subscription_to_business(request):
                     user_context_role=ucr,
                     module=module,
                     actions=all_actions,
-                    is_active='yes',
+                    is_active=True,
                     created_by=added_by  # Use the same user who added the subscription
                 )
 

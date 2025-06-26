@@ -40,7 +40,7 @@ def login_user(request):
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
-        if user.is_active != 'yes':
+        if not user.is_active:
             return Response(
                 {"error": "Your account is not active. Please activate your account or contact support."},
                 status=status.HTTP_403_FORBIDDEN
@@ -121,7 +121,7 @@ def login_user(request):
 
                 feature_permissions = UserFeaturePermission.objects.filter(
                     user_context_role=user_context_role,
-                    is_active="yes"
+                    is_active=True
                 )
 
             except UserContextRole.DoesNotExist:

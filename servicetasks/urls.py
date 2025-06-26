@@ -1,6 +1,5 @@
 from django.urls import path
 from . import views
-from .views import subtask_list
 
 urlpatterns = [
     path('', views.service_task_list, name='service-task-list'),                     # GET all, POST create

@@ -45,6 +45,21 @@ def business_identity_detail(request, pk):
 
     elif request.method == 'DELETE':
         # Delete associated files if they exist
+        file_type = request.query_params.get('file_type')
+        if file_type:
+            try:
+                if file_type == 'pan_of_business_or_COI' and item.pan_of_business_or_COI:
+                    item.pan_of_business_or_COI.storage.delete(item.pan_of_business_or_COI.name)
+                    item.pan_of_business_or_COI = None
+                elif file_type == 'aadhar_of_signatory' and item.aadhar_of_signatory:
+                    item.aadhar_of_signatory.storage.delete(item.aadhar_of_signatory.name)
+                    item.aadhar_of_signatory = None
+                item.save()
+                return Response({"message": "{} deleted successfully".format(file_type)},
+                                status=status.HTTP_204_NO_CONTENT)
+            except Exception as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
         if item.pan_of_business_or_COI:
             item.pan_of_business_or_COI.storage.delete(item.pan_of_business_or_COI.name)
         if item.aadhar_of_signatory:
@@ -78,16 +93,17 @@ def business_classification_list(request):
         if 'nic_codes' in data and isinstance(data['nic_codes'], str):
             try:
                 nic_codes = json.loads(data['nic_codes'])
+                data['nic_codes'] = json.dumps(nic_codes)
             except json.JSONDecodeError:
                 return Response({"error": "Invalid JSON format for nic_codes"}, status=status.HTTP_400_BAD_REQUEST)
-        data['nic_codes'] = json.dumps(nic_codes)
 
         if 'number_of_persons_employed' in data and isinstance(data['number_of_persons_employed'], str):
             try:
                 number_of_persons_employed = json.loads(data['number_of_persons_employed'])
+                data['number_of_persons_employed'] = json.dumps(number_of_persons_employed)
             except json.JSONDecodeError:
-                return Response({"error": "Invalid JSON format for number_of_persons_employed"}, status=status.HTTP_400_BAD_REQUEST)
-        data['number_of_persons_employed'] = json.dumps(number_of_persons_employed)
+                return Response({"error": "Invalid JSON format for number_of_persons_employed"},
+                                status=status.HTTP_400_BAD_REQUEST)
 
         serializer = BusinessClassificationInputsSerializer(data=data)
         if serializer.is_valid():
@@ -120,17 +136,17 @@ def business_classification_detail(request, pk):
         if 'nic_codes' in data and isinstance(data['nic_codes'], str):
             try:
                 nic_codes = json.loads(data['nic_codes'])
+                data['nic_codes'] = json.dumps(nic_codes)
             except json.JSONDecodeError:
                 return Response({"error": "Invalid JSON format for nic_codes"}, status=status.HTTP_400_BAD_REQUEST)
-        data['nic_codes'] = json.dumps(nic_codes)
 
         if 'number_of_persons_employed' in data and isinstance(data['number_of_persons_employed'], str):
             try:
                 number_of_persons_employed = json.loads(data['number_of_persons_employed'])
+                data['number_of_persons_employed'] = json.dumps(number_of_persons_employed)
             except json.JSONDecodeError:
                 return Response({"error": "Invalid JSON format for number_of_persons_employed"},
                                 status=status.HTTP_400_BAD_REQUEST)
-        data['number_of_persons_employed'] = json.dumps(number_of_persons_employed)
 
         serializer = BusinessClassificationInputsSerializer(item, data=data, partial=True)
         if serializer.is_valid():
@@ -167,9 +183,11 @@ def turnover_declaration_list(request):
         if 'turnover_in_inr' in data and isinstance(data['turnover_in_inr'], str):
             try:
                 turnover_in_inr = json.loads(data['turnover_in_inr'])
+                data['turnover_in_inr'] = json.dumps(turnover_in_inr)
+
             except json.JSONDecodeError:
-                return Response({"error": "Invalid JSON format for turnover_in_inr"}, status=status.HTTP_400_BAD_REQUEST)
-        data['turnover_in_inr'] = json.dumps(turnover_in_inr)
+                return Response({"error": "Invalid JSON format for turnover_in_inr"},
+                                status=status.HTTP_400_BAD_REQUEST)
 
         serializer = TurnoverAndInvestmentDeclarationSerializer(data=data)
         if serializer.is_valid():
@@ -201,9 +219,10 @@ def turnover_declaration_detail(request, pk):
         if 'turnover_in_inr' in data and isinstance(data['turnover_in_inr'], str):
             try:
                 turnover_in_inr = json.loads(data['turnover_in_inr'])
+                data['turnover_in_inr'] = json.dumps(turnover_in_inr)
             except json.JSONDecodeError:
-                return Response({"error": "Invalid JSON format for turnover_in_inr"}, status=status.HTTP_400_BAD_REQUEST)
-        data['turnover_in_inr'] = json.dumps(turnover_in_inr)
+                return Response({"error": "Invalid JSON format for turnover_in_inr"},
+                                status=status.HTTP_400_BAD_REQUEST)
 
         serializer = TurnoverAndInvestmentDeclarationSerializer(declaration, data=data, partial=True)
         if serializer.is_valid():
@@ -213,6 +232,18 @@ def turnover_declaration_detail(request, pk):
 
     elif request.method == 'DELETE':
         # Delete associated gst_certificate file if it exists
+        file_type = request.query_params.get('file_type')
+        if file_type:
+            try:
+                if file_type == 'gst_certificate' and declaration.gst_certificate:
+                    declaration.gst_certificate.storage.delete(declaration.gst_certificate.name)
+                    declaration.gst_certificate = None
+                    declaration.save()
+                    return Response({"message": "GST Certificate deleted successfully"},
+                                    status=status.HTTP_204_NO_CONTENT)
+            except Exception as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
         if declaration.gst_certificate:
             declaration.gst_certificate.storage.delete(declaration.gst_certificate.name)
         declaration.delete()
@@ -243,9 +274,10 @@ def registered_address_list(request):
         if 'official_address_of_enterprise' in data and isinstance(data['official_address_of_enterprise'], str):
             try:
                 official_address = json.loads(data['official_address_of_enterprise'])
+                data['official_address_of_enterprise'] = json.dumps(official_address)
             except json.JSONDecodeError:
-                return Response({"error": "Invalid JSON format for official_address_of_enterprise"}, status=status.HTTP_400_BAD_REQUEST)
-        data['official_address_of_enterprise'] = json.dumps(official_address)
+                return Response({"error": "Invalid JSON format for official_address_of_enterprise"},
+                                status=status.HTTP_400_BAD_REQUEST)
 
         serializer = RegisteredAddressSerializer(data=data)
         if serializer.is_valid():
@@ -277,10 +309,10 @@ def registered_address_detail(request, pk):
         if 'official_address_of_enterprise' in data and isinstance(data['official_address_of_enterprise'], str):
             try:
                 official_address = json.loads(data['official_address_of_enterprise'])
+                data['official_address_of_enterprise'] = json.dumps(official_address)
             except json.JSONDecodeError:
                 return Response({"error": "Invalid JSON format for official_address_of_enterprise"},
                                 status=status.HTTP_400_BAD_REQUEST)
-        data['official_address_of_enterprise'] = json.dumps(official_address)
 
         serializer = RegisteredAddressSerializer(item, data=data, partial=True)
         if serializer.is_valid():
@@ -290,6 +322,20 @@ def registered_address_detail(request, pk):
 
     elif request.method == 'DELETE':
         # Delete associated files if they exist
+        file_type = request.query_params.get('file_type')
+        if file_type:
+            try:
+                if file_type == 'bank_statement_or_cancelled_cheque' and item.bank_statement_or_cancelled_cheque:
+                    item.bank_statement_or_cancelled_cheque.storage.delete(item.bank_statement_or_cancelled_cheque.name)
+                    item.bank_statement_or_cancelled_cheque = None
+                elif file_type == 'official_address_of_proof' and item.official_address_of_proof:
+                    item.official_address_of_proof.storage.delete(item.official_address_of_proof.name)
+                    item.official_address_of_proof = None
+                item.save()
+                return Response({"message": "{} deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+            except Exception as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
         if item.bank_statement_or_cancelled_cheque:
             item.bank_statement_or_cancelled_cheque.storage.delete(item.bank_statement_or_cancelled_cheque.name)
         if item.official_address_of_proof:
@@ -322,9 +368,9 @@ def location_of_plant_or_unit_list(request):
         if 'unit_details' in data and isinstance(data['unit_details'], str):
             try:
                 unit_details = json.loads(data['unit_details'])
+                data['unit_details'] = json.dumps(unit_details)
             except json.JSONDecodeError:
                 return Response({"error": "Invalid JSON format for unit_details"}, status=status.HTTP_400_BAD_REQUEST)
-        data['unit_details'] = json.dumps(unit_details)
 
         serializer = LocationOfPlantOrUnitSerializer(data=data)
         if serializer.is_valid():
@@ -356,9 +402,9 @@ def location_of_plant_or_unit_detail(request, pk):
         if 'unit_details' in data and isinstance(data['unit_details'], str):
             try:
                 unit_details = json.loads(data['unit_details'])
+                data['unit_details'] = json.dumps(unit_details)
             except json.JSONDecodeError:
                 return Response({"error": "Invalid JSON format for unit_details"}, status=status.HTTP_400_BAD_REQUEST)
-        data['unit_details'] = json.dumps(unit_details)
 
         serializer = LocationOfPlantOrUnitSerializer(location, data=data, partial=True)
         if serializer.is_valid():
@@ -458,12 +504,14 @@ def get_review_filing_certificate(request):
     serializer = ReviewFilingCertificateSerializer(instance)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
+
 MSME_MODEL_SERIALIZER_MAP = {
-    "Business Identity": (BusinessIdentity, BusinessIdentitySerializer, False),
-    "Business Classification": (BusinessClassificationInputs, BusinessClassificationInputsSerializer, False),
-    "Turnover Declaration": (TurnoverAndInvestmentDeclaration, TurnoverAndInvestmentDeclarationSerializer, False),
-    "Registered Address": (RegisteredAddress, RegisteredAddressWithLocationPlantSerializer, False),
-    "Review Certificate": (MsmeReviewFilingCertificate, ReviewFilingCertificateSerializer, False),
+    "Business Identity": (BusinessIdentity, BusinessIdentitySerializer),
+    "Business Classification Inputs": (BusinessClassificationInputs, BusinessClassificationInputsSerializer),
+    "Turnover And InvestmentDeclaration": (TurnoverAndInvestmentDeclaration,
+                                           TurnoverAndInvestmentDeclarationSerializer),
+    "Registered Address": (RegisteredAddress, RegisteredAddressWithLocationPlantSerializer),
+    "Review Filing Certificate": (MsmeReviewFilingCertificate, ReviewFilingCertificateSerializer),
 }
 
 
@@ -480,7 +528,8 @@ def get_msme_data_by_service_request(request, service_request_id):
         queryset = model_class.objects.filter(service_request=service_request)
 
         if queryset.exists():
-            data = serializer_class(queryset, many=True).data if is_multiple else serializer_class(queryset.first()).data
+            data = serializer_class(queryset, many=True).data if is_multiple else (
+                serializer_class(queryset.first()).data)
         else:
             data = [] if is_multiple else None
 
@@ -490,4 +539,114 @@ def get_msme_data_by_service_request(request, service_request_id):
         "service_request": service_request.id,
         "client": service_request.user.id,
         "msme_data": msme_data
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+def get_msme_full_data_by_service_request(request, service_request_id):
+    if not service_request_id:
+        return Response({"error": "Missing service_request_id"}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        service_request = ServiceRequest.objects.get(pk=service_request_id)
+    except ServiceRequest.DoesNotExist:
+        return Response({"error": "ServiceRequest not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    tasks = service_request.service_tasks.all()
+    full_data = {}
+    for task in tasks:
+        category_name = task.category_name.strip()
+        config = MSME_MODEL_SERIALIZER_MAP.get(category_name)
+
+        task_info = {
+            "task_id": task.id,
+            "category_name": category_name,
+            "task_status": task.status,
+            "priority": task.priority,
+            "due_date": task.due_date,
+            "assignee": task.assignee.id if task.assignee else None,
+            "reviewer": task.reviewer.id if task.reviewer else None,
+            "data": None
+        }
+        if config:
+            model_class, serializer_class = config
+            try:
+                instance = model_class.objects.get(service_task=task)
+                serializer = serializer_class(instance)
+                task_info["data"] = serializer.data
+            except model_class.DoesNotExist:
+                task_info["data"] = None
+        else:
+            task_info["data"] = "No model/Serializer mapping defined"
+        full_data[category_name] = task_info
+
+    return Response({
+        "service_request_id": service_request.id,
+        "client": service_request.user.id,
+        "tasks": full_data
+    }, status=status.HTTP_200_OK)
+
+
+Category_Task_Map = {
+    "enterprise_profile_info": ["Business Identity", "Business Classification Inputs"],
+    "financial_and_location_info": ["Turnover And InvestmentDeclaration", "Registered Address"],
+    "review_filing_certificate": ["Review Filing Certificate"]
+}
+
+
+@api_view(['GET'])
+def get_msme_tasks_using_section_name(request):
+
+    service_request_id = request.query_params.get('service_request_id')
+    section_key = request.query_params.get('section')
+
+    if not service_request_id or not section_key:
+        return Response({"error": "Missing service_request_id or section"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        service_request = ServiceRequest.objects.get(pk=service_request_id)
+    except ServiceRequest.DoesNotExist:
+        return Response({"error": "ServiceRequest not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    section_tasks = Category_Task_Map.get(section_key)
+
+    if not section_tasks:
+        return Response({"error": "Invalid Section Name"}, status=status.HTTP_400_BAD_REQUEST)
+
+    section_data = {}
+
+    tasks = service_request.service_tasks.filter(category_name__in=section_tasks)
+
+    for task in tasks:
+        category_name = task.category_name.strip()
+        config = MSME_MODEL_SERIALIZER_MAP.get(category_name)
+
+        task_info = {
+            "task_id": task.id,
+            "category_name": category_name,
+            "status": task.status,
+            "priority": task.priority,
+            "due_date": task.due_date,
+            "assignee": task.assignee.id if task.assignee else None,
+            "reviewer": task.reviewer.id if task.reviewer else None,
+            "data": None
+        }
+
+        if config:
+            model_class, serializer_class = config
+            try:
+                instance = model_class.objects.get(service_task=task)
+                serializer = serializer_class(instance)
+                task_info["data"] = serializer.data
+            except model_class.DoesNotExist:
+                task_info["data"] = None
+        else:
+            task_info["data"] = "No model/serializer mapping defined"
+
+        section_data[category_name] = task_info
+
+    return Response({
+        "service_request_id": service_request.id,
+        "client": service_request.user.id,
+        "section": section_key,
+        "tasks": section_data
     }, status=status.HTTP_200_OK)

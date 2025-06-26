@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 #
-sudo rm -rf /home/ubuntu/TaraFirst/*
+sudo rm -rf /home/ubuntu/tarafirst/*

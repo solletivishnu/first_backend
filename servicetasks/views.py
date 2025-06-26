@@ -147,7 +147,6 @@ def subtask_list(request):
         ).distinct()
 
     # Retrieve all subtasks
-    subtasks = ServiceSubTask.objects.all()
     serializer = ServiceSubTaskSerializer(subtasks, many=True)
     return Response(serializer.data)
 
