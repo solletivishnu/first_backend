@@ -980,7 +980,7 @@ def get_service_request_section_data(request):
             "status": task.status,
             "priority": task.priority,
             "due_date": task.due_date,
-            "assigned_to": task.assignee.id if task.assignee else None,
+            "assignee": task.assignee.id if task.assignee else None,
             "reviewer": task.reviewer.id if task.reviewer else None,
             "data": None
         }

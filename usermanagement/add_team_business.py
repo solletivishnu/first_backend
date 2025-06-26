@@ -248,7 +248,7 @@ def add_team_member_to_business(request):
                     status='invited',
                     registration_flow='standard',
                     registration_completed='no',
-                    is_active='no',
+                    is_active=False,
                     created_by=authenticated_user,
                     is_super_admin=False,
                     active_context=context
@@ -274,7 +274,7 @@ def add_team_member_to_business(request):
                     user_context_role=user_context_role,
                     module=module,
                     actions=service_actions,
-                    is_active='yes',
+                    is_active=True,
                     created_by=authenticated_user
                 )
 
@@ -515,7 +515,7 @@ def accept_team_invitation(request):
         if user.status in ['pending', 'invited'] and user.registration_flow in ['invited', 'standard']:
             user.status = 'active'
             user.registration_completed = True
-            user.is_active = 'yes'
+            user.is_active = True
             user.active_context = user_context_role.context.id
             user.save()
             logger.info("New user status updated successfully")
@@ -628,7 +628,7 @@ def get_user_contexts(request):
             permissions = []
             feature_permissions = UserFeaturePermission.objects.filter(
                 user_context_role=ucr,
-                is_active='yes'
+                is_active=True
             ).select_related('module')
 
             for permission in feature_permissions:
@@ -771,7 +771,7 @@ def list_context_users(request):
             permissions = []
             feature_permissions = UserFeaturePermission.objects.filter(
                 user_context_role=ucr,
-                is_active='yes'
+                is_active=True
             ).select_related('module')
 
             for permission in feature_permissions:

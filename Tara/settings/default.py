@@ -39,7 +39,7 @@ ALLOWED_HOSTS = [
     'localhost',  # Local development
     '127.0.0.1',  # Local development
     '35.154.44.198',  # Replace with your actual domain
-    'ec2-35-154-44-198.ap-south-1.compute.amazonaws.com',  # EC2 public DNS
+    'ec2-13-233-201-80.ap-south-1.compute.amazonaws.com',  # EC2 public DNS
     'api.ipify.org',  # Add this if your app needs to handle requests from this domain
     '*',
     'dev.tarafirst.com'
@@ -60,7 +60,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'user_management',
-    'drf_yasg',
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
@@ -169,7 +168,7 @@ USE_TZ = True
 STATIC_URL = '/static/'
 
 # Directory where static files will be collected
-STATIC_ROOT = os.path.join(BASE_DIR, '../staticfiles')
+# STATIC_ROOT = os.path.join(BASE_DIR, '../staticfiles')
 
 # STATICFILES_DIRS = [
 #     os.path.join(BASE_DIR, 'static'),  # Root-level static files
@@ -203,7 +202,8 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',  # Only JSON response, no HTML
-    ]
+    ],
+    'EXCEPTION_HANDLER': 'Tara.utils.custom_exception_handler'
 }
 
 
@@ -326,26 +326,22 @@ print("*******************")
 
 S3_BUCKET_NAME = "tarafirstdevelopment"
 
-# database connections
-userName = os.getenv('prod_database_username')
-password = os.getenv('prod_password')
+database_host = os.getenv('DATABASE_HOST')
+username = os.getenv('DATABASE_USERNAME')
+password = os.getenv('DATABASE_PASSWORD')
+database_name = os.getenv('DATABASE_NAME')
 
 
 DATABASES = {
-        'default': {
-            'ENGINE': 'djongo',
-            'NAME': 'Production',
-            'ENFORCE_SCHEMA': False,
-            'CLIENT': {
-                'host': f'mongodb+srv://{userName}:{password}@cluster0.onilu.mongodb.net/Production'
-                        '?tls=true&tlsAllowInvalidCertificates=true',
-                'port': 27017,
-                'username': f'{userName}',
-                'password': f'{password}',
-                'authSource': 'Production',
-                'authMechanism': 'SCRAM-SHA-1',
-            }
-        }
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': database_name,
+        'USER': username,
+        'PASSWORD': password,
+        'HOST': database_host,
+        'PORT': '5432',
+
+    }
 }
 
 

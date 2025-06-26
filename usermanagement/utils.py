@@ -69,7 +69,7 @@ def validate_user_permissions(user_context_role_id, module_id, required_actions=
             permission = UserFeaturePermission.objects.get(
                 user_context_role=user_context_role,
                 module=module,
-                is_active='yes'
+                is_active=True
             )
         except UserFeaturePermission.DoesNotExist:
             return False, Response(

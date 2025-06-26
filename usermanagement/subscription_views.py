@@ -6,7 +6,6 @@ from .models import SubscriptionPlan, Module
 from .serializers import SubscriptionPlanSerializer
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError
-from distutils.util import strtobool
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -97,36 +96,33 @@ def create_subscription_plan(request):
 @permission_classes([AllowAny])
 def list_subscription_plans(request):
     """
-    List all subscription plans
+    List all subscription plans.
     Optional filters: module_id, plan_type, is_active
     """
-    try:
-        module_id = request.query_params.get('module_id')
-        plan_type = request.query_params.get('plan_type')
-        is_active = request.query_params.get('is_active')
+    module_id = request.query_params.get('module_id')
+    plan_type = request.query_params.get('plan_type')
+    is_active_param = request.query_params.get('is_active')
 
-        query = {}
-        if module_id:
-            query['module_id'] = module_id
-        if plan_type:
-            query['plan_type'] = plan_type
-        if is_active:
-            query['is_active'] = is_active
+    filter_kwargs = {}
 
-        plans = SubscriptionPlan.objects.filter(**query)
-        serializer = SubscriptionPlanSerializer(plans, many=True)
+    if module_id:
+        filter_kwargs['module_id'] = module_id
+    if plan_type:
+        filter_kwargs['plan_type'] = plan_type
+    if is_active_param:
+        is_active_param = is_active_param.lower()
+        if is_active_param in ['yes', 'true', '1']:
+            filter_kwargs['is_active'] = True
+        elif is_active_param in ['no', 'false', '0']:
+            filter_kwargs['is_active'] = False
 
-        return Response({
-            'success': True,
-            'data': serializer.data
-        }, status=status.HTTP_200_OK)
+    plans = SubscriptionPlan.objects.filter(**filter_kwargs)
+    serializer = SubscriptionPlanSerializer(plans, many=True)
 
-    except Exception as e:
-        return Response({
-            'success': False,
-            'error': 'An unexpected error occurred',
-            'details': str(e)
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response({
+        'success': True,
+        'data': serializer.data
+    }, status=status.HTTP_200_OK)
 
 
 

@@ -1,7 +1,8 @@
 from django.db import models
 from Tara.settings.default import *
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
-from djongo.models import ArrayField, EmbeddedField, JSONField
+from django.contrib.postgres.fields import ArrayField
+from django.db.models import JSONField
 from .helpers import *
 from usermanagement.models import ServiceRequest, Users
 from servicetasks.models import ServiceTask
@@ -277,7 +278,7 @@ class NRIEmployeeSalaryDetails(models.Model):
         related_name='foreign_income_details_reviewed'
     )
     foreign_salary_and_employment = models.CharField(max_length=255, null=True, blank=True)
-    employment_history = JSONField(null=True, blank=True, default=[])
+    employment_history = JSONField(null=True, blank=True, default=list)
 
     def save(self, *args, **kwargs):
         # Default to service_request values if not set
@@ -404,7 +405,7 @@ class CapitalGainsApplicableDetails(models.Model):
         related_name='capital_gains_applicable_details_reviewed'
     )
 
-    gains_applicable = JSONField(null=True, blank=True, default=[])
+    gains_applicable = JSONField(null=True, blank=True, default=list)
 
     def save(self, *args, **kwargs):
         # Default to service_request values if not set
@@ -609,7 +610,7 @@ class BusinessProfessionalIncomeInfo(models.Model):
     business_type = models.CharField(max_length=255, null=False, blank=False)
     opting_for_presumptive_taxation = models.CharField(max_length=255, null=False, blank=False,
                                                        choices=[('yes', 'Yes'), ('no', 'No')], default='no')
-    opting_data = JSONField(default={}, null=True, blank=True)
+    opting_data = JSONField(default=dict, null=True, blank=True)
     gst_registered = models.CharField(max_length=255, null=False, blank=False,
                                       choices=[('yes', 'Yes'), ('no', 'No')], default='no')
 

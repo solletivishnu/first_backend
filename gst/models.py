@@ -1,6 +1,7 @@
 from Tara.settings.default import *
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
-from djongo.models import ArrayField, EmbeddedField, JSONField
+from django.contrib.postgres.fields import ArrayField
+from django.db.models import JSONField
 from .helpers import *
 from usermanagement.models import *
 from django.db import models
@@ -68,31 +69,11 @@ class RegistrationInfo(models.Model):
     service_type = models.CharField(max_length=20, default="GST", editable=False)
     service_task = models.OneToOneField(ServiceTask, on_delete=models.CASCADE,
                                      related_name='service_task_registration_info')
-    YES_NO_CHOICES = [
-        ('Yes', 'Yes'),
-        ('No', 'No'),
-    ]
 
-    is_this_voluntary_registration = models.CharField(
-        max_length=3,
-        choices=YES_NO_CHOICES,
-        default='No'
-    )
-    applying_for_casual_taxable_person = models.CharField(
-        max_length=3,
-        choices=YES_NO_CHOICES,
-        default='No'
-    )
-    opting_for_composition_scheme = models.CharField(
-        max_length=3,
-        choices=YES_NO_CHOICES,
-        default='No'
-    )
-    any_existing_registration = models.CharField(
-        max_length=3,
-        choices=YES_NO_CHOICES,
-        default='No'
-    )
+    is_this_voluntary_registration = models.BooleanField(default=False)
+    applying_for_casual_taxable_person = models.BooleanField(default=False)
+    opting_for_composition_scheme = models.BooleanField(default=False)
+    any_existing_registration = models.BooleanField(default=False)
     registration_number = models.CharField(max_length=100, blank=True, null=True)
     date_of_registration = models.DateField(blank=True, null=True)
     status = models.CharField(max_length=20, choices=[('in progress', 'In Progress'), ('completed', 'Completed'),
@@ -130,7 +111,7 @@ class PrincipalPlaceDetails(models.Model):
     OWNERSHIP_TYPE_CHOICES = [
         ('own', 'Own'),
         ('rented', 'Rented'),
-        ('lease', 'Lease'),
+        ('leased', 'Leased'),
     ]
     principal_place = JSONField(default=dict, blank=True, null=True)
     nature_of_possession_of_premise = models.CharField(max_length=255,
@@ -218,11 +199,7 @@ class PromoterSignatoryInfo(models.Model):
     aadhaar = models.FileField(upload_to=upload_promoter_aadhaar, blank=True, null=True, storage=PrivateS3Storage())
     photo = models.FileField(upload_to=upload_promoter_photo, blank=True, null=True, storage=PrivateS3Storage())
     designation = models.CharField(max_length=255, blank=True, null=True)
-    residential_same_as_aadhaar_address = models.CharField(
-        max_length=3,
-        choices=[('Yes', 'Yes'), ('No', 'No')],
-        default='No'
-    )
+    residential_same_as_aadhaar_address = models.BooleanField(default=False)
     residential_address = models.TextField(blank=True, null=True)
 
     def __str__(self):
@@ -235,15 +212,23 @@ class GSTReviewFilingCertificate(models.Model):
                                             related_name='GST_review_filing_certificate')
     service_task = models.OneToOneField(ServiceTask, on_delete=models.CASCADE,
                                         related_name='ServiceTask_GST_review_filing_certificate')
+    REVIEW_STATUS_CHOICES = [
+        ('in progress', 'In Progress'),
+        ('completed', 'Completed'),
+        ('sent for approval', 'Sent for Approval'),
+        ('revoked', 'Revoked')
+    ]
 
     FILING_STATUS_CHOICES = [
         ('in progress', 'In Progress'),
         ('filed', 'Filed'),
+        ('sent for approval', 'Sent for Approval'),
         ('resubmitted', 'Resubmitted'),
-        ]
+    ]
     APPROVAL_STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('resubmission', 'Resubmission'),
+        ('sent for approval', 'Sent for Approval'),
         ('rejected', 'Rejected'),
         ('approved', 'Approved'),
     ]
@@ -252,6 +237,17 @@ class GSTReviewFilingCertificate(models.Model):
     status = models.CharField(max_length=20, choices=[('in progress', 'In Progress'), ('completed', 'Completed'),
                                         ('sent for approval', 'Sent for Approval'),('revoked', 'Revoked')],
                                          default='in progress', null=False,blank=False)
+
+    draft_filing_certificate = models.FileField(
+        upload_to=draft_filing_certificate, null=True, blank=True, storage=PrivateS3Storage()
+    )
+    review_certificate_status = models.CharField(
+        max_length=20,
+        choices=REVIEW_STATUS_CHOICES,
+        null=True,
+        blank=True,
+        default=None
+    )
 
     filing_status = models.CharField(
         max_length=20,
@@ -373,3 +369,8 @@ def sync_gst_review_service_task_status(sender, instance, **kwargs):
     task.completion_percentage = calculate_completion_percentage(instance)
 
     task.save()
+
+@receiver(post_save, sender=PromoterSignatoryInfo)
+def sync_promoter_signatory_details_status(sender, instance, **kwargs):
+    instance.promoter_detail.status = "in progress"
+    instance.promoter_detail.save(update_fields=["status"])

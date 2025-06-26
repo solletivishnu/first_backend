@@ -1,12 +1,13 @@
 from django.core.validators import RegexValidator
 from django.db import models
 from .helpers import *
-from djongo.models import ArrayField, EmbeddedField, JSONField
-from usermanagement.models import Users, Business
+from django.contrib.postgres.fields import ArrayField
+from django.db.models import JSONField
+from usermanagement.models import Users, Business, GSTDetails
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.core.exceptions import ValidationError
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import post_save, post_delete, pre_delete
 from django.dispatch import receiver
 from datetime import date
 from django.db.models import Q
@@ -83,7 +84,8 @@ class InvoiceFormat(models.Model):
     #     default=False,
     #     help_text="Indicates if this format applies to all GSTINs under the invoicing profile"
     # )
-    is_common_format = models.CharField(max_length=10, choices=[('yes', 'Yes'), ('no', 'No')], default='yes')
+    is_common_format = models.BooleanField(default=True,
+                            help_text="Indicates if this format applies to all GSTINs under the invoicing profile")
     gstin = models.CharField(max_length=20, null=True, blank=False)
     prefix = models.CharField(max_length=20, blank=True, null=True)
     series_code = models.CharField(max_length=10, blank=True, null=True)
@@ -127,13 +129,16 @@ class CustomerProfile(models.Model):
     state = models.CharField(max_length=30, null=True, blank=True)
     postal_code = models.CharField(max_length=10, null=True, blank=True)
     city = models.CharField(max_length=30, null=True, blank=True)
-    gst_registered = models.CharField(max_length=100, null=True, blank=True)
+    gst_registered = models.BooleanField(default=False, null=True, blank=True)
     gstin = models.CharField(max_length=100, null=True, blank=True)
     gst_type = models.CharField(max_length=60, null=True, blank=True)
     email = models.CharField(max_length=100, null=True, blank=True)
     mobile_number = models.CharField(max_length=15, null=True, blank=True)
     opening_balance = models.IntegerField(null=True)
     entity_type = models.CharField(max_length=100, null=True, blank=True, default=None)
+    has_multiple_branches = models.BooleanField(default=False, null=True, blank=True)
+    branches = JSONField(default=list, blank=True, null=True,
+                                help_text="List of branches with their details if has_multiple_branches is True")
 
     def __str__(self):
         return f"Customer: {self.name}"
@@ -150,6 +155,9 @@ class GoodsAndServices(models.Model):
     tax_preference = models.CharField(max_length=60, null=True, blank=True)
     selling_price = models.IntegerField(null=True)
     description = models.CharField(max_length=200, null=True, blank=True)
+
+    class Meta:
+        unique_together = ("invoicing_profile", "name")
 
     def __str__(self):
         return f"{self.name} - GST Rate: {self.gst_rate}%"
@@ -239,6 +247,7 @@ class Invoice(models.Model):
     invoice_status = models.CharField(max_length=60, null=False, blank=False)
     customer_gstin = models.CharField(max_length=100, null=True, blank=True)
     customer_pan = models.CharField(max_length=100, null=True, blank=True)
+    customer_branch = models.CharField(max_length=100, null=True, blank=True)
 
     def __str__(self):
         return f"Invoice: {self.invoice_number}"
@@ -310,3 +319,27 @@ def update_invoice_payment_status_on_delete(sender, instance, **kwargs):
     Triggered when a CustomerInvoiceReceipt is deleted.
     """
     instance.invoice.update_payment_status()
+
+
+@receiver(pre_delete, sender=GSTDetails)
+def delete_gst_details(sender, instance, **kwargs):
+    """
+    Triggered before a GSTDetails instance is deleted.
+    Deletes associated InvoiceFormat records where the invoicing_profile and gstin match.
+    """
+    try:
+        # Get related invoicing profile using GSTDetails.gstin
+        invoicing_profile = InvoicingProfile.objects.get(business=instance.business)
+
+        # Filter InvoiceFormat records matching this invoicing_profile and gstin
+        invoice_formats = InvoiceFormat.objects.filter(
+            invoicing_profile=invoicing_profile,
+            gstin=instance.gstin
+        )
+
+        # Delete the matching InvoiceFormat records
+        if invoice_formats.exists():
+            invoice_formats.delete()
+
+    except InvoicingProfile.DoesNotExist:
+        pass

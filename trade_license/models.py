@@ -1,7 +1,8 @@
 from django.db import models
 from Tara.settings.default import *
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
-from djongo.models import ArrayField, EmbeddedField, JSONField
+from django.contrib.postgres.fields import ArrayField
+from django.db.models import JSONField
 from .helpers import *
 from usermanagement.models import Users, ServiceRequest
 from servicetasks.models import ServiceTask
@@ -257,8 +258,9 @@ class BusinessDocumentDetails(models.Model):
 class ReviewFilingCertificate(models.Model):
     REVIEW_STATUS_CHOICES = [
         ('in progress', 'In Progress'),
-        ('resubmission', 'Resubmission'),
-        ('done', 'Done'),
+        ('completed', 'Completed'),
+        ('sent for approval', 'Sent for Approval'),
+        ('revoked', 'Revoked')
     ]
 
     FILING_STATUS_CHOICES = [
@@ -289,6 +291,9 @@ class ReviewFilingCertificate(models.Model):
 
     review_certificate = models.FileField(upload_to=review_filing_certificate,
                                           null=True, blank=True, storage=PrivateS3Storage())
+
+    draft_filing_certificate = models.FileField(upload_to=draft_filing_certificate,
+                                                null=True, blank=True, storage=PrivateS3Storage())
     review_certificate_status = models.CharField(
         max_length=20,
         choices=REVIEW_STATUS_CHOICES,
@@ -443,10 +448,22 @@ def sync_review_filing_certificate_service_task_status(sender, instance, **kwarg
     task = instance.service_task
 
     # Sync status
-    if task.status != instance.review_certificate_status:
-        task.status = instance.review_certificate_status
+    if task.status != instance.status:
+        task.status = instance.status
 
     # Sync completion %
     task.completion_percentage = calculate_completion_percentage(instance)
 
     task.save()
+
+
+@receiver(post_save, sender=AdditionalSpaceBusiness)
+def sync_business_location_status(sender, instance, **kwargs):
+    instance.business_locations.status = "in progress"
+    instance.business_locations.save()
+
+
+@receiver(post_save, sender=SignatoryInfo)
+def sync_signatory_info_status(sender, instance, **kwargs):
+    instance.signatory_details.status = "in progress"
+    instance.signatory_details.save()

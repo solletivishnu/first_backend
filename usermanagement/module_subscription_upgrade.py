@@ -62,7 +62,7 @@ def upgrade_module_subscription(request):
             )
 
         # Get optional fields
-        auto_renew = request.data.get('auto_renew', 'no')
+        auto_renew = request.data.get('auto_renew', False)
         add_ons = request.data.get('add_ons', [])
 
         # Get existing subscription with related data
@@ -91,7 +91,7 @@ def upgrade_module_subscription(request):
                 # Get current active cycle using the reverse relationship
                 current_cycle = SubscriptionCycle.objects.filter(
                     subscription=subscription,
-                    is_paid='yes',
+                    is_paid=True,
                     end_date__gt=timezone.now()
                 ).first()
 
@@ -126,7 +126,7 @@ def upgrade_module_subscription(request):
                 start_date=timezone.now(),
                 end_date=new_end_date,
                 amount=base_price,
-                is_paid='no',
+                is_paid=False,
                 feature_usage={}
             )
 
@@ -169,7 +169,7 @@ def upgrade_module_subscription(request):
 
             # Get current cycle details
             current_cycle = subscription.cycles.filter(
-                is_paid='yes',
+                is_paid=True,
                 end_date__gt=timezone.now()
             ).first()
 

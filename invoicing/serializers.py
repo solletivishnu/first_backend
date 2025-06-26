@@ -15,13 +15,19 @@ class CustomerProfileSerializers(serializers.Serializer):
     address_line2 = serializers.CharField(max_length=200, allow_null=True, allow_blank=True)
     state = serializers.CharField(max_length=30, allow_null=True, allow_blank=True)
     postal_code = serializers.CharField(max_length=10, allow_null=True, allow_blank=True)
-    gst_registered = serializers.CharField(max_length=100, allow_null=True, allow_blank=True)
+    gst_registered = serializers.BooleanField(default=False)
     gstin = serializers.CharField(max_length=100, allow_null=True, allow_blank=True)
     gst_type = serializers.CharField(max_length=60, allow_null=True, allow_blank=True)
     email = serializers.CharField(max_length=100, allow_null=True, allow_blank=True)
     mobile_number = serializers.CharField(max_length=15, allow_null=True, allow_blank=True)
     opening_balance = serializers.IntegerField(allow_null=True)
     entity_type = serializers.CharField(max_length=100, allow_null=True, allow_blank=True)
+    has_multiple_branches = serializers.BooleanField(default=False)
+    branches = serializers.JSONField(
+        allow_null=True,
+        default=list,
+        help_text="List of branches in JSON format"
+    )
 
     def create(self, validated_data):
         """
@@ -72,6 +78,32 @@ class GoodsAndServicesSerializer(serializers.Serializer):
             'unit_price',
             'description'
         ]
+
+    def validate(self, data):
+        """
+        Check that the name is unique for each invoicing profile.
+        """
+        invoicing_profile = data.get('invoicing_profile')
+        name = data.get('name')
+        instance = getattr(self, 'instance', None)
+
+        if name and invoicing_profile:
+            # Check if another GoodsAndServices with same name exists for this profile
+            existing = GoodsAndServices.objects.filter(
+                invoicing_profile=invoicing_profile,
+                name=name
+            )
+            
+            # If updating, exclude current instance from the check
+            if instance:
+                existing = existing.exclude(pk=instance.pk)
+            
+            if existing.exists():
+                raise serializers.ValidationError({
+                    'name': 'A goods and service with name "{}" already exists for this invoicing profile.'.format(name)
+                })
+        
+        return data
 
     def create(self, validated_data):
         """
@@ -168,7 +200,7 @@ class InvoiceSerializer(serializers.Serializer):
         default=[],
     )
     gstin = serializers.CharField(max_length=60, allow_null=True)
-    branch_code = serializers.CharField(max_length=60, allow_null=True, allow_blank=True)
+    branch_code = serializers.CharField(max_length=60, allow_null=True, allow_blank=True, required=False)
     total_amount = serializers.FloatField(allow_null=True)
     subtotal_amount = serializers.FloatField(allow_null=True)
     shipping_amount = serializers.FloatField(allow_null=True)
@@ -187,6 +219,7 @@ class InvoiceSerializer(serializers.Serializer):
     customer_gstin = serializers.CharField(max_length=60, allow_null=True,allow_blank=False)
     customer_pan = serializers.CharField(max_length=60, allow_null=True,allow_blank=False)
     invoice_status = serializers.CharField(max_length=60, allow_null=False, allow_blank=False)
+    customer_branch = serializers.CharField(max_length=200, allow_null=True, allow_blank=True)
 
     def create(self, validated_data):
         """
@@ -279,6 +312,12 @@ class InvoicingProfileSerializer(serializers.ModelSerializer):
 
 
 class CustomerProfileGetSerializers(serializers.ModelSerializer):
+    branches = serializers.JSONField(
+        allow_null=True,
+        default=list,
+        help_text="List of branches in JSON format"
+    )
+
     class Meta:
         model = CustomerProfile
         exclude = ['invoicing_profile']
@@ -392,13 +431,18 @@ class InvoicingProfileInvoices(serializers.ModelSerializer):
         """
         request = self.context.get('request')
         financial_year = request.query_params.get('financial_year') if request else None
+        month = request.query_params.get('month') if request else None
 
         # Get all invoices related to the InvoicingProfile instance (obj)
         invoices = obj.invoices.all()
 
         # Apply the financial_year filter if provided
         if financial_year:
-            invoices = invoices.filter(financial_year=financial_year)
+            if month:
+                # If month is provided, filter by both financial_year and month
+                invoices = invoices.filter(financial_year=financial_year, month=month)
+            else:
+                invoices = invoices.filter(financial_year=financial_year)
 
         # Serialize the filtered invoices using the InvoicesSerializer
         return InvoicesSerializer(invoices, many=True).data

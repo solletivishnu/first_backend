@@ -1,113 +1,58 @@
 from rest_framework import serializers
 from .models import *
 
-
-class CompanyIncorporationSerializer(serializers.ModelSerializer):
+class ProposedCompanyDetailsSerializer(serializers.ModelSerializer):
     class Meta:
-        model = CompanyIncorporation
+        model = ProposedCompanyDetails
         fields = '__all__'
 
-    def create(self, validated_data):
-        return CompanyIncorporation.objects.create(**validated_data)
-
-    def update(self, instance, validated_data):
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
-        return instance
+class RegisteredOfficeAddressDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RegisteredOfficeAddressDetails
+        fields = '__all__'
 
 
-class CompanyIncorporationSerializerRetrieval(serializers.ModelSerializer):
-    address = serializers.JSONField()
+class AuthorizedPaidUpShareCapitalSerializer(serializers.ModelSerializer):
 
     class Meta:
-        model = CompanyIncorporation
+        model = AuthorizedPaidUpShareCapital
         fields = '__all__'
 
 
 class DirectorsDetailsSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = DirectorsDetails
-        fields = '__all__'
-
-        def create(self, validated_data):
-            return ShareHoldersInformation.objects.create(**validated_data)
-
-        def update(self, instance, validated_data):
-            for attr, value in validated_data.items():
-                setattr(instance, attr, value)
-            instance.save()
-            return instance
-
-
-
-class DirectorsDetailsSerializerRetrieval(serializers.ModelSerializer):
-    address = serializers.JSONField()
-    shareholder_details = serializers.JSONField()
+    no_of_shares = serializers.IntegerField(min_value=0, allow_null= True, required = False)
+    shareholding_percentage = serializers.FloatField(allow_null= True, required = False)
+    paid_up_capital = serializers.IntegerField(allow_null= True, required = False)
 
     class Meta:
         model = DirectorsDetails
         fields = '__all__'
 
 
-class AuthorizedAndPaidUpCapitalSerializer(serializers.ModelSerializer):
+
+class DirectorsSerializer(serializers.ModelSerializer):
+    directors = DirectorsDetailsSerializer(many=True, read_only=True)
+
     class Meta:
-        model = AuthorizedAndPaidupCapital
+        model = Directors
         fields = '__all__'
 
-    def create(self, validated_data):
-        return AuthorizedAndPaidupCapital.objects.create(**validated_data)
-
-    def update(self, instance, validated_data):
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
-        return instance
-
-
-class ShareHoldersInformationSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ShareHoldersInformation
-        fields = '__all__'
-
-    def create(self, validated_data):
-        return ShareHoldersInformation.objects.create(**validated_data)
-
-    def update(self, instance, validated_data):
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
-        return instance
-
-
-class ShareHoldersInformationSerializerRetrieval(serializers.ModelSerializer):
-    address = serializers.JSONField()
+class ShareholdersDetailsSerializer(serializers.ModelSerializer):
+    shareholding_percentage = serializers.FloatField(allow_null=True)
 
     class Meta:
-        model = ShareHoldersInformation
+        model = ShareholdersDetails
         fields = '__all__'
 
 
-class DetailsOfExistingDirectorshipsSerializer(serializers.ModelSerializer):
+class ShareholdersSerializer(serializers.ModelSerializer):
+    shareholders = ShareholdersDetailsSerializer(many=True, read_only=True)
     class Meta:
-        model = DetailsOfExistingDirectorships
+        model = Shareholders
         fields = '__all__'
 
-    def create(self, validated_data):
-        return DetailsOfExistingDirectorships.objects.create(**validated_data)
 
-    def update(self, instance, validated_data):
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
-        return instance
-
-
-class CompanyIncorporationDataSerializer(serializers.ModelSerializer):
-    directors_details = DirectorsDetailsSerializer(many=True, read_only=True)
-    authorized_capital = AuthorizedAndPaidUpCapitalSerializer(many=True, read_only=True)
-    share_holders = ShareHoldersInformationSerializer(many=True, read_only=True)
-
+class ReviewFilingCertificateSerializer(serializers.ModelSerializer):
     class Meta:
-        model = CompanyIncorporation
+        model = ReviewFilingCertificate
         fields = '__all__'

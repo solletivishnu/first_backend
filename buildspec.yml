@@ -3,14 +3,12 @@ version: 0.2
 cache:
   paths:
     - '/root/.cache/pip/**/*'  # Cache pip dependencies
-    - 'staticfiles/**/*'       # Cache static files
     - '/tmp/previous_*'        # Cache requirements hash file
 
 phases:
   pre_build:
     commands:
       - echo "Starting pre-build phase..."
-      - echo "Testing the phase >>>>"
       - |
         # Check if requirements.txt has changed by comparing their hashes
         if [ ! -f /tmp/previous_requirements.txt ] || ! cmp -s requirements.txt /tmp/previous_requirements.txt; then
@@ -24,20 +22,7 @@ phases:
   build:
     commands:
       - echo "Starting build phase..."
-      - |
-        # Check if staticfiles directory exists, create if missing
-        if [ ! -d "staticfiles" ]; then
-          echo "Staticfiles directory not found, creating directory..."
-          mkdir -p staticfiles
-        fi
-
-        # Check if static files are empty, then collect if needed
-        if [ "$(find staticfiles -type f | wc -l)" -eq "0" ]; then
-          echo "Static files not found or empty, running collectstatic..."
-          python3 manage.py collectstatic --noinput
-        else
-          echo "Static files already collected, skipping collectstatic."
-        fi
+      - echo "No static files to collect. Skipping collectstatic."
 
   post_build:
     commands:

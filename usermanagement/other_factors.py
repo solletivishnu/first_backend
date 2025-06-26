@@ -7,8 +7,6 @@ from .serializers import (UsersKYCSerializer, UserActivationSerializer,
 from django.db.models import Count
 from .serializers import *
 from password_generator import PasswordGenerator
-from drf_yasg.utils import swagger_auto_schema
-from drf_yasg import openapi
 from rest_framework.views import APIView
 import traceback
 from django.db import DatabaseError, IntegrityError
@@ -431,7 +429,7 @@ class ActivateUserView(APIView):
             return Response({"message": "Invalid activation link"}, status=status.HTTP_400_BAD_REQUEST)
 
         if default_token_generator.check_token(user, token):
-            user.is_active = "yes"
+            user.is_active = True
             user.save()
             logger.info(f"User account with UID {uid} successfully activated.")
             return Response({"message": "Account activated successfully"}, status=status.HTTP_200_OK)
@@ -478,15 +476,6 @@ class ChangePasswordView(APIView):
 
 class TestProtectedAPIView(APIView):
 
-    @swagger_auto_schema(
-        operation_description="Test protected endpoint",
-        responses={
-            200: openapi.Response("Success", openapi.Schema(type=openapi.TYPE_OBJECT, properties={
-                "message": openapi.Schema(type=openapi.TYPE_STRING)
-            })),
-            403: openapi.Response("Forbidden")
-        }
-    )
     def get(self, request):
         """
         Protected endpoint for authenticated users.
@@ -1530,23 +1519,6 @@ class VisaApplicationDetailAPIView(APIView):
     permission_classes = [GroupPermission]
     permission_required = "VS_Task_View"
 
-    @swagger_auto_schema(
-        operation_description="Retrieve details of a specific visa application by ID.",
-        tags=["VisaApplication"],
-        responses={
-            200: "Visa application details retrieved successfully.",
-            404: "Visa application not found."
-        },
-        manual_parameters=[
-                    openapi.Parameter(
-                        'Authorization',
-                        openapi.IN_HEADER,
-                        description="Bearer <JWT Token>",
-                        type=openapi.TYPE_STRING,
-                        required=True,
-                    ),
-                ]
-    )
     def get(self, request, pk):
         try:
             # visa_application = VisaApplications.objects.get(user_id=pk)
@@ -1613,16 +1585,6 @@ class VisaApplicationDetailAPIView(APIView):
 
     permission_required = "VS_Task_Edit"
 
-    @swagger_auto_schema(
-        operation_description="Update an existing visa application by ID.",
-        tags=["VisaApplication"],
-        request_body=VisaApplicationsSerializer,
-        responses={
-            200: "Visa application updated successfully.",
-            400: "Invalid data.",
-            404: "Visa application not found."
-        }
-    )
     def put(self, request, pk):
         try:
             visa_application = VisaApplications.objects.get(pk=pk)
@@ -1638,14 +1600,7 @@ class VisaApplicationDetailAPIView(APIView):
     # For DELETE
     permission_required = "VS_Task_Delete"  # Define the required permission for DELETE method
 
-    @swagger_auto_schema(
-        operation_description="Delete a visa application by ID.",
-        tags=["VisaApplication"],
-        responses={
-            204: "Visa application deleted successfully.",
-            404: "Visa application not found."
-        }
-     )
+
     def delete(self, request, pk):
         try:
             visa_application = VisaApplications.objects.get(pk=pk)
@@ -1964,52 +1919,7 @@ def collect_service_data(serializer_data, user_role):
                 return {"error": f"Unexpected error: {e}"}, False
     return all_services, True
 
-@swagger_auto_schema(
-    method='get',
-    operation_description="Retrieve all service data irrespective of their statuses"
-                          " (pending, in-progress, completed, etc.) for "
-                          "Visa Applications under the logged-in ServiceProviderAdmin.",
-    tags=["VisaApplicantsAllTasks"],
-    responses={
-        200: openapi.Response(
-            description="A list of all services.",
-            examples={
-                "application/json": [
-                    {
-                        "service_id": 1,
-                        "service_type": "Visa Renewal",
-                        "service_name": "Renewal Service",
-                        "visa_application_name": "John Doe",
-                        "comments": "Urgent processing required",
-                        "quantity": 1,
-                        "date": "2024-12-11",
-                        "status": "in_progress"
-                    },
-                    {
-                        "service_id": 2,
-                        "service_type": "New Visa",
-                        "service_name": "New Application Service",
-                        "visa_application_name": "Jane Smith",
-                        "comments": "",
-                        "quantity": 1,
-                        "date": "2024-12-10",
-                        "status": "completed"
-                    }
-                ]
-            }
-        ),
-        403: openapi.Response("Unauthorized access."),
-    },
-    manual_parameters=[
-        openapi.Parameter(
-            'Authorization',
-            openapi.IN_HEADER,
-            description="Bearer <JWT Token>",
-            type=openapi.TYPE_STRING,
-            required=True
-        )
-    ]
-)
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 @has_group_permission('VS_Task_View')
@@ -2052,14 +1962,6 @@ def all_service_data(request):
         )
 
 
-auth_header = openapi.Parameter(
-    'Authorization',
-    in_=openapi.IN_HEADER,
-    description="Bearer <JWT Token>",
-    type=openapi.TYPE_STRING,
-    required=True
-)
-
 class ServiceDetailsAPIView(APIView):
     permission_classes = [IsAuthenticated]
     permission_required = "VS_Task_View"
@@ -2073,16 +1975,6 @@ class ServiceDetailsAPIView(APIView):
                 user.user_type == 'ServiceProvider'
         )
 
-    @swagger_auto_schema(
-        operation_description="Retrieve a specific ServiceDetails instance by ID.",
-        tags=["VisaServiceTasks"],
-        manual_parameters=[auth_header],
-        responses={
-            200: ServiceDetailsSerializer(),
-            401: "Unauthorized - Missing or invalid token.",
-            404: "Service not found.",
-        },
-    )
     def get(self, request, pk):
         """Retrieve a specific ServiceDetails instance by ID."""
         print("****")
@@ -2095,51 +1987,9 @@ class ServiceDetailsAPIView(APIView):
         serializer = ServiceDetailsSerializer(service)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    request_body = openapi.Schema(
-        type=openapi.TYPE_OBJECT,
-        properties={
-            'visa_application': openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties={
-                    'user': openapi.Schema(type=openapi.TYPE_INTEGER),
-                    'passport_number': openapi.Schema(type=openapi.TYPE_STRING),
-                    'purpose': openapi.Schema(type=openapi.TYPE_STRING),
-                    'visa_type': openapi.Schema(type=openapi.TYPE_STRING),
-                    'destination_country': openapi.Schema(type=openapi.TYPE_STRING)
-                },
-                required=['user', 'passport_number', 'purpose', 'visa_type', 'destination_country']
-            ),
-            'service': openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties={
-                    'id': openapi.Schema(type=openapi.TYPE_INTEGER),
-                    'service_type_id': openapi.Schema(type=openapi.TYPE_INTEGER),
-                    'date': openapi.Schema(type=openapi.FORMAT_DATETIME),
-                    'status': openapi.Schema(type=openapi.TYPE_STRING),
-                    'comments': openapi.Schema(type=openapi.TYPE_STRING),
-                    'quantity': openapi.Schema(type=openapi.TYPE_INTEGER),
-                    'last_updated': openapi.Schema(type=openapi.FORMAT_DATETIME),
-                },
-                required=['id', 'service_type_id', 'date', 'status', 'comments', 'quantity', 'last_updated']
-            ),
-        },
-        required=['visa_application', 'service']
-    )
 
     permission_required = "VS_Task_Edit"
 
-    @swagger_auto_schema(
-        operation_description="Partially update a specific ServiceDetails instance (partial=True).",
-        tags=["VisaServiceTasks"],
-        manual_parameters=[auth_header],
-        request_body=request_body,
-        responses={
-            200: ServiceDetailsSerializer(),
-            400: "Validation error.",
-            401: "Unauthorized - Missing or invalid token.",
-            404: "Service not found.",
-        },
-    )
     def put(self, request, pk):
         """Partially update a specific ServiceDetails instance (partial=True)."""
         if not self.has_permission(request.user):
@@ -2185,16 +2035,7 @@ class ServiceDetailsAPIView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     permission_required = "VS_Task_Delete"
-    @swagger_auto_schema(
-        operation_description="Delete a specific ServiceDetails instance by ID.",
-        tags=["VisaServiceTasks"],
-        manual_parameters=[auth_header],
-        responses={
-            204: "Service deleted successfully.",
-            401: "Unauthorized - Missing or invalid token.",
-            404: "Service not found.",
-        },
-    )
+
     def delete(self, request, pk):
         """Delete a specific ServiceDetails instance."""
         if not self.has_permission(request.user):
@@ -2267,6 +2108,7 @@ def contact_detail(request, pk):
             return Response({"message": "Contact deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
         except Exception as e:
             return Response({"error": f"Failed to delete contact: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
 
 @api_view(["GET"])
 def list_contacts_by_date(request):

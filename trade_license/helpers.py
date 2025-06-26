@@ -144,3 +144,12 @@ def review_filing_certificate(instance, filename):
     # Construct the upload path
     return os.path.join('service_requests',  'Trade License', service_request_id,
                         'review_filing_certificate', filename)
+
+
+def draft_filing_certificate(instance, filename):
+    # Get the name of the business, replace spaces with underscores
+    service_request_id = str(instance.service_request.id)
+    # Construct the upload path
+    return os.path.join('service_requests',  'Trade License', service_request_id,
+                        'draft_filing_certificate', filename)
+

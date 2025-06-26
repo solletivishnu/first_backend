@@ -1,12 +1,5 @@
 from rest_framework import serializers
-from .models import (
-    BasicBusinessInfo,
-    RegistrationInfo,
-    PrincipalPlaceDetails,
-    PromoterSignatoryDetails,
-    GSTReviewFilingCertificate,
-    PromoterSignatoryInfo
-)
+from .models import *
 
 
 class BasicBusinessInfoSerializer(serializers.ModelSerializer):

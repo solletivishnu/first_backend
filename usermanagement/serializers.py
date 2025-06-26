@@ -6,6 +6,7 @@ from .models import (
 from .models import *
 from django.utils.timezone import now
 import re
+from datetime import date
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -469,6 +470,9 @@ class BusinessSerializer(serializers.ModelSerializer):
 
 class GSTDetailsSerializer(serializers.ModelSerializer):
     gst_document = serializers.FileField(allow_null=True, required=False)
+    lut_letter = serializers.FileField(allow_null=True, required=False)
+    valid_date = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
 
     class Meta:
         model = GSTDetails
@@ -489,6 +493,26 @@ class GSTDetailsSerializer(serializers.ModelSerializer):
         [setattr(instance, k, v) for k, v in validated_data.items()]
         instance.save()
         return instance
+
+    def get_financial_year_end_date(self, dob):
+        """Helper method to calculate March 31st of the financial year based on DOB."""
+        if dob:
+            year = dob.year
+            month = dob.month
+            financial_year = year + 1 if month >= 4 else year
+            return date(financial_year, 3, 31)
+        return None
+
+    def get_valid_date(self, obj):
+        fy_end_date = self.get_financial_year_end_date(obj.dob)
+        return fy_end_date.strftime("%d-%m-%Y") if fy_end_date else None
+
+    def get_status(self, obj):
+        fy_end_date = self.get_financial_year_end_date(obj.dob)
+        if fy_end_date:
+            return "active" if fy_end_date > date.today() else "expired"
+        return None
+
 
 
 class BranchSerializer(serializers.ModelSerializer):

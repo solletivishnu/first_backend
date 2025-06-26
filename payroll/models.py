@@ -1,6 +1,7 @@
 from django.db import models
 from django.core.exceptions import ValidationError
-from djongo.models import ArrayField, EmbeddedField, JSONField
+from django.contrib.postgres.fields import ArrayField
+from django.db.models import JSONField
 from .helpers import *
 from usermanagement.models import *
 from datetime import date

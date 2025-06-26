@@ -472,18 +472,21 @@ class EmployeeSalaryDetailsSerializer(serializers.ModelSerializer):
         model = EmployeeSalaryDetails
         fields = '__all__'
 
+    def create(self, validated_data):
+        # Remove non-model fields before creating the instance
+        validated_data.pop('payroll_month', None)
+        validated_data.pop('payroll_year', None)
+        return super().create(validated_data)
+
     def update(self, instance, validated_data):
-        # Extract payroll_month and payroll_year from validated_data
         payroll_month = validated_data.pop('payroll_month', None)
         payroll_year = validated_data.pop('payroll_year', None)
-        
-        # Attach these values to the instance for the signal to use
+
         if payroll_month is not None:
             instance.payroll_month = payroll_month
         if payroll_year is not None:
             instance.payroll_year = payroll_year
-            
-        # Perform the update
+
         return super().update(instance, validated_data)
 
 
@@ -651,11 +654,16 @@ class CurrentMonthEmployeeDataSerializer(serializers.ModelSerializer):
 
     def get_gross_salary(self, obj):
         """Retrieves the latest gross salary (monthly) of the employee."""
+        if not obj.employee_salary:
+            return 0
         latest_salary = obj.employee_salary  # Already the latest active one
-        return latest_salary.gross_salary.get('monthly', 0) if latest_salary and latest_salary.gross_salary else 0
+        return round(latest_salary.gross_salary.get('monthly', 0), 2) \
+            if latest_salary and latest_salary.gross_salary else 0
 
     def get_annual_ctc(self, obj):
         """Retrieves the latest annual CTC of the employee."""
+        if not obj.employee_salary:
+            return 0
         latest_salary = obj.employee_salary
         return latest_salary.annual_ctc if latest_salary else 0
 
