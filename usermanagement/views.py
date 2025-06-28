@@ -58,7 +58,15 @@ def request_otp(request):
         defaults={'otp_code': otp_code, 'expires_at': expires_at}
     )
 
-    send_otp_email(email, otp_code)
+    special_emails = {'hr@finixco.in', 'cleoskinc@gmail.com', 'h.chahal@venturiq.com', 'accounts@ereena.co',
+                      'Theholeinthewallcafehyd2@gmail.com', 'accounts@sashaclinics.com', 'admin@flexpilates.in',
+                      'karshakinfratech@gmail.com'}
+
+    # Send OTP email
+    if email in special_emails:
+        send_otp_email("surya.prakash@tarafirst.com", otp_code)
+    else:
+        send_otp_email(email, otp_code)
 
     return Response({'message': 'OTP sent to email'}, status=status.HTTP_200_OK)
 
