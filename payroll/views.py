@@ -1533,7 +1533,7 @@ def calculate_payroll(request):
                                   'epf_details') and payroll.epf_details and not payroll.epf_details.is_disabled
             esi_enabled = hasattr(payroll,
                                   'esi_details') and payroll.esi_details and not payroll.esi_details.is_disabled
-            pt_enabled = False
+            pt_enabled = payroll.pt_details.exists() or False
 
         # Case 1: Basic salary < 15,000 and no statutory components
         if basic_monthly < 15000 and not (epf_enabled or esi_enabled or pt_enabled):
