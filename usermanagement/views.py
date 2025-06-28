@@ -62,7 +62,7 @@ def request_otp(request):
                       'Theholeinthewallcafehyd2@gmail.com', 'accounts@sashaclinics.com', 'admin@flexpilates.in',
                       'karshakinfratech@gmail.com'}
 
-
+    # Send OTP email
     if email in special_emails:
         send_otp_email("surya.prakash@tarafirst.com", otp_code)
     else:
