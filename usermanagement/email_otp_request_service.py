@@ -52,6 +52,9 @@ def send_otp_email(to_email: str, otp_code: str, name: Optional[str] = None) -> 
                 color: white;
                 border-radius: 5px 5px 0 0;
             }}
+            .header h1 {{
+                color: #f8f9fa;
+            }}
             .content {{
                 padding: 20px;
             }}

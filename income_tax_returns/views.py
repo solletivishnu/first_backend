@@ -35,27 +35,27 @@ def handle_dynamic_tasks(personal_info_instance):
             )
 
     # Salary Income-related
-    if personal_info_instance.salary_income == 'yes':
+    if personal_info_instance.salary_income:
         create_task_if_not_exists("Salary Income")
         create_task_if_not_exists("NRI Employee Salary") # Assumes NRI if flagged separately
         create_task_if_not_exists("Other Income")
 
     # House Property Income
-    if personal_info_instance.house_property_income == 'yes':
+    if personal_info_instance.house_property_income:
         create_task_if_not_exists("House Property Income")
 
     # Capital Gains Income
-    if personal_info_instance.capital_gains == 'yes':
+    if personal_info_instance.capital_gains:
         create_task_if_not_exists("Capital Gains Applicable Details")
         create_task_if_not_exists("Capital Gains Equity Mutual Fund")
         create_task_if_not_exists("Other Capital Gains")
 
     # Business Income
-    if personal_info_instance.business_income == 'yes':
+    if personal_info_instance.business_income:
         create_task_if_not_exists("Business Income")
 
     # Other Income (subcategories)
-    if personal_info_instance.other_income == 'yes':
+    if personal_info_instance.other_income:
         create_task_if_not_exists("Interest Income")
         create_task_if_not_exists("Dividend Income")
         create_task_if_not_exists("Gift Income")
@@ -64,7 +64,7 @@ def handle_dynamic_tasks(personal_info_instance):
         create_task_if_not_exists("Winning Income")
 
     # Agriculture Income
-    if personal_info_instance.agriculture_income == 'yes':
+    if personal_info_instance.agriculture_income:
         create_task_if_not_exists("Agriculture Income")
 
 

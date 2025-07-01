@@ -95,7 +95,8 @@ def business_classification_list(request):
                 nic_codes = json.loads(data['nic_codes'])
                 data['nic_codes'] = json.dumps(nic_codes)
             except json.JSONDecodeError:
-                return Response({"error": "Invalid JSON format for nic_codes"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "Invalid JSON format for nic_codes"},
+                                status=status.HTTP_400_BAD_REQUEST)
 
         if 'number_of_persons_employed' in data and isinstance(data['number_of_persons_employed'], str):
             try:
@@ -138,7 +139,8 @@ def business_classification_detail(request, pk):
                 nic_codes = json.loads(data['nic_codes'])
                 data['nic_codes'] = json.dumps(nic_codes)
             except json.JSONDecodeError:
-                return Response({"error": "Invalid JSON format for nic_codes"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "Invalid JSON format for nic_codes"},
+                                status=status.HTTP_400_BAD_REQUEST)
 
         if 'number_of_persons_employed' in data and isinstance(data['number_of_persons_employed'], str):
             try:
@@ -370,7 +372,8 @@ def location_of_plant_or_unit_list(request):
                 unit_details = json.loads(data['unit_details'])
                 data['unit_details'] = json.dumps(unit_details)
             except json.JSONDecodeError:
-                return Response({"error": "Invalid JSON format for unit_details"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "Invalid JSON format for unit_details"},
+                                status=status.HTTP_400_BAD_REQUEST)
 
         serializer = LocationOfPlantOrUnitSerializer(data=data)
         if serializer.is_valid():
@@ -404,7 +407,8 @@ def location_of_plant_or_unit_detail(request, pk):
                 unit_details = json.loads(data['unit_details'])
                 data['unit_details'] = json.dumps(unit_details)
             except json.JSONDecodeError:
-                return Response({"error": "Invalid JSON format for unit_details"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "Invalid JSON format for unit_details"},
+                                status=status.HTTP_400_BAD_REQUEST)
 
         serializer = LocationOfPlantOrUnitSerializer(location, data=data, partial=True)
         if serializer.is_valid():

@@ -2,6 +2,8 @@ from rest_framework import serializers
 from .models import *
 from datetime import date, datetime
 from calendar import monthrange
+from rest_framework.exceptions import ValidationError
+from django.db.models import Q
 
 
 class PayrollOrgSerializer(serializers.ModelSerializer):
@@ -435,33 +437,43 @@ class EmployeeManagementSerializer(serializers.ModelSerializer):
         model = EmployeeManagement
         fields = '__all__'
 
+    def validate_unique_fields(self, validated_data, instance=None):
+        payroll_id = validated_data.get('payroll')
+        work_email = validated_data.get('work_email')
+        mobile_number = validated_data.get('mobile_number')
+        associate_id = validated_data.get('associate_id')
+        uan = validated_data.get('statutory_components', {}).get('employee_provident_fund', {}).get('uan')
+
+        # Build base queryset excluding the current instance (if update)
+        qs = EmployeeManagement.objects.filter(payroll_id=payroll_id)
+        if instance:
+            qs = qs.exclude(pk=instance.pk)
+
+        # Check conflicts
+        existing = qs.filter(
+            Q(work_email=work_email) |
+            Q(mobile_number=mobile_number) |
+            Q(associate_id=associate_id)
+        ).first()
+
+        if existing:
+            if existing.work_email == work_email:
+                raise ValidationError("A record with this Work Email already exists.")
+            if existing.mobile_number == mobile_number:
+                raise ValidationError("A record with this Mobile Number already exists.")
+            if existing.associate_id == associate_id:
+                raise ValidationError("A record with this Employee ID already exists.")
+
+        if uan and qs.filter(statutory_components__employee_provident_fund__uan=uan).exists():
+            raise ValidationError("A record with this UAN already exists.")
+
     def create(self, validated_data):
-        statutory_components = validated_data.get('statutory_components', {})
-        # Check for duplicate PAN
-        if EmployeeManagement.objects.filter(work_email=validated_data.get('work_email'),
-                                             payroll_id=validated_data.get('payroll')).exists():
-            raise ValidationError("A record with this Work Email already exists")
-
-        # Check for duplicate Aadhar
-        if EmployeeManagement.objects.filter(mobile_number=validated_data.get('mobile_number'),
-                                             payroll_id=validated_data.get('payroll')).exists():
-            raise ValidationError("A record with this Mobile Number already exists.")
-        if EmployeeManagement.objects.filter(associate_id=validated_data.get('associate_id'),
-                                             payroll_id=validated_data.get('payroll')).exists():
-            raise ValidationError("A record with this Employee ID already exists.")
-
-        uan = statutory_components.get('employee_provident_fund', {}).get('uan')
-        if uan:
-            # This fetches all records and manually checks the nested UAN field
-            for emp in EmployeeManagement.objects.filter(payroll_id=validated_data.get('payroll')):
-                existing_uan = (
-                    emp.statutory_components.get('employee_provident_fund', {}).get('uan')
-                    if emp.statutory_components else None
-                )
-                if existing_uan == uan:
-                    raise ValidationError("A record with this UAN already exists.")
-
+        self.validate_unique_fields(validated_data)
         return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        self.validate_unique_fields(validated_data, instance=instance)
+        return super().update(instance, validated_data)
 
 
 class EmployeeSalaryDetailsSerializer(serializers.ModelSerializer):
@@ -653,19 +665,16 @@ class CurrentMonthEmployeeDataSerializer(serializers.ModelSerializer):
         return max(0, paid_days)  # Ensure it doesn't go negative
 
     def get_gross_salary(self, obj):
-        """Retrieves the latest gross salary (monthly) of the employee."""
-        if not obj.employee_salary:
-            return 0
-        latest_salary = obj.employee_salary  # Already the latest active one
-        return round(latest_salary.gross_salary.get('monthly', 0), 2) \
-            if latest_salary and latest_salary.gross_salary else 0
+        """Retrieves the gross monthly salary of the employee if available."""
+        salary = getattr(obj, 'employee_salary', None)
+
+        return round(salary.gross_salary.get('monthly', 0), 2) if salary and salary.gross_salary else 0
 
     def get_annual_ctc(self, obj):
-        """Retrieves the latest annual CTC of the employee."""
-        if not obj.employee_salary:
-            return 0
-        latest_salary = obj.employee_salary
-        return latest_salary.annual_ctc if latest_salary else 0
+        """Retrieves the annual CTC of the employee if available."""
+        salary = getattr(obj, 'employee_salary', None)
+
+        return salary.annual_ctc if salary and salary.annual_ctc else 0
 
 
 class PayrollEPFESISerializer(serializers.ModelSerializer):

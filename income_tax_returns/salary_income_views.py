@@ -2,7 +2,7 @@ from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from rest_framework import status
-
+from django.db import transaction
 from .models import SalaryIncome, SalaryDocumentFile
 from .serializers import SalaryIncomeSerializer
 
@@ -17,26 +17,28 @@ def salary_income_list(request):
         return Response(serializer.data)
 
     elif request.method == 'POST':
-        serializer = SalaryIncomeSerializer(data=request.data)
-        if serializer.is_valid():
-            salary_income = serializer.save()
+        with transaction.atomic():
+            serializer = SalaryIncomeSerializer(data=request.data)
+            if serializer.is_valid():
+                salary_income = serializer.save()
 
-            # Handle file uploads
-            doc_map = {
-                'form16_files': 'FORM_16',
-                'payslip_files': 'PAYSLIP',
-                'bank_statement_files': 'BANK_STATEMENT',
-            }
+                # Handle file uploads
+                doc_map = {
+                    'form16_files': 'FORM_16',
+                    'payslip_files': 'PAYSLIP',
+                    'bank_statement_files': 'BANK_STATEMENT',
+                }
 
-            for field_name, doc_type in doc_map.items():
-                for file in request.FILES.getlist(field_name):
-                    SalaryDocumentFile.objects.create(
-                        income=salary_income,
-                        document_type=doc_type,
-                        file=file
-                    )
+                for field_name, doc_type in doc_map.items():
+                    for file in request.FILES.getlist(field_name):
+                        SalaryDocumentFile.objects.create(
+                            income=salary_income,
+                            document_type=doc_type,
+                            file=file
+                        )
 
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -53,25 +55,26 @@ def salary_income_detail(request, pk):
         return Response(serializer.data)
 
     elif request.method == 'PUT':
-        serializer = SalaryIncomeSerializer(income, data=request.data, partial=True)
-        if serializer.is_valid():
-            salary_income = serializer.save()
+        with transaction.atomic():
+            serializer = SalaryIncomeSerializer(income, data=request.data, partial=True)
+            if serializer.is_valid():
+                salary_income = serializer.save()
 
-            doc_map = {
-                'form16_files': 'FORM_16',
-                'payslip_files': 'PAYSLIP',
-                'bank_statement_files': 'BANK_STATEMENT',
-            }
+                doc_map = {
+                    'form16_files': 'FORM_16',
+                    'payslip_files': 'PAYSLIP',
+                    'bank_statement_files': 'BANK_STATEMENT',
+                }
 
-            for field_name, doc_type in doc_map.items():
-                for file in request.FILES.getlist(field_name):
-                    SalaryDocumentFile.objects.create(
-                        income=salary_income,
-                        document_type=doc_type,
-                        file=file
-                    )
+                for field_name, doc_type in doc_map.items():
+                    for file in request.FILES.getlist(field_name):
+                        SalaryDocumentFile.objects.create(
+                            income=salary_income,
+                            document_type=doc_type,
+                            file=file
+                        )
 
-            return Response(serializer.data)
+                return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

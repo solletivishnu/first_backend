@@ -2844,122 +2844,190 @@ def generate_next_month_attendance(request):
 #         "skipped_records": skipped_records
 #     }, status=status.HTTP_201_CREATED)
 
+
 @api_view(['POST'])
 def generate_current_month_attendance(request):
     """
     Automatically creates attendance records for all employees under a given payroll_id for the current month,
     excluding employees who have left the organization. If records already exist, it skips them.
     If payroll_id is not provided, fetch all payroll IDs for the current month and financial year.
+    Only generates attendance for employees who have existing salary details.
     """
-    # Extract query parameters
-    payroll_id = request.query_params.get("payroll_id")
-    current_month = int(
-        request.query_params.get("month", date.today().month))  # Default to current month if not provided
-    financial_year = request.query_params.get("financial_year")
+    try:
+        # Extract and validate query parameters
 
-    today = date.today()
-    if not financial_year:
-        # Determine the financial year based on current month
-        financial_year = f"{today.year}-{today.year + 1}" if current_month >= 4 else f"{today.year - 1}-{today.year}"
+        payroll_id = request.query_params.get("payroll_id")
+        current_month = int(request.query_params.get("month", date.today().month))
+        financial_year = request.query_params.get("financial_year")
 
-    current_year = int(financial_year.split('-')[1]) if 1 <= current_month <= 3 else int(financial_year.split('-')[0])
+        today = date.today()
+        
+        # Determine financial year if not provided
+        if not financial_year:
+            financial_year = f"{today.year}-{today.year + 1}" if current_month >= 4 else f"{today.year - 1}-{today.year}"
 
-    # Calculate first and last day of the current month
-    first_day_current_month = date(current_year, current_month, 1)
-    last_day_current_month = date(current_year, current_month, calendar.monthrange(current_year, current_month)[1])
+        current_year = int(financial_year.split('-')[1]) if 1 <= current_month <= 3 else int(financial_year.split('-')[0])
 
-    # Fetch all payroll_ids if payroll_id is not provided
-    if not payroll_id:
-        payroll_ids = EmployeeManagement.objects.filter(
-            payroll__payroll_year__gte=first_day_current_month,
-            payroll__payroll_year__lte=last_day_current_month
-        ).values_list('payroll_id', flat=True).distinct()
+        # Calculate month boundaries
+        first_day_current_month = date(current_year, current_month, 1)
+        last_day_current_month = date(current_year, current_month, calendar.monthrange(current_year, current_month)[1])
 
-        if not payroll_ids:
-            return Response({"error": "No payroll IDs found for the current month and financial year."},
-                            status=status.HTTP_404_NOT_FOUND)
-    else:
-        payroll_ids = [payroll_id]
+        # Get payroll IDs to process
+        if not payroll_id:
+            payroll_ids = list(EmployeeManagement.objects.filter(
+                payroll__payroll_year__gte=first_day_current_month,
+                payroll__payroll_year__lte=last_day_current_month
+            ).values_list('payroll_id', flat=True).distinct())
+            
+            if not payroll_ids:
+                return Response(
+                    {"error": "No payroll IDs found for the current month and financial year."},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        else:
+            payroll_ids = [payroll_id]
 
-    # Dictionary to track created and skipped records for each payroll_id
-    payroll_results = {}
-
-    # Loop through each payroll_id
-    for payroll_id in payroll_ids:
-        # Fetch all employees under the given payroll_id
-        all_employees = EmployeeManagement.objects.filter(payroll_id=payroll_id)
-
-        if not all_employees.exists():
-            payroll_results[payroll_id] = {"created": 0, "skipped": 1}
-            continue  # Skip this payroll ID if no employees are found
-
-        # Fetch exited employees
-        exited_employees = set(
+        # Pre-fetch all data in bulk to avoid N+1 queries
+        exited_employee_ids = set(
             EmployeeExit.objects.filter(doe__lt=first_day_current_month)
             .values_list("employee_id", flat=True)
         )
 
-        # Exclude exited employees manually
-        active_employees = [
-            emp for emp in all_employees
-            if emp.id not in exited_employees and
-               emp.doj <= last_day_current_month
-        ]
-
-        if not active_employees:
-            payroll_results[payroll_id] = {"created": 0, "skipped": len(all_employees)}
-            continue  # Skip if no active employees are found
-
-        # Fetch holiday and week-off details
-        holiday_data = calculate_holidays_and_week_offs(payroll_id, current_year, current_month)
-
-        if "error" in holiday_data:
-            payroll_results[payroll_id] = {"created": 0, "skipped": len(all_employees)}
-            continue  # Skip this payroll_id if there's an error in holiday calculation
-
-        total_days = holiday_data["total_days"]
-        holidays = holiday_data["holiday_count"]
-        week_offs = holiday_data["week_off_count"]
-
-        created_records = 0
-        skipped_records = 0
-
-        for employee in active_employees:
-            # Check if an attendance record already exists
-            if EmployeeAttendance.objects.filter(
-                    employee=employee, financial_year=financial_year, month=current_month
-            ).exists():
-                skipped_records += 1
-                continue  # Skip this employee
-
-            # Create new attendance record
-            EmployeeAttendance.objects.create(
-                employee=employee,
+        existing_attendance = set(
+            EmployeeAttendance.objects.filter(
                 financial_year=financial_year,
-                month=current_month,
-                total_days_of_month=total_days,
-                holidays=holidays,
-                week_offs=week_offs,
-                present_days=0,
-                balance_days=0,
-                casual_leaves=0,
-                sick_leaves=0,
-                earned_leaves=0,
-                loss_of_pay=0
-            )
-            created_records += 1
+                month=current_month
+            ).values_list('employee_id', flat=True)
+        )
 
-        # Store results for the current payroll_id
-        payroll_results[payroll_id] = {
-            "created": created_records,
-            "skipped": skipped_records
-        }
+        employees_with_salary = set(
+            EmployeeSalaryDetails.objects.values_list('employee_id', flat=True)
+        )
 
-    # Return a response with the results
-    return Response({
-        "message": f"Attendance records for {date(current_year, current_month, 1).strftime('%B %Y')} processed successfully.",
-        "payroll_results": payroll_results
-    }, status=status.HTTP_201_CREATED)
+        payroll_results = {}
+
+        # Process each payroll
+        for current_payroll_id in payroll_ids:
+            try:
+                # Get all employees for this payroll with related data in one query
+                employees = EmployeeManagement.objects.filter(
+                    payroll_id=current_payroll_id
+                ).select_related('payroll')
+
+                if not employees.exists():
+                    payroll_results[current_payroll_id] = {
+                        "created": [],
+                        "skipped": [],
+                        "no_salary_details": [],
+                        "status": "No employees found"
+                    }
+                    continue
+
+                # Filter active employees (not exited and joined before month end)
+                active_employees = [
+                    emp for emp in employees
+                    if emp.id not in exited_employee_ids and emp.doj <= last_day_current_month
+                ]
+
+                if not active_employees:
+                    payroll_results[current_payroll_id] = {
+                        "created": [],
+                        "skipped": [],
+                        "no_salary_details": [],
+                        "status": "No active employees"
+                    }
+                    continue
+
+                # Calculate holidays and week-offs once per payroll
+                holiday_data = calculate_holidays_and_week_offs(current_payroll_id, current_year, current_month)
+                
+                if "error" in holiday_data:
+                    payroll_results[current_payroll_id] = {
+                        "created": [],
+                        "skipped": [],
+                        "no_salary_details": [],
+                        "status": f"Holiday calculation error: {holiday_data['error']}"
+                    }
+                    continue
+
+                # Prepare attendance data for bulk creation
+                attendance_records_to_create = []
+                no_salary_details_employees = []
+                skipped_employees = []
+                created_employees = []
+
+                for employee in active_employees:
+                    # Check if employee has salary details
+                    if employee.id not in employees_with_salary:
+                        no_salary_details_employees.append({
+                            "associate_id": employee.associate_id,
+                            "employee_name": f"{employee.first_name} {employee.last_name}".strip(),
+                            "message": "This employee salary details not completed"
+                        })
+                        continue
+
+                    # Check if attendance already exists
+                    if employee.id in existing_attendance:
+                        skipped_employees.append({
+                            "associate_id": employee.associate_id,
+                            "employee_name": f"{employee.first_name} {employee.last_name}".strip(),
+                            "message": "Attendance record already exists for this employee"
+                        })
+                        continue
+
+                    # Prepare attendance record for bulk creation
+                    attendance_records_to_create.append(
+                        EmployeeAttendance(
+                            employee=employee,
+                            financial_year=financial_year,
+                            month=current_month,
+                            total_days_of_month=holiday_data["total_days"],
+                            holidays=holiday_data["holiday_count"],
+                            week_offs=holiday_data["week_off_count"],
+                            present_days=0,
+                            balance_days=0,
+                            casual_leaves=0,
+                            sick_leaves=0,
+                            earned_leaves=0,
+                            loss_of_pay=0
+                        )
+                    )
+                    
+                    created_employees.append({
+                        "associate_id": employee.associate_id,
+                        "employee_name": f"{employee.first_name} {employee.last_name}".strip(),
+                        "message": "Attendance record created successfully"
+                    })
+
+                # Bulk create attendance records
+                if attendance_records_to_create:
+                    EmployeeAttendance.objects.bulk_create(attendance_records_to_create)
+
+                # Store results
+                payroll_results[current_payroll_id] = {
+                    "created": len(created_employees),
+                    "skipped": len(skipped_employees),
+                    "no_salary_details": no_salary_details_employees,
+                    "status": "Success"
+                }
+
+            except Exception as e:
+                payroll_results[current_payroll_id] = {
+                    "created": [],
+                    "skipped": [],
+                    "no_salary_details": [],
+                    "status": f"Error processing payroll: {str(e)}"
+                }
+
+        return Response({
+            "message": f"Attendance records for {date(current_year, current_month, 1).strftime('%B %Y')} processed successfully.",
+            "payroll_results": payroll_results[current_payroll_id]
+        }, status=status.HTTP_201_CREATED)
+
+    except Exception as e:
+        return Response({
+            "error": f"Failed to generate attendance: {str(e)}"
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 
@@ -3604,15 +3672,15 @@ def employee_monthly_salary_template(request):
         # Add EPF Deduction to Total Deduction only if EPF object exists and is enabled
         if EPF.objects.filter(payroll=salary_record.employee.payroll).exists() and \
            not EPF.objects.filter(payroll=salary_record.employee.payroll).first().is_disabled and \
-        salary_record.employee.statutory_components.get('employee_provident_fund', {}).get('epf_employee_contribution'):
+        salary_record.employee.statutory_components.get('epf_enabled', False):
             epf_deduction = deduction_values.get("epf_employee_contribution", 0) \
-            if deduction_values.get("esi_employee_contribution") != 'NA' else 0
+            if deduction_values.get("epf_employee_contribution") != 'NA' else 0
             total_deduction += epf_deduction
 
         # Add ESI Deduction to Total Deduction only if ESI object exists and is enabled
         if ESI.objects.filter(payroll=salary_record.employee.payroll).exists() and \
            not ESI.objects.filter(payroll=salary_record.employee.payroll).first().is_disabled and \
-        salary_record.employee.statutory_components.get('employee_provident_fund', {}).get('esi_employee_contribution'):
+        salary_record.employee.statutory_components.get('esi_enabled', False):
             esi_deduction = deduction_values.get("esi_employee_contribution", 0) \
                 if deduction_values.get("esi_employee_contribution") != 'NA' else 0
             total_deduction += esi_deduction

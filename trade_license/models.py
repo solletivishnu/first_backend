@@ -25,11 +25,6 @@ DESIGNATION_CHOICES = [
     ('other', 'Other'),
 ]
 
-YES_NO_CHOICES = [
-        ('yes', 'Yes'),
-        ('no', 'No'),
-    ]
-
 
 class BusinessIdentity(models.Model):
     service_task = models.OneToOneField(ServiceTask, on_delete=models.CASCADE, related_name='business_identity_task')
@@ -71,8 +66,8 @@ class ApplicantDetails(models.Model):
                                  blank=True, null=True, storage=PrivateS3Storage())
     passport_photo = models.FileField(upload_to=signatory_details_passport,
                                       blank=True, null=True, storage=PrivateS3Storage())
-    residential_address = models.CharField(max_length=3, choices=[('yes', 'YES'), ('no', 'No')],
-                                           null=False, blank=False)
+    residential_address = models.BooleanField(default=False,
+                                              help_text='Is the residential address same as Aadhaar address?')
     address = models.TextField(blank=True, null=True)
     mobile_number = models.BigIntegerField(blank=False, null=False)
     email = models.EmailField(blank=False, null=False)
@@ -133,8 +128,8 @@ class SignatoryInfo(models.Model):
                                       blank=True, null=True, storage=PrivateS3Storage())
     mobile_number = models.BigIntegerField(blank=False, null=False)
     email = models.EmailField(blank=False, null=False)
-    residential_address = models.CharField(max_length=3, choices=[('yes', 'YES'), ('no', 'No')],
-                                           null=False, blank=False)
+    residential_address = models.BooleanField(default=False,
+                                              help_text='Is the residential address same as Aadhaar address?')
     address = models.TextField(blank=True, null=True)
 
     def __str__(self):
@@ -155,8 +150,8 @@ class BusinessLocation(models.Model):
                                         blank=False, null=False, storage=PrivateS3Storage())
     bank_statement = models.FileField(upload_to=business_location_bank_statement,
                                       blank=True, null=True, storage=PrivateS3Storage())
-    additional_space = models.CharField(max_length=3, choices=[('yes', 'YES'), ('no', 'No')],
-                                        null=False, blank=False, default='no')
+    additional_space = models.BooleanField(default=False,
+                                           help_text='Is there an additional space for business?')
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='in progress')
     service_type = models.CharField(max_length=100, default='Trade License', editable=False)
@@ -197,7 +192,7 @@ class AdditionalSpaceBusiness(models.Model):
 class TradeLicenseDetails(models.Model):
     service_request = models.OneToOneField(ServiceRequest, on_delete=models.CASCADE,
                                            related_name='trade_license_details')
-    apply_new_license = models.CharField(max_length=10, choices=YES_NO_CHOICES, default='yes')
+    apply_new_license = models.BooleanField(default=True, help_text='Is this a new trade license application?')
     trade_license_number = models.CharField(max_length=100, blank=True, null=True)
     trade_license_file = models.FileField(upload_to=trade_license_document,
                                           blank=True, null=True, storage=PrivateS3Storage())
