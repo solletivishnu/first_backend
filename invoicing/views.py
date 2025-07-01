@@ -992,24 +992,24 @@ def get_invoices(request):
         elif filter_type == "over_dues":
             filtered_invoices = Invoice.objects.filter(
                             invoicing_profile_id=invoicing_profile_id,
-                            payment_status="Pending",
+                            payment_status__in=["Pending", "Partially Paid"],
                             due_date__lt=datetime.today().date()
                         )
 
         elif filter_type == "due_today":
             filtered_invoices = Invoice.objects.filter(
                 invoicing_profile_id=invoicing_profile_id,
-                payment_status="Pending",
+                payment_status__in=["Pending", "Partially Paid"],
                 due_date=datetime.today()
             )
         elif filter_type == "due_within_30_days":
             filtered_invoices = Invoice.objects.filter(invoicing_profile_id=invoicing_profile_id,
-                                                       payment_status="Pending",
+                                                       payment_status__in=["Pending", "Partially Paid"],
                                                        invoice_date__lte=datetime.today().date() + timedelta(days=30))
         elif filter_type == "total_recievables":
             filtered_invoices = Invoice.objects.filter(
                 invoicing_profile_id=invoicing_profile_id,
-                payment_status="Pending"
+                payment_status__in=["Pending", "Partially Paid"],
             )
         elif filter_type == "bad_debt":
             filtered_invoices = Invoice.objects.filter(
@@ -1127,7 +1127,6 @@ def latest_invoice_id(request, invoicing_profile_id):
             latest_invoice = Invoice.objects.filter(
                 invoicing_profile=invoicing_profile,
                 format_version=latest_invoice_format.format_version,
-                gstin='NA',
             ).order_by('-id').first()
         else:
             latest_invoice_format = InvoiceFormat.objects.filter(

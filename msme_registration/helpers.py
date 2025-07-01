@@ -28,7 +28,8 @@ def draft_filing_certificate(instance, filename):
     # Get the name of the business, replace spaces with underscores
     service_request_id = str(instance.service_request_id)
     # Construct the upload path
-    return os.path.join('service_requests', 'MSME Registration', service_request_id, 'draft_filing_certificate', filename)
+    return os.path.join('service_requests', 'MSME Registration', service_request_id,
+                        'draft_filing_certificate', filename)
 
 
 # Turnover And Investment Declaration

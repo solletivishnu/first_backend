@@ -7,6 +7,11 @@ class BusinessIdentitySerializer(serializers.ModelSerializer):
         model = BusinessIdentity
         fields = '__all__'
 
+    def validate(self, attrs):
+        if attrs.get('has_business_commenced') is False: # If business not commenced, remove date
+            attrs['date_of_commencement'] = None
+        return attrs
+
 
 class BusinessClassificationInputsSerializer(serializers.ModelSerializer):
     nic_codes = serializers.JSONField(required=False, allow_null=True)

@@ -51,9 +51,9 @@ class TradeLicenseDetailsSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def validate(self, data):
-        apply_new_license = data.get('apply_new_license', getattr(self.instance, 'apply_new_license', 'yes'))
+        apply_new_license = data.get('apply_new_license', getattr(self.instance, 'apply_new_license', True))
 
-        if apply_new_license == 'no':
+        if not apply_new_license:
             trade_license_number = data.get('trade_license_number') or getattr(self.instance, 'trade_license_number', None)
             trade_license_file = data.get('trade_license_file') or getattr(self.instance, 'trade_license_file', None)
 

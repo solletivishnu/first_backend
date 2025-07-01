@@ -11,14 +11,6 @@ from docwallet.models import PrivateS3Storage
 #MSME_Registration = ["BusinessIdentity", "BusinessClassificationInputs", "TurnoverAndInvestmentDeclaration",
 # "RegisteredAddress", "MsmeReviewFilingCertificate"]
 
-# Yes/No/N/A choices
-YES_NO_CHOICES = [
-    ('yes', 'Yes'),
-    ('no', 'No'),
-    ('na', 'N/A'),
-    ('not_applicable', 'Not Applicable'),
-    ('not_available', 'Not Available'),
-]
 
 class BusinessIdentity(models.Model):
     service_request = models.OneToOneField(ServiceRequest, on_delete=models.CASCADE,
@@ -34,10 +26,11 @@ class BusinessIdentity(models.Model):
                                            blank=True, storage=PrivateS3Storage())
     mobile_number = models.CharField(max_length=15, blank=True)
     email_id = models.EmailField(max_length=255, blank=True)
-    Are_you_previously_registered_UAM = models.CharField(max_length=20, choices=YES_NO_CHOICES,
-                                                         default='no', blank=True)
+    Are_you_previously_registered_UAM = models.BooleanField(default=False, blank=True, null=True,
+                                                            help_text="Check if previously registered under UAM")
     UAM_number = models.CharField(max_length=50, blank=True, null=True)
-    has_business_commenced = models.CharField(max_length=20, choices=YES_NO_CHOICES,blank=True, default='no')
+    has_business_commenced = models.BooleanField(default=False, blank=True, null=True,
+                                                 help_text="Check if business has commenced")
     date_of_commencement = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=[('in progress', 'In Progress'), ('completed', 'Completed'),
                                                       ('sent for approval', 'Sent for Approval'),
@@ -67,14 +60,14 @@ class BusinessClassificationInputs(models.Model):
     service_task = models.OneToOneField(ServiceTask, on_delete=models.CASCADE,
                                      related_name='service_task_business_classification_details')
     MAJOR_ACTIVITY_CHOICES = [
-        ('MANUFACTURING', 'Manufacturing'),
-        ('SERVICE', 'Service'),
+        ('Manufacturing','Manufacturing'),
+        ('Service', 'Service'),
     ]
     major_activity = models.CharField(
         max_length=20,
         choices=MAJOR_ACTIVITY_CHOICES,
         blank=True,
-        default='MANUFACTURING'
+        default='Manufacturing',
     )
     nature_of_business = models.CharField(max_length=100, blank=True)
     nic_codes = models.JSONField(default=dict, blank=True, null=True)
@@ -106,7 +99,6 @@ GST_REGISTRATION_CHOICES = [
     ('yes', 'Yes'),
     ('no', 'No'),
     ('exempted', 'Exempted'),
-    ('upload', 'Upload GST Certificate'),
 ]
 
 
@@ -118,7 +110,8 @@ class TurnoverAndInvestmentDeclaration(models.Model):
                                      related_name='service_task_turnover_details')
     turnover_in_inr = models.JSONField(default=dict, blank=True, null=True)
     investment_in_plant_and_machinery = models.IntegerField(blank=True, null=True)
-    have_you_filed_itr_previous_year = models.CharField(max_length=20,choices=YES_NO_CHOICES,blank=True)
+    have_you_filed_itr_previous_year = models.BooleanField(default=False, blank=True, null=True,
+                                                    help_text="Check if you have filed ITR for the previous year")
     are_you_registered_under_gst = models.CharField(max_length=10,choices=GST_REGISTRATION_CHOICES,
                                             blank=True,null=True)
     gst_certificate = models.FileField(upload_to=upload_gst_certificate_path, blank=True,
@@ -155,8 +148,8 @@ class RegisteredAddress(models.Model):
                                                           blank=True, null=True, storage=PrivateS3Storage())
     official_address_of_proof = models.FileField(upload_to=upload_official_address_proof_path,
                                                  blank=True, null=True, storage=PrivateS3Storage())
-    location_of_plant = models.CharField(max_length=3, choices=[('yes', 'YES'), ('no', 'No')],
-                                        null=False, blank=False, default='no')
+    location_of_plant = models.BooleanField(default=False, blank=True, null=True,
+                                            help_text="Check if you have a location of plant or unit")
     status = models.CharField(max_length=20, choices=[('in progress', 'In Progress'), ('completed', 'Completed'),
                                     ('sent for approval', 'Sent for Approval'),('revoked', 'Revoked')],
                                     null=False, blank=False, default="in progress")

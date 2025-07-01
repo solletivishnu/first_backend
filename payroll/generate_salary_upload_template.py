@@ -15,6 +15,7 @@ from openpyxl.styles import Font
 from openpyxl.styles import Protection
 from .models import *
 from openpyxl import load_workbook
+from django.db.models import Exists, OuterRef
 
 
 # Sample default earnings (this can be moved to DB or settings)
@@ -60,7 +61,12 @@ default_deductions = [
 def generate_salary_upload_template(request, payroll_id):
     try:
         payroll = PayrollOrg.objects.get(pk=payroll_id)
-        employees = EmployeeManagement.objects.filter(payroll=payroll)
+        # Exclude employees who already have a salary record
+        employees = EmployeeManagement.objects.filter(
+            payroll=payroll
+        ).annotate(
+            has_salary=Exists(EmployeeSalaryDetails.objects.filter(employee=OuterRef('pk')))
+        ).filter(has_salary=False)
         serializer = EmployeeSimpleSerializer(employees, many=True)
 
         base_columns = ['employee_id', 'associate_id', 'full_name', 'annual_ctc', 'tax_regime_opted', 'valid_from']

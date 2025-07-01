@@ -1457,6 +1457,7 @@ class KeyManagerialPersonnel(models.Model):
     pan_number = models.CharField(max_length=20, null=True, blank=True)
     role = models.CharField(max_length=100, null=True, blank=True)
     status = models.CharField(max_length=20, null=True, blank=True)
+    passport_number = models.CharField(max_length=20, null=True, blank=True)
 
     def __str__(self):
         return f"KMP Details for {self.business.nameOfBusiness}"

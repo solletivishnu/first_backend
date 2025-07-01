@@ -25,7 +25,8 @@ def generate_employee_upload_template(request, payroll_id):
         'esi_enabled', 'esi_number', 'professional_tax', 'employee_status',
 
         # Personal details
-        'dob', 'age', 'guardian_name', 'pan', 'aadhar', 'address',
+        'dob', 'age', 'guardian_name', 'pan', 'aadhar', 'address_line1',
+        'address_line2', 'address_city', 'address_state', 'address_pinCode',
         'alternate_contact_number', 'marital_status', 'blood_group',
 
         # Bank details
@@ -84,6 +85,19 @@ def generate_employee_upload_template(request, payroll_id):
                 dv.add(f"{col_letter}2:{col_letter}1000")
                 break
 
+    # Helper to apply date validation
+    def apply_date_validation(field_name):
+        for col in ws.iter_cols(1, ws.max_column):
+            if col[0].value == field_name:
+                col_letter = get_column_letter(col[0].column)
+                dv = DataValidation(type='date')
+                dv.error = 'Please enter a valid date in YYYY-MM-DD format.'
+                dv.errorTitle = 'Invalid Date'
+                ws.add_data_validation(dv)
+                dv.add(f'{col_letter}2:{col_letter}1000')
+                ws.column_dimensions[col_letter].number_format = 'YYYY-MM-DD'
+                break
+
     # Apply dropdowns
     apply_dropdown("gender", "Dropdowns!$A$2:$A$10")
     apply_dropdown("work_location", "Dropdowns!$B$2:$B$100")
@@ -96,6 +110,9 @@ def generate_employee_upload_template(request, payroll_id):
     apply_dropdown("employee_status", "Dropdowns!$E$2:$E$3")
     apply_dropdown("marital_status", "Dropdowns!$F$2:$F$3")
     apply_dropdown("blood_group", "Dropdowns!$G$2:$G$10")
+
+    apply_date_validation('doj')
+    apply_date_validation('dob')
 
     # Auto-adjust column widths
     for col in ws.columns:

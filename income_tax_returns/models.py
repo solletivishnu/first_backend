@@ -49,18 +49,14 @@ class PersonalInformation(models.Model):
         related_name='personal_information_reviewed'
     )
     non_resident_indian = models.CharField(max_length=255, null=True, blank=True)
-    salary_income = models.CharField(max_length=5, null=True, blank=True,
-                                     choices=[('yes', 'Yes'), ('no', 'No')], default='no')
-    other_income = models.CharField(max_length=5, null=True, blank=True,
-                                    choices=[('yes', 'Yes'), ('no', 'No')], default='no')
-    house_property_income = models.CharField(max_length=5, null=True, blank=True,
-                                             choices=[('yes', 'Yes'), ('no', 'No')], default='no')
-    capital_gains = models.CharField(max_length=5, null=True, blank=True,
-                                       choices=[('yes', 'Yes'), ('no', 'No')], default='no')
-    business_income = models.CharField(max_length=5, null=True, blank=True,
-                                       choices=[('yes', 'Yes'), ('no', 'No')], default='no')
-    agriculture_income = models.CharField(max_length=5, null=True, blank=True,
-                                          choices=[('yes', 'Yes'), ('no', 'No')], default='no')
+    salary_income = models.BooleanField(default=False, help_text="Is the user earning salary income?")
+    other_income = models.BooleanField(default=False, help_text="Is the user earning any other income?")
+    house_property_income = models.BooleanField(default=False,
+                                                help_text="Is the user earning income from house property?")
+    capital_gains = models.BooleanField(default=False, help_text="Is the user earning capital gains income?")
+    business_income = models.BooleanField(default=False,
+                                          help_text="Is the user earning business or professional income?")
+    agriculture_income = models.BooleanField(default=False, help_text="Is the user earning agriculture income?")
 
 
     def save(self, *args, **kwargs):
@@ -433,7 +429,7 @@ class CapitalGainsProperty(models.Model):
                                     storage=PrivateS3Storage())
     sale_doc = models.FileField(upload_to=capital_gains_property_sale_doc, null=True, blank=True,
                                 storage=PrivateS3Storage())
-    reinvestment_made = models.CharField(max_length=20, choices=[('yes', 'Yes'), ('no', 'No')], default='no')
+    reinvestment_made = models.BooleanField(default=False, help_text="Has the user made any reinvestment?")
     reinvestment_details = JSONField(default=dict, null=True, blank=True)
     reinvestment_details_docs = models.FileField(upload_to=capital_gains_property_reinvestment_docs,
                                                  null=True, blank=True, storage=PrivateS3Storage())
@@ -471,8 +467,8 @@ class CapitalGainsEquityMutualFund(models.Model):
         related_name='capital_gains_equity_mutual_funds_reviewed'
     )
     equity_mutual_fund_type = JSONField(null=True, blank=True, default=list)
-    sell_any_foreign_sales = models.CharField(max_length=20, choices=[('yes', 'yes'), ('no', 'no')], default='no')
-    sell_any_unlisted_sales = models.CharField(max_length=20, choices=[('yes', 'yes'), ('no', 'no')], default='no')
+    sell_any_foreign_sales = models.BooleanField(default=False, help_text="Has the user made any foreign sales?")
+    sell_any_unlisted_sales = models.BooleanField(default=False, help_text="Has the user made any unlisted sales?")
 
     def __str__(self):
         return "{} - Equity Mutual Fund Details".format(self.service_request.id)
@@ -608,11 +604,12 @@ class BusinessProfessionalIncomeInfo(models.Model):
                                                      related_name='business_professional_income_info')
     business_name = models.CharField(max_length=255, null=False, blank=False)
     business_type = models.CharField(max_length=255, null=False, blank=False)
-    opting_for_presumptive_taxation = models.CharField(max_length=255, null=False, blank=False,
-                                                       choices=[('yes', 'Yes'), ('no', 'No')], default='no')
+    opting_for_presumptive_taxation = models.BooleanField(default=False,
+                                                          help_text='Is the user opting for presumptive taxation?')
+    book_maintained= models.BooleanField(default=False,
+                                           help_text='Is the user maintaining books of accounts?')
     opting_data = JSONField(default=dict, null=True, blank=True)
-    gst_registered = models.CharField(max_length=255, null=False, blank=False,
-                                      choices=[('yes', 'Yes'), ('no', 'No')], default='no')
+    gst_registered = models.BooleanField(default=False, help_text='Is the user GST registered?')
 
     def __str__(self):
         return "{} - {} Details".format(self.business_professional_income.service_request.id, self.business_name)
@@ -800,8 +797,7 @@ class GiftIncomeDocument(models.Model):
     relation = models.CharField(max_length=255, null=True, blank=True, choices=[('Relative', 'Relative'),
                                                                                 ('Non Relative', 'Non Relative')])
     date_received = models.DateField(null=True, blank=True)
-    was_it_marriage_related = models.CharField(max_length=255, null=True, blank=True,
-                                               choices=[('Yes', 'Yes'), ('No', 'No')])
+    was_it_marriage_related = models.BooleanField(default=False, help_text="Was the gift received during marriage?")
 
     def __str__(self):
         return "{} - {}".format(self.gift_income.service_request.id, self.relation)
@@ -914,7 +910,7 @@ class ForeignIncomeInfo(models.Model):
     country = models.CharField(max_length=20)
     currency = models.CharField(max_length=3)
     amount = models.IntegerField()
-    tax_paid_abroad = models.CharField(max_length=20, choices=[('yes', 'Yes'), ('no', 'No')], default='No')
+    tax_paid_abroad = models.BooleanField(default=False, help_text="Has the user paid tax abroad?")
     form67_file = models.FileField(upload_to=foreign_income_file, null=True, blank=True, storage=PrivateS3Storage())
 
     def __str__(self):

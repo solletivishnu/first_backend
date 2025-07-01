@@ -3,6 +3,7 @@ from . import views
 from . import employee_management
 from . import generate_salary_upload_template
 from . import bulk_employee_upload
+from . import bulk_salary_details_upload
 
 urlpatterns = [
     # URL for listing and creating PayrollOrg instances
@@ -190,5 +191,6 @@ urlpatterns = [
 
     path('employees/upload/', bulk_employee_upload.upload_employee_excel, name='upload-employee-excel'),
 
+    path('employee-salary-bulk-upload/', bulk_salary_details_upload.upload_employee_salary_excel, name='upload-bulk-salary-data'),
 
 ]
