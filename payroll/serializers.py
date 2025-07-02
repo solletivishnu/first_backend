@@ -549,20 +549,54 @@ class SimplifiedEmployeeSalarySerializer(serializers.ModelSerializer):
 
 
 class EmployeePersonalDetailsSerializer(serializers.ModelSerializer):
+    payroll = serializers.IntegerField(write_only=True)  # Incoming payroll ID from frontend
+
     class Meta:
         model = EmployeePersonalDetails
         fields = '__all__'
 
+    def validate_unique_identifiers(self, validated_data, instance=None):
+        """
+        Shared validator for PAN and Aadhar based on payroll match.
+        If `instance` is provided, it's an update operation.
+        """
+        payroll_id = validated_data.pop('payroll', None)
+        employee = validated_data.get('employee') or (instance.employee if instance else None)
+
+        if not employee:
+            raise ValidationError("Employee is required.")
+
+        if not hasattr(employee, 'payroll') or employee.payroll.id != payroll_id:
+            # Skip PAN/Aadhar validation if payroll doesn't match
+            return validated_data
+
+        # PAN validation (skip current instance if updating)
+        pan = validated_data.get('pan')
+        if pan:
+            qs = EmployeePersonalDetails.objects.filter(pan=pan)
+            if instance:
+                qs = qs.exclude(pk=instance.pk)
+            if qs.exists():
+                raise ValidationError("A record with this PAN already exists.")
+
+        # Aadhar validation (skip current instance if updating)
+        aadhar = validated_data.get('aadhar')
+        if aadhar:
+            qs = EmployeePersonalDetails.objects.filter(aadhar=aadhar)
+            if instance:
+                qs = qs.exclude(pk=instance.pk)
+            if qs.exists():
+                raise ValidationError("A record with this Aadhar already exists.")
+
+        return validated_data
+
     def create(self, validated_data):
-        # Check for duplicate PAN
-        if EmployeePersonalDetails.objects.filter(pan=validated_data.get('pan')).exists():
-            raise ValidationError("A record with this PAN already exists")
-
-        # Check for duplicate Aadhar
-        if EmployeePersonalDetails.objects.filter(aadhar=validated_data.get('aadhar')).exists():
-            raise ValidationError("A record with this Aadhar already exists.")
-
+        validated_data = self.validate_unique_identifiers(validated_data)
         return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        validated_data = self.validate_unique_identifiers(validated_data, instance)
+        return super().update(instance, validated_data)
 
 
 class EmployeeBankDetailsSerializer(serializers.ModelSerializer):

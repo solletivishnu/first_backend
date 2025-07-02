@@ -363,6 +363,7 @@ class PayrollOrgBusinessDetailView(APIView):
                 # Checking existence of related objects
                 "organisation_details": organisation_details,
                 "payroll_id": payroll_org.id if organisation_details else None,
+                "sender_email": payroll_org.sender_email if payroll_org.sender_email else None,
                 "work_locations": WorkLocations.objects.filter(
                     payroll=payroll_org.id).exists() or payroll_org.work_location if organisation_details else False,
                 "departments": Departments.objects.filter(payroll=payroll_org.id).exists() or payroll_org.department
@@ -1474,11 +1475,23 @@ def calculate_employee_deductions(pf_wage, basic_monthly, epf_enabled, esi_enabl
     )
 
     # Professional Tax
-    deductions["PT"] = {
-        "monthly": 200,
-        "annually": 2400,
-        "calculation_type": "Fixed Amount (₹200)"
-    } if pt_enabled else {"monthly": "NA", "annually": "NA", "calculation_type": "Not Applicable"}
+    if pt_enabled:
+        if basic_monthly <= 15000:
+            pt_monthly = 0
+        elif 15001 <= basic_monthly <= 20000:
+            pt_monthly = 150
+        else:
+            pt_monthly = 200
+
+        deductions["PT"] = {
+            "monthly": pt_monthly,
+            "annually": pt_monthly * 12,
+            "calculation_type": "Slab-based Professional Tax"
+        }
+    else:
+        deductions["PT"] = {
+            "monthly": "NA", "annually": "NA", "calculation_type": "Not Applicable"
+        }
 
     return deductions
 
@@ -1511,13 +1524,14 @@ def calculate_payroll(request):
         annual_ctc = float(data["annual_ctc"])
         earnings = data["earnings"]
         employee_id = data.get("employee")
+        gross_salary = data["gross_salary"]["annually"]
 
         # Validate basic salary component
         basic_salary = next((item for item in earnings if item["component_name"] == "Basic"), None)
         if not basic_salary:
             return Response({"errorMessage": "Basic component is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        basic_annual = basic_salary["annually"]
+        basic_annual = gross_salary
         basic_monthly = basic_annual / 12
         pf_wage = min(basic_annual, 180000)
 
@@ -1686,8 +1700,8 @@ def pay_schedule_list_create(request):
                     'fourth_saturday'
                 ]
             ])
-            if days_selected < 2:
-                return Response({"error": "At least two days must be selected."}, status=status.HTTP_400_BAD_REQUEST)
+            # if days_selected < 2:
+            #     return Response({"error": "At least two days must be selected."}, status=status.HTTP_400_BAD_REQUEST)
             serializer.save()
             return Response({"data": serializer.data, "message": "Pay Schedule created successfully."},
                             status=status.HTTP_201_CREATED)
@@ -1905,7 +1919,7 @@ def employee_list(request):
     if request.method == 'GET':
         payroll_id = request.query_params.get('payroll_id')
         if payroll_id:
-            employees = EmployeeManagement.objects.filter(payroll_id=payroll_id)
+            employees = EmployeeManagement.objects.filter(payroll_id=payroll_id).order_by('-id')
         else:
             employees = EmployeeManagement.objects.all()
         serializer = EmployeeDataSerializer(employees, many=True)
@@ -2053,7 +2067,7 @@ def new_employees_list(request):
         if payroll_id:
             filter_criteria["payroll_id"] = payroll_id
 
-        employees = EmployeeManagement.objects.filter(**filter_criteria)
+        employees = EmployeeManagement.objects.filter(**filter_criteria).order_by('-id')
 
         # If no employees found, return an empty list with a message
         if not employees.exists():
@@ -3137,10 +3151,19 @@ def calculate_employee_monthly_salary(request):
     return Response(salaries, status=status.HTTP_200_OK)
 
 
+def is_valid_number(value):
+    try:
+        float(value)
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+
 import traceback
 @api_view(['GET'])
 def detail_employee_monthly_salary(request):
-    
+
     try:
         today = date.today()
         current_day = today.day
@@ -3212,40 +3235,10 @@ def detail_employee_monthly_salary(request):
                 epf_base = min(epf_eligible_total, 15000)
                 pf = round(epf_base * 0.12, 2)
 
-                # ESI Calculation
-                esi = round(earned_salary * 0.0075, 2) if gross_salary <= 21000 else 0
-
                 # PT Calculation
                 pt_amount = 0
-                pt_obj = PT.objects.filter(payroll=payroll_id, work_location=employee.work_location).first()
-                if pt_obj:
-                    for slab in pt_obj.slab:
-                        salary_range = slab.get("Monthly Salary (₹)")
-                        pt_value = slab.get("Professional Tax (₹ per month)", "0").replace("₹", "").replace(",", "").strip()
-
-                        try:
-                            if "to" in salary_range:
-                                parts = salary_range.split("to")
-                                lower = int(parts[0].strip().replace("Up to", "").replace(",", ""))
-                                upper = int(parts[1].strip().replace(",", ""))
-                                if lower < gross_salary <= upper:
-                                    pt_amount = int(pt_value) if pt_value.isdigit() else 0
-                                    break
-
-                            elif "and above" in salary_range:
-                                threshold = int(salary_range.split("and")[0].strip().replace(",", ""))
-                                if gross_salary > threshold:
-                                    pt_amount = int(pt_value) if pt_value.isdigit() else 0
-                                    break
-
-                            elif "Up to" in salary_range:
-                                upper = int(salary_range.replace("Up to", "").strip().replace(",", ""))
-                                if gross_salary <= upper:
-                                    pt_amount = int(pt_value) if pt_value.isdigit() else 0
-                                    break
-
-                        except (ValueError, IndexError):
-                            continue  # Skip this slab if parsing fails
+                # ESI Calculation
+                esi = round(earned_salary * 0.0075, 2) if gross_salary <= 21000 else 0
 
                 # Benefits
                 benefits_total = sum(
@@ -3254,8 +3247,11 @@ def detail_employee_monthly_salary(request):
                 )
 
                 # Taxes
-                taxes = sum(d.get("monthly", 0) for d in salary_record.deductions if "Tax" in d.get("component_name", ""))
-
+                taxes = sum(
+                    float(d["monthly"])
+                    for d in salary_record.deductions
+                    if "Tax" in d.get("component_name", "") and is_valid_number(d.get("monthly"))
+                )
                 # Advance Loan EMI
                 advance_loan = getattr(employee, "employee_advance_loan", None)
                 emi_deduction = 0
@@ -3267,21 +3263,16 @@ def detail_employee_monthly_salary(request):
                     if active_loan:
                         emi_deduction = float(active_loan.emi_amount) if isinstance(active_loan.emi_amount, (int, float)) else 0
 
-                exclude_earnings = {"basic", "hra", "special_allowance", "bonus"}
-                exclude_deductions = {"pf", "esi", "pt", "tds", "loan_emi"}
+                exclude_deductions = {"epf_employee_contribution", "esi_employee_contribution", "pt", "tds", "loan_emi"}
 
                 def prorate(value):
                     return (value * total_working_days) / attendance.total_days_of_month if value else 0
 
-                other_earnings = 0
-                if salary_record.earnings:
-                    for earning in salary_record.earnings:
-                        name = earning.get("component_name", "").lower().replace(" ", "_")
-                        if name not in exclude_earnings:
-                            other_earnings += prorate(earning.get("monthly", 0))
+                component_amounts = calculate_component_amounts(
+                    salary_record.earnings, total_working_days, attendance.total_days_of_month
+                )
 
                 epf_value = pf
-                ept_value = 0
                 other_deductions = 0
                 employee_deductions = 0
                 if salary_record.deductions:
@@ -3289,10 +3280,15 @@ def detail_employee_monthly_salary(request):
                         name = deduction.get("component_name", "").lower().replace(" ", "_")
                         value = deduction.get("monthly", 0)
                         value = value if isinstance(value, (int, float)) else 0  # Ensure numeric
-                        if name == "pt" and value > 0:
-                            ept_value = value
                         if "tax" not in name:
-                            employee_deductions += value
+                            if name == "epf_employee_contribution" and employee.statutory_components.get("epf_enabled", False):
+                                employee_deductions += value
+                            elif name == "esi_employee_contribution" and employee.statutory_components.get("esi_enabled", False):
+                                employee_deductions += value
+                            elif name == "pt" and employee.statutory_components.get("professional_tax", False) and pt_amount == 0:
+                                pt_amount= prorate(value)
+                            elif name == "tds":
+                                employee_deductions += value
                         if all(ex not in name for ex in exclude_deductions):
                             other_deductions += prorate(value)
 
@@ -3305,21 +3301,15 @@ def detail_employee_monthly_salary(request):
                             return item.get("monthly", 0)
                     return 0
 
-                # Prorated fixed components
-                prorated_basic = prorate(get_component_amount(salary_record.earnings, "basic"))
-                prorated_hra = prorate(get_component_amount(salary_record.earnings, "hra"))
-                prorated_bonus = prorate(get_component_amount(salary_record.earnings, "bonus"))
-                prorated_special_allowance = prorate(get_component_amount(salary_record.earnings,
-                                                                          "special allowance"))
-                
+
                 FINANCIAL_MONTH_MAP = {1: 10, 2: 11, 3: 12, 4: 1, 5: 2, 6: 3,7: 4, 8: 5, 9: 6, 10: 7, 11: 8, 12: 9}
-                
+
                 current_month = FINANCIAL_MONTH_MAP.get(month, 1)
 
                 annual_gross=int(round(earned_salary, 2))*12
-                
+
                 monthly_tds,annual_tds=calculate_tds(regime_type=salary_record.tax_regime_opted,annual_salary=annual_gross,
-                                                     current_month=current_month, epf_value=epf_value, ept_value = ept_value)
+                                                     current_month=current_month, epf_value=epf_value, ept_value = pt_amount)
                 tds_ytd = 0
                 try:
                     entry = EmployeeSalaryHistory.objects.filter(
@@ -3341,6 +3331,9 @@ def detail_employee_monthly_salary(request):
                     annual_tds = annual_tds
 
                 # Create or update EmployeeSalaryHistory
+                pf = pf if employee.statutory_components.get("epf_enabled", False) else 0
+                esi = esi if employee.statutory_components.get("esi_enabled", False) else 0
+                pt_amount = pt_amount if employee.statutory_components.get("professional_tax", False) else 0
                 EmployeeSalaryHistory.objects.create(
                     employee=employee,
                     payroll=employee.payroll,
@@ -3350,16 +3343,26 @@ def detail_employee_monthly_salary(request):
                     lop=attendance.loss_of_pay,
                     paid_days=total_working_days,
                     ctc=salary_record.annual_ctc,
-                    gross_salary=int(gross_salary),
-                    earned_salary=int(round(earned_salary, 2)),
-                    basic_salary=int(round(prorated_basic, 2)),
-                    hra=int(round(prorated_hra, 2)),
-                    special_allowance=int(round(prorated_special_allowance, 2)),
-                    bonus=int(round(prorated_bonus, 2)),
-                    other_earnings=int(round(other_earnings, 2)),
-                    benefits_total=int(
-                        round(prorated_basic + prorated_hra + prorated_bonus + prorated_special_allowance + other_earnings,
-                              2)),
+                    gross_salary=gross_salary,
+                    earned_salary=round(earned_salary, 2),
+                    basic_salary=round(component_amounts['basic'], 2),
+                    hra=round(component_amounts['hra'], 2),
+                    conveyance_allowance=round(component_amounts.get('conveyance_allowance', 0), 2),
+                    travelling_allowance=round(component_amounts.get('travelling_allowance', 0), 2),
+                    commission=round(component_amounts.get('commission', 0), 2),
+                    children_education_allowance=round(component_amounts.get('children_education_allowance', 0), 2),
+                    overtime_allowance=round(component_amounts.get('overtime_allowance', 0), 2),
+                    transport_allowance=round(component_amounts.get('transport_allowance', 0), 2),
+                    special_allowance=round(component_amounts['special_allowance'], 2),
+                    bonus=round(component_amounts['bonus'], 2),
+                    other_earnings=round(component_amounts['other_earnings'], 2),
+                    benefits_total=int(round(
+                        sum(component_amounts[key] for key in [
+                            'basic', 'hra', 'special_allowance', 'bonus', 'other_earnings',
+                            'conveyance_allowance', 'travelling_allowance', 'commission',
+                            'children_education_allowance', 'overtime_allowance', 'transport_allowance'
+                        ]), 2
+                    )),
                     epf=pf,
                     esi=esi,
                     pt=pt_amount,
@@ -3373,7 +3376,7 @@ def detail_employee_monthly_salary(request):
                     is_active=True,
                     notes="Salary processed from API"
                 )
-        
+
         salary_records = EmployeeSalaryHistory.objects.filter(
             payroll=payroll_id,
             month=month,
@@ -3389,6 +3392,47 @@ def detail_employee_monthly_salary(request):
             'error': str(e),
             'traceback': tb
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def calculate_component_amounts(earnings, total_working_days, total_days_of_month):
+    """Calculate prorated component amounts"""
+
+    def prorate(value):
+        return (value * total_working_days) / total_days_of_month if value and total_days_of_month > 0 else 0
+
+    def get_component_amount(earnings_data, component_name):
+        for item in earnings_data:
+            if item["component_name"].lower() == component_name.lower().replace("_", " "):
+                return item.get("monthly", 0)
+        return 0
+
+    # Standard components
+    basic_components = [
+        'basic', 'hra', 'special_allowance', 'bonus',
+        'conveyance_allowance', 'travelling_allowance', 'commission',
+        'children_education_allowance', 'overtime_allowance', 'transport_allowance'
+    ]
+
+    component_amounts = {}
+    exclude_earnings = {"basic", "hra", "special_allowance", "bonus", "conveyance_allowance",
+                        "travelling_allowance", "commission", "children_education_allowance",
+                        "overtime_allowance", "transport_allowance"}
+
+    # Calculate standard components
+    for component in basic_components:
+        amount = get_component_amount(earnings, component)
+        component_amounts[component] = prorate(amount)
+
+    # Calculate other earnings (excluding standard components)
+    other_earnings = 0
+    for earning in earnings:
+        name = earning.get("component_name", "").lower().replace(" ", "_")
+        if name not in exclude_earnings:
+            other_earnings += prorate(earning.get("monthly", 0))
+
+    component_amounts['other_earnings'] = other_earnings
+    return component_amounts
+
 
 from django.db.models import Sum, Q
 from django.db.models.functions import ExtractMonth, ExtractYear
@@ -3579,222 +3623,93 @@ def employee_monthly_salary_template(request):
         current_day = today.day
         month = int(request.query_params.get("month", today.month))
         year_ = int(request.query_params.get("year", today.year))
-        financial_year = request.query_params.get("financial_year", None)
+        financial_year = request.query_params.get("financial_year")
         employee_id = request.query_params.get("employee_id")
 
         month_name = calendar.month_abbr[month]
-        print(month_name)
 
         if not financial_year:
             return Response({"error": "Financial year is required."}, status=status.HTTP_400_BAD_REQUEST)
-
         if not employee_id:
             return Response({"error": "Employee Id is required."}, status=status.HTTP_400_BAD_REQUEST)
-
         if current_day < 26 and month == today.month:
             return Response({"message": "Salary processing will be initiated between the 26th and 30th of the month."},
                             status=status.HTTP_200_OK)
 
-        salary_record = EmployeeSalaryDetails.objects.filter(employee=employee_id).last()
-
-        if not salary_record:
-            return Response({"message": "No salary records found for this payroll ID"}, status=status.HTTP_200_OK)
-
         try:
-            attendance = EmployeeAttendance.objects.get(employee=employee_id, financial_year=financial_year, month=month)
-        except EmployeeAttendance.DoesNotExist:
-            return Response({"message": "No attendance record found"}, status=status.HTTP_200_OK)
+            salary_history = EmployeeSalaryHistory.objects.get(
+                employee_id=employee_id,
+                financial_year=financial_year,
+                month=month
+            )
+        except EmployeeSalaryHistory.DoesNotExist:
+            return Response({"message": "No salary history record found"}, status=status.HTTP_200_OK)
 
-        # Calculate working days and per-day salary
-        total_working_days = attendance.total_days_of_month - attendance.loss_of_pay
-        gross_salary = salary_record.gross_salary.get("monthly", 0)  # Parse JSON string
+        # Convert net salary to words
+        total_in_words = num2words(round(salary_history.net_salary)).title() + ' Rupees Only'
 
-        per_day_salary = gross_salary / attendance.total_days_of_month if attendance.total_days_of_month else 0
-        earned_salary = per_day_salary * total_working_days
-        lop_amount = per_day_salary * attendance.loss_of_pay
-
-        # Extract Earnings from JSON
-        earnings = salary_record.earnings if isinstance(salary_record.earnings, list) else json.loads(salary_record.earnings)
-
-        # Allowance Keys to Extract
-        allowance_keys = [
-            "Basic", "HRA", "Conveyance Allowance", "Travelling Allowance",
-            "Bonus", "Commission", "Children Education Allowance", "Overtime Allowance",
-            "Fixed Allowance", "Transport Allowance"
-        ]
-
-        # Initialize Allowance Dictionary
-        allowance_values = {key.lower().replace(" ", "_"): 0 for key in allowance_keys}
-
-        # Extract Allowances
-        for item in earnings:
-            component_name = item["component_name"]
-            if component_name in allowance_keys:
-                key = component_name.lower().replace(" ", "_")
-                allowance_values[key] = item["monthly"]
-
-        # Calculate Per-Day and Earned Allowances
-        earned_allowances = {
-            f"earned_{key}": (allowance_values[key] / attendance.total_days_of_month * total_working_days)
-            if attendance.total_days_of_month else 0
-            for key in allowance_values
-        }
-
-        # Merge the earned allowances into allowance_values
-        allowance_values.update(earned_allowances)
-
-        for k, v in allowance_values.items():
-            if v > 0:
-                earned = (v * total_working_days / attendance.total_days_of_month) if attendance.total_days_of_month \
-                    else 0
-                allowance_values[k] = round(earned, 2)
-
-        # Extract Deductions from JSON
-        deductions = salary_record.deductions if isinstance(salary_record.deductions, list) \
-            else json.loads(salary_record.deductions)
-
-        # Deduction Keys
-        deduction_keys = ["EPF Employee Contribution", "Professional Tax", "Income Tax", "ESI Employee Contribution"]
-
-        # Initialize Deduction Dictionary
-        deduction_values = {key.lower().replace(" ", "_"): 0 for key in deduction_keys}
-
-        # Extract Deductions
-        for item in deductions:
-            component_name = item["component_name"]
-            if component_name in deduction_keys:
-                key = component_name.lower().replace(" ", "_")
-                deduction_values[key] = item["monthly"]
-
-        # Initialize Total Deduction
-        total_deduction = 0
-
-        # Add EPF Deduction to Total Deduction only if EPF object exists and is enabled
-        if EPF.objects.filter(payroll=salary_record.employee.payroll).exists() and \
-           not EPF.objects.filter(payroll=salary_record.employee.payroll).first().is_disabled and \
-        salary_record.employee.statutory_components.get('epf_enabled', False):
-            epf_deduction = deduction_values.get("epf_employee_contribution", 0) \
-            if deduction_values.get("epf_employee_contribution") != 'NA' else 0
-            total_deduction += epf_deduction
-
-        # Add ESI Deduction to Total Deduction only if ESI object exists and is enabled
-        if ESI.objects.filter(payroll=salary_record.employee.payroll).exists() and \
-           not ESI.objects.filter(payroll=salary_record.employee.payroll).first().is_disabled and \
-        salary_record.employee.statutory_components.get('esi_enabled', False):
-            esi_deduction = deduction_values.get("esi_employee_contribution", 0) \
-                if deduction_values.get("esi_employee_contribution") != 'NA' else 0
-            total_deduction += esi_deduction
-
-        # Initialize PT Deduction (Fixed ₹200)
-        pt_deduction = 0
-
-        # Add PT Deduction only if both EPF and ESI are enabled
-        if EPF.objects.filter(payroll=salary_record.employee.payroll).exists() and \
-           ESI.objects.filter(payroll=salary_record.employee.payroll).exists() and \
-           not EPF.objects.filter(payroll=salary_record.employee.payroll).first().is_disabled and \
-           not ESI.objects.filter(payroll=salary_record.employee.payroll).first().is_disabled:
-            pt_deduction = 200  # Fixed PT Deduction as ₹200
-            deduction_values["pt"] = pt_deduction
-            total_deduction += pt_deduction
-
-        # Check for Advance Loan and Add EMI Deduction if Applicable
-        loan_deductions = AdvanceLoan.objects.filter(employee_id=employee_id)
-        loan_deduction_total = 0
-        for loan in loan_deductions:
-            # Check if the current month is within the loan start and end period
-            if loan.start_month <= today.replace(day=1) <= loan.end_month:
-                loan_deduction_total += loan.emi_amount  # Add EMI amount for loan to the total deduction
-                # Add EMI Deduction to Total Deductions
-                deduction_values["loan_emi"] = loan_deduction_total
-
-        total_deduction += loan_deduction_total
-
-        # Calculate Net Pay
-        net_pay = earned_salary - total_deduction
-        total_in_words = num2words(round(net_pay))
-        total_in_words = total_in_words.capitalize()
-        total_in_words = total_in_words.replace("<br/>", ' ')
-        total_in_words = total_in_words.title() + ' ' + 'Rupees Only'
-
-
-        # Construct the Context Dictionary
         context = {
-            "company_name": getattr(salary_record.employee.payroll.business, "nameOfBusiness", ""),
-            "address": f"{getattr(salary_record.employee.payroll, 'filling_address_line1', '')}, "
-                       f"{getattr(salary_record.employee.payroll, 'filling_address_state', '')}, "
-                       f"{getattr(salary_record.employee.payroll, 'filling_address_city', '')}, "
-                       f"{getattr(salary_record.employee.payroll, 'filling_address_pincode', '')}",
+            "company_name": getattr(salary_history.payroll.business, "nameOfBusiness", ""),
+            "address": f"{getattr(salary_history.payroll, 'filling_address_line1', '')}, "
+                       f"{getattr(salary_history.payroll, 'filling_address_state', '')}, "
+                       f"{getattr(salary_history.payroll, 'filling_address_city', '')}, "
+                       f"{getattr(salary_history.payroll, 'filling_address_pincode', '')}",
             "month": month,
             "year": year_,
-            "employee_name": f"{getattr(salary_record.employee, 'first_name', '')} "
-                             f"{getattr(salary_record.employee, 'last_name', '')}",
-            "designation": getattr(salary_record.employee.designation, "designation_name", ""),
-            "employee_id": getattr(salary_record.employee, "associate_id", ""),
-            "doj": getattr(salary_record.employee, "doj", ""),
+            "employee_name": f"{getattr(salary_history.employee, 'first_name', '')} "
+                             f"{getattr(salary_history.employee, 'last_name', '')}",
+            "designation": getattr(salary_history.employee.designation, "designation_name", ""),
+            "employee_id": getattr(salary_history.employee, "associate_id", ""),
+            "doj": getattr(salary_history.employee, "doj", ""),
             "pay_period": f"{month_name} {year_}",
             "pay_date": "",
-            "bank_account_number":salary_record.employee.employee_bank_details.account_number
-            if hasattr(salary_record.employee, 'employee_bank_details')
-               and salary_record.employee.employee_bank_details.account_number
-            else
-            "",
-            "uan_number": salary_record.employee.statutory_components.get('employee_provident_fund', {}).get('uan', '')
-            if hasattr(salary_record.employee, 'statutory_components')
-               and salary_record.employee.statutory_components else "",
+            "bank_account_number": salary_history.employee.employee_bank_details.account_number
+                if hasattr(salary_history.employee, 'employee_bank_details') else "",
+            "uan_number": salary_history.employee.statutory_components.get('employee_provident_fund', {}).get('uan', '')
+                if hasattr(salary_history.employee, 'statutory_components') else "",
 
-            # Earnings and Allowances
-            "basic": format_with_commas(allowance_values.get("basic", 0)),
-            "hra_allowance": format_with_commas(allowance_values.get("hra", 0)),
-            "conveyance_allowance": format_with_commas(allowance_values.get("conveyance_allowance", 0)),
-            "travelling_allowance": format_with_commas(allowance_values.get("travelling_allowance", 0)),
-            "bonus": format_with_commas(allowance_values.get("bonus", 0)),
-            "commission": format_with_commas(allowance_values.get("commission", 0)),
-            "children_education_allowance": format_with_commas(allowance_values.get("children_education_allowance", 0)),
-            "overtime_allowance": format_with_commas(allowance_values.get("overtime_allowance", 0)),
-            "transport_allowance": format_with_commas(allowance_values.get("transport_allowance", 0)),
-            "fixed_allowance": format_with_commas(allowance_values.get("fixed_allowance", 0)),
+            # Earnings
+            "basic": format_with_commas(salary_history.basic_salary),
+            "hra_allowance": format_with_commas(salary_history.hra),
+            "conveyance_allowance": format_with_commas(salary_history.conveyance_allowance),
+            "travelling_allowance": format_with_commas(salary_history.travelling_allowance),
+            "bonus": format_with_commas(salary_history.bonus),
+            "commission": format_with_commas(salary_history.commission),
+            "children_education_allowance": format_with_commas(salary_history.children_education_allowance),
+            "overtime_allowance": format_with_commas(salary_history.overtime_allowance),
+            "transport_allowance": format_with_commas(salary_history.transport_allowance),
+            "fixed_allowance": format_with_commas(salary_history.other_earnings),
 
-            # Gross and Net Salary
-            "gross_earnings": format_with_commas(earned_salary),
-            "salary_adjustments": 0,  # Placeholder if any adjustments apply
+            # Salary Figures
+            "gross_earnings": format_with_commas(salary_history.earned_salary),
+            "salary_adjustments": 0,
 
-            # Individual Deductions
-            "epf": EPF.objects.filter(payroll=getattr(salary_record.employee,"payroll_id","")).exists(),
-            "epf_contribution": format_with_commas(deduction_values.get("epf_employee_contribution", 0))
-            if deduction_values.get("epf_employee_contribution") != 'NA' else 0,
-            "pt": pt_deduction > 0,  # PT is included if enabled
-            "professional_tax": format_with_commas(deduction_values.get("pt", 0)),
-            "income_tax": format_with_commas(deduction_values.get("income_tax", 0)),
-            "esi": ESI.objects.filter(payroll=getattr(salary_record.employee,"payroll_id","")).exists(),
-            "esi_employee_contribution": format_with_commas(deduction_values.get("esi_employee_contribution", 0)),
-            "total_deduction": format_with_commas(total_deduction),
+            # Deductions
+            "epf": salary_history.epf > 0,
+            "epf_contribution": format_with_commas(salary_history.epf),
+            "pt": salary_history.pt > 0,
+            "professional_tax": format_with_commas(salary_history.pt),
+            "income_tax": format_with_commas(salary_history.tds),
+            "esi": salary_history.esi > 0,
+            "esi_employee_contribution": format_with_commas(salary_history.esi),
+            "total_deduction": format_with_commas(salary_history.total_deductions),
 
-            # Final Net Pay Calculation
-            "net_pay": format_with_commas(earned_salary - total_deduction),
-            "paid_days": total_working_days,
-            "lop_days": attendance.loss_of_pay,
-            "amount_in_words": total_in_words,  # Placeholder for number-to-words conversion
+            "net_pay": format_with_commas(salary_history.net_salary),
+            "paid_days": salary_history.paid_days,
+            "lop_days": salary_history.lop,
+            "amount_in_words": total_in_words,
 
-            # Advance Loan Details in Context
-            "loan_emi": format_with_commas(loan_deduction_total),  # Add EMI to context
-            "loan_details": [
-                {"loan_type": loan.loan_type, "emi_amount": loan.emi_amount,
-                 "start_month": loan.start_month, "end_month": loan.end_month}
-                for loan in loan_deductions
-            ]
+            # Loan Details
+            "loan_emi": format_with_commas(salary_history.loan_emi),
+            "loan_details": []  # Can be extended if you want loan records from another model
         }
 
-        # Assuming you have a DocumentGenerator class that generates the PDF
-        document_generator = DocumentGenerator(request, salary_record, context)
-
-        # Assuming `template_name` is the path to your HTML template
         template_name = "salary_template.html"
-
-        # Generate the PDF document
+        document_generator = DocumentGenerator(request, salary_history, context)
         pdf_response = document_generator.generate_document(template_name)
 
-        # Return the PDF response
         return pdf_response
+
     except Exception as e:
         return Response({'error': str(e)}, status=500)
 

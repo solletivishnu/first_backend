@@ -135,7 +135,7 @@ def get_context_service_requests(request,pk):
             )
         
         # Get all service requests for this context
-        service_requests = ServiceRequest.objects.filter(context_id=pk)
+        service_requests = ServiceRequest.objects.filter(context_id=pk).order_by('-id')
         
         # Serialize the data
         serializer = ServiceRequestSerializer(service_requests, many=True)

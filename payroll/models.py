@@ -879,11 +879,17 @@ class EmployeeSalaryHistory(models.Model):
     ctc = models.IntegerField(null=False)  # Total CTC
     gross_salary = models.IntegerField(null=False)  # Gross Salary
     earned_salary = models.IntegerField(null=False)  # Earned Salary
-    basic_salary = models.IntegerField(null=False)  # Basic Salary
-    hra = models.IntegerField(null=False)  # House Rent Allowance
-    special_allowance = models.IntegerField(null=False)  # Special Allowance
-    bonus = models.IntegerField(null=False)  # Bonus
-    other_earnings = models.IntegerField(null=False)  # Other Earnings
+    basic_salary = models.FloatField(null=False)  # Basic Salary
+    hra = models.FloatField(null=False)  # House Rent Allowance
+    conveyance_allowance = models.FloatField(null=False, default=0)  # Conveyance Allowance
+    travelling_allowance = models.FloatField(null=False, default=0)  # Travelling Allowance
+    commission = models.FloatField(null=False, default=0)  # Commission
+    children_education_allowance = models.FloatField(null=False, default=0)  # Children Education Allowance
+    overtime_allowance = models.FloatField(null=False, default=0)  #OverTime  Allowance
+    transport_allowance = models.FloatField(null=False, default=0)  # Transport Allowance
+    special_allowance = models.FloatField(null=False)  # Special Allowance
+    bonus = models.FloatField(null=False)  # Bonus
+    other_earnings = models.FloatField(null=False)  # Fixed Allowance or other earnings
     benefits_total = models.IntegerField(null=False)  # Total Benefits
     epf = models.FloatField(null=False)  # EPF Contribution
     esi = models.FloatField(null=False)  # ESI Contribution

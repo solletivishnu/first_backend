@@ -152,9 +152,9 @@ def upload_employee_excel(request):
     designation_names = df['designation'].dropna().astype(str).str.strip().unique().tolist()
     department_names = df['department'].dropna().astype(str).str.strip().unique().tolist()
 
-    work_locations_map = {wl.location_name.strip().lower(): wl for wl in WorkLocations.objects.filter(location_name__in=work_location_names)}
-    designations_map = {d.designation_name.strip().lower(): d for d in Designation.objects.filter(designation_name__in=designation_names)}
-    departments_map = {dep.dept_name.strip().lower(): dep for dep in Departments.objects.filter(dept_name__in=department_names)}
+    work_locations_map = {wl.location_name.strip().lower(): wl for wl in WorkLocations.objects.filter(location_name__in=work_location_names, payroll=payroll_id)}
+    designations_map = {d.designation_name.strip().lower(): d for d in Designation.objects.filter(designation_name__in=designation_names, payroll=payroll_id)}
+    departments_map = {dep.dept_name.strip().lower(): dep for dep in Departments.objects.filter(dept_name__in=department_names, payroll=payroll_id)}
 
     success_count = 0
 
