@@ -1035,22 +1035,12 @@ def handle_payment_success(sender, instance, created, **kwargs):
 
 @receiver(post_save, sender=ModuleSubscription)
 def create_initial_subscription_cycle(sender, instance, created, **kwargs):
-    """
-    Creates the initial subscription cycle only when a new ModuleSubscription is created
-    """
-    if not created:  # Wrong in your code
+    if not created:
         return
 
     try:
         with transaction.atomic():
-            # Initialize feature usage from plan's features
-            initial_feature_usage = {}
-            if instance.plan.features_enabled:
-                for feature, details in instance.plan.features_enabled.items():
-                    if isinstance(details, dict) and 'limit' in details:
-                        initial_feature_usage[feature] = 0
-
-            # Determine amount
+            # Step 1: Determine is_paid
             if instance.status == 'trial':
                 amount = 0.00
                 is_paid = True
@@ -1059,65 +1049,74 @@ def create_initial_subscription_cycle(sender, instance, created, **kwargs):
                     amount = round(float(instance.plan.base_price), 2)
                 except (TypeError, ValueError):
                     amount = 0.00
-                is_paid = False
+                is_paid = amount == 0.00
 
-            # Create the initial subscription cycle
+            if not is_paid:
+                return
+
+            # Step 2: Copy features
+            features = instance.plan.features_enabled or {}
+
+            # Step 3: Create SubscriptionCycle
             cycle = SubscriptionCycle.objects.create(
                 subscription=instance,
                 start_date=instance.start_date,
                 end_date=instance.end_date,
                 amount=amount,
                 is_paid=is_paid,
-                feature_usage=initial_feature_usage
+                feature_usage=features
             )
 
-            # Initialize ModuleUsageCycle entries for feature tracking
-            if instance.plan.features_enabled:
-                for feature_key, config in instance.plan.features_enabled.items():
-                    if isinstance(config, dict) and (config.get("limit") is not None or config.get("track") is True):
-                        ModuleUsageCycle.objects.create(
-                            cycle=cycle,
-                            feature_key=feature_key,
-                            usage_count=0
-                        )
+            # Step 4: Prevent duplicates with lowercase key tracking
+            seen_features = set()
+
+            for feature_key, limit in features.items():
+                normalized_key = feature_key.lower()
+
+                if normalized_key in seen_features:
+                    continue  # skip duplicate in same transaction
+
+                seen_features.add(normalized_key)
+
+                limit_str = str(limit).lower()
+
+                if limit_str == "unlimited":
+                    actual_count = "unlimited"
+                    usage_count = "unlimited"
+                elif limit_str.isdigit():
+                    actual_count = str(limit)
+
+                    # ✅ If it's 'users_count', start with 1
+                    if normalized_key == 'users_count':
+                        usage_count = "1"
+                    else:
+                        usage_count = "0"
+                else:
+                    actual_count = None
+                    usage_count = "0"
+
+                ModuleUsageCycle.objects.create(
+                    cycle=cycle,
+                    feature_key=feature_key,
+                    actual_count=actual_count,
+                    usage_count=usage_count
+                )
 
     except Exception as e:
-        raise
+        raise Exception(f"Registration failed: {str(e)}")
 
 
 class ModuleUsageCycle(models.Model):
     cycle = models.ForeignKey(SubscriptionCycle, on_delete=models.CASCADE, related_name="usages")
     feature_key = models.CharField(max_length=100)  # e.g., 'invoices', 'payrolls'
-    usage_count = models.IntegerField(default=0)
+    # Allow both numbers and the string "unlimited"
+    actual_count = models.CharField(max_length=20, null=True, blank=True)
+    usage_count = models.CharField(max_length=20, default="0")  # default as string
+
     last_updated = models.DateTimeField(auto_now=True)
 
     class Meta:
         unique_together = ['cycle', 'feature_key']
-
-
-@receiver(post_save, sender=SubscriptionCycle)
-def create_usage_cycles(sender, instance, created, **kwargs):
-    if not created:
-        return
-
-    plan = instance.subscription.plan
-    features = plan.features_enabled or {}
-
-    for feature_key, config in features.items():
-        # Only track features with "limit" or explicitly "track": true
-        if isinstance(config, dict):
-            if config.get("limit") is not None or config.get("track") is True:
-                ModuleUsageCycle.objects.create(
-                    cycle=instance,
-                    feature_key=feature_key,
-                    usage_count=0
-                )
-        elif isinstance(config, int):  # basic numeric limit
-            ModuleUsageCycle.objects.create(
-                cycle=instance,
-                feature_key=feature_key,
-                usage_count=0
-            )
 
 
 class UserKYC(models.Model):

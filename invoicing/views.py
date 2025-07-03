@@ -31,6 +31,7 @@ from django.utils.timezone import now
 from django.shortcuts import get_object_or_404
 from usermanagement.utils import *
 from usermanagement.decorators import *
+from usermanagement.usage_limits import get_usage_entry, increment_usage
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 from datetime import date
 import requests
@@ -452,8 +453,7 @@ def create_invoice(request):
         invoice_date = request.data.get("invoice_date")
         if invoice_date:
             try:
-                # Convert the string to a date object and extract the month
-                invoice_date_obj = datetime.strptime(invoice_date, "%Y-%m-%d").date()  # Convert to a date object
+                invoice_date_obj = datetime.strptime(invoice_date, "%Y-%m-%d").date()
                 request.data["month"] = invoice_date_obj.month
             except ValueError as e:
                 logger.warning(f"Invalid invoice_date format: {e}")
@@ -462,10 +462,43 @@ def create_invoice(request):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        # Serialize and save the data
+        # Step 1: Determine context from invoicing_profile (which maps to business -> context)
+        invoicing_profile_id = request.data.get("invoicing_profile")
+
+        context_id = None
+        if invoicing_profile_id:
+            try:
+                invoicing_profile = InvoicingProfile.objects.select_related('business__context').get(id=invoicing_profile_id)
+                context_id = invoicing_profile.business.context.id if invoicing_profile.business and invoicing_profile.business.context else None
+            except InvoicingProfile.DoesNotExist:
+                return Response(
+                    {"error": "Invalid invoicing_profile ID provided."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # Fallback to user's active context if context not found
+        if not context_id and request.user.active_context:
+            context_id = request.user.active_context.id
+
+        if not context_id:
+            return Response(
+                {"error": "No valid context found to track usage."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Step 2: Check usage entry
+        usage_entry, error_response = get_usage_entry(context_id, 'invoices_count')
+        if error_response:
+            return error_response
+
+        # Step 3: Serialize and save the data
         serializer = InvoiceSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
+
+            # Step 4: Increment usage
+            increment_usage(usage_entry)
+
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         logger.warning(f"Validation error: {serializer.errors}")

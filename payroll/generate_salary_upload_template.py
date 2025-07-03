@@ -16,6 +16,7 @@ from openpyxl.styles import Protection
 from .models import *
 from openpyxl import load_workbook
 from django.db.models import Exists, OuterRef
+from openpyxl.worksheet.datavalidation import DataValidation
 
 
 # Sample default earnings (this can be moved to DB or settings)
@@ -66,7 +67,7 @@ def generate_salary_upload_template(request, payroll_id):
             payroll=payroll
         ).annotate(
             has_salary=Exists(EmployeeSalaryDetails.objects.filter(employee=OuterRef('pk')))
-        ).filter(has_salary=False)
+        ).filter(has_salary=False).order_by('id')
         serializer = EmployeeSimpleSerializer(employees, many=True)
 
         base_columns = ['employee_id', 'associate_id', 'full_name', 'annual_ctc', 'tax_regime_opted', 'valid_from']
@@ -332,6 +333,22 @@ def generate_salary_upload_template(request, payroll_id):
             ws.cell(row=row_idx, column=col_index('net_salary_annually')).value = \
                 (f"=IF(ISNUMBER({annual_ctc_cell}), "
                  f"{get_column_letter(col_index('net_salary_monthly'))}{row_idx}*12, \"\")")
+
+        # Find the column index for 'tax_regime_opted'
+        tax_regime_col_idx = final_columns.index('tax_regime_opted') + 1  # 1-based index
+        n_rows = ws.max_row
+
+        # Create the data validation dropdown
+        dv = DataValidation(type="list", formula1='"old,new"', allow_blank=True)
+        dv.error = 'Select either "old" or "new"'
+        dv.errorTitle = 'Invalid Input'
+
+        # The range for the dropdown (excluding header)
+        col_letter = get_column_letter(tax_regime_col_idx)
+        dv_range = f"{col_letter}2:{col_letter}{n_rows}"
+
+        dv.add(dv_range)
+        ws.add_data_validation(dv)
 
         ws.protection.sheet = True
         ws.protection.password = 'tara'

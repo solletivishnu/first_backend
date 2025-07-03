@@ -901,4 +901,7 @@ class EmployeeSimpleSerializer(serializers.ModelSerializer):
         fields = ['id', 'associate_id', 'full_name']
 
     def get_full_name(self, obj):
-        return f"{obj.first_name} {obj.middle_name or ''} {obj.last_name}".strip()
+        middle = obj.middle_name
+        middle_part = f" {middle}" if middle and str(middle).lower() != 'nan' else ''
+        return f"{obj.first_name}{middle_part} {obj.last_name}".strip()
+

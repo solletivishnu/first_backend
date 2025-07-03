@@ -43,12 +43,14 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.http import JsonResponse
 from urllib.parse import urlparse, unquote
 from django.db.models.functions import TruncDate
+from .usage_limits import *
 # Create loggers for general and error logs
 logger = logging.getLogger(__name__)
 
 
 class Constants:
     SMS_API_POST_URL = 'https://www.fast2sms.com/dev/bulkV2'
+
 
 def auto_generate_password():
     pwo = PasswordGenerator()
@@ -1096,19 +1098,55 @@ def business_detail(request, pk):
 @parser_classes([JSONParser, MultiPartParser, FormParser])
 def gst_details_list_create(request):
     """
-    List all GST details or create a new GST detail.
+    Create a new GST detail and update usage count for GSTIN.
+    Context is extracted from business_id or falls back to user's active context.
     """
-    if request.method == 'POST':
-        data = request.data.copy()
-        # Remove gst_document from data if it's not provided
-        if 'gst_document' not in request.FILES:
-            data.pop('gst_document', None)
+    data = request.data.copy()
 
-        serializer = GSTDetailsSerializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    # Remove gst_document if not provided
+    if 'gst_document' not in request.FILES:
+        data.pop('gst_document', None)
+
+    # Step 1: Get context from business or fallback to user's active_context
+    context = None
+    business_id = data.get('business_id')
+
+    if business_id:
+        try:
+            business = Business.objects.get(id=business_id)
+            context = business.context
+        except Business.DoesNotExist:
+            return Response({"error": "Invalid business ID."}, status=status.HTTP_400_BAD_REQUEST)
+        except AttributeError:
+            pass
+
+    if not context:
+        context = getattr(request.user, 'active_context', None)
+
+    if not context:
+        return Response({"error": "No context found from business or user."}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Step 2: Check usage entry for 'gstin'
+    usage_entry, error_response = get_usage_entry(context.id, 'gstin')
+    if error_response:
+        return error_response
+
+    # Step 3: Enforce usage limits
+    if usage_entry.actual_count != 'unlimited':
+        if int(usage_entry.usage_count) >= int(usage_entry.actual_count):
+            return Response({"error": "GSTIN usage limit reached."}, status=status.HTTP_403_FORBIDDEN)
+
+    # Step 4: Create GST detail
+    serializer = GSTDetailsSerializer(data=data)
+    if serializer.is_valid():
+        serializer.save()
+
+        # Step 5: Increment usage
+        increment_usage(usage_entry)
+
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET', 'PUT', 'DELETE'])

@@ -125,12 +125,14 @@ def upload_employee_excel(request):
     pans = [val for val in clean_unique_vals(df['pan']) if val]
     aadhars = clean_unique_vals(df['aadhar'])
     account_numbers = clean_unique_vals(df['account_number'])
+    associate_ids = clean_unique_vals(df['associate_id'])
 
     # Batch DB lookups for existing unique fields
-    existing_work_emails = set(EmployeeManagement.objects.filter(work_email__in=work_emails).values_list('work_email', flat=True))
+    existing_work_emails = set(EmployeeManagement.objects.filter(work_email__in=work_emails, payroll=payroll_id).values_list('work_email', flat=True))
     existing_pans = set(EmployeePersonalDetails.objects.filter(pan__in=pans).values_list('pan', flat=True)) if pans else set()
     existing_aadhars = set(EmployeePersonalDetails.objects.filter(aadhar__in=aadhars).values_list('aadhar', flat=True))
     existing_account_numbers = set(EmployeeBankDetails.objects.filter(account_number__in=account_numbers).values_list('account_number', flat=True))
+    existing_associate_ids = set(EmployeeManagement.objects.filter(associate_id__in=associate_ids, payroll=payroll_id).values_list('associate_id', flat=True))
 
     # Check conflicts with DB existing data
     for idx, row in df.iterrows():
@@ -143,6 +145,8 @@ def upload_employee_excel(request):
             errors.append(f"Row {row_num}: aadhar '{row['aadhar']}' already exists in database.")
         if row['account_number'] in existing_account_numbers:
             errors.append(f"Row {row_num}: account_number '{row['account_number']}' already exists in database.")
+        if row['associate_id'] in existing_associate_ids:
+            errors.append(f"Row {row_num}: associate_id '{row['associate_id']}' already exists in database.")
 
     if errors:
         return Response({"error": errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -227,7 +231,8 @@ def upload_employee_excel(request):
                     payroll_id=payroll_obj_id,
                     defaults={
                         'first_name': row['first_name'],
-                        'middle_name': row.get('middle_name', None) or None,
+                        'middle_name': None if pd.isna(row.get('middle_name')) or str(
+                            row.get('middle_name')).strip().lower() == 'nan' or None else row.get('middle_name'),
                         'last_name': row['last_name'],
                         'doj': parse_excel_date(row.get('doj')),
                         'work_email': row['work_email'],
