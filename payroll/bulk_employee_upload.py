@@ -207,6 +207,13 @@ def upload_employee_excel(request):
                     "epf_enabled": bool(row.get('epf_enabled')),
                     "esi_enabled": bool(row.get('esi_enabled')),
                     "professional_tax": bool(row.get('professional_tax')),
+                    "employee_provident_fund": {
+                        "uan": get_numeric_or_none(row.get('uan')),
+                        "pf_account_number":  get_numeric_or_none(row.get('pf_account_number'))
+                    },
+                    "employee_state_insurance": {
+                        "esi_number": get_numeric_or_none(row.get('esi_number'))
+                    }
                 }
 
                 epf = {
