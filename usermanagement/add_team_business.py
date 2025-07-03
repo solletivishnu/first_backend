@@ -14,10 +14,11 @@ from Tara.settings.default import *
 from django.utils.http import urlsafe_base64_decode
 from .models import (
     Users, Context, Role, UserContextRole, Module,
-    ModuleFeature, UserFeaturePermission, SubscriptionPlan, ModuleSubscription
+    ModuleFeature, UserFeaturePermission, SubscriptionPlan, ModuleSubscription, ModuleUsageCycle
 )
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from .usage_limits import get_usage_entry, increment_usage
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -119,6 +120,24 @@ def add_team_member_to_business(request):
         if context.context_type != 'business':
             return Response(
                 {"error": "Team members can only be added to business contexts."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            # ✅ Validate usage entry AFTER getting the context
+        # Get usage entry
+        usage_entry, error_response = get_usage_entry(context_id, "users_count")
+        if error_response:
+            return error_response
+
+        # Count pending invites
+        pending_invites = UserContextRole.objects.filter(
+            context_id=context_id,
+            status='pending'
+        ).count()
+
+        remaining_slots = int(usage_entry.actual_count) - int(usage_entry.usage_count) - pending_invites
+        if remaining_slots <= 0:
+            return Response(
+                {"error": "User limit reached or pending invitations already occupy available slots."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -247,7 +266,7 @@ def add_team_member_to_business(request):
                     mobile_number=mobile_number,
                     status='invited',
                     registration_flow='standard',
-                    registration_completed='no',
+                    registration_completed=False,
                     is_active=False,
                     created_by=authenticated_user,
                     is_super_admin=False,
@@ -263,7 +282,6 @@ def add_team_member_to_business(request):
                 status='pending',  # Set to pending until the user accepts
                 added_by=authenticated_user
             )
-
             # 3. Set up feature permissions
             for permission_data in permissions:
                 module_id = permission_data.get('module_id')
@@ -430,102 +448,70 @@ def add_team_member_to_business(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def accept_team_invitation(request):
-    """
-    Accept a team invitation and activate the user context role.
-    For new users, their account is already set up with temporary credentials.
-    For existing users, just activate their role.
-
-    Expected request data:
-    {
-        "uid": "base64_encoded_user_id",
-        "token": "invitation_token"
-    }
-    """
     uid = request.data.get('uid')
     token = request.data.get('token')
 
-    logger.info(f"Received invitation acceptance request - uid: {uid}, token: {token}")
-
     if not all([uid, token]):
-        return Response(
-            {"error": "Missing required fields"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response({"error": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        # Decode user ID
-        try:
-            # If uid is already a string, use it directly
-            if isinstance(uid, str):
-                user_id = urlsafe_base64_decode(uid).decode()
-            else:
-                # If uid is bytes, decode it directly
-                user_id = urlsafe_base64_decode(uid).decode()
-            logger.info(f"Successfully decoded user ID: {user_id}")
-        except Exception as e:
-            logger.error(f"Failed to decode user ID: {str(e)}")
-            return Response(
-                {"error": "Invalid user ID format"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        user_id = urlsafe_base64_decode(uid).decode()
+    except Exception:
+        return Response({"error": "Invalid user ID format"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Get user and verify token
-        try:
-            user = Users.objects.get(pk=user_id)
-            logger.info(f"Found user: {user.email} (ID: {user.id})")
+    try:
+        user = Users.objects.get(pk=user_id)
+        if not invitation_token_generator.check_token(user, token):
+            return Response({"error": "Invalid or expired invitation link"}, status=status.HTTP_400_BAD_REQUEST)
+    except Users.DoesNotExist:
+        return Response({"error": "Invalid user ID"}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Generate a new token for comparison
-            expected_token = invitation_token_generator.make_token(user)
-            logger.info(f"Expected token: {expected_token}, Received token: {token}")
+    try:
+        user_context_role = UserContextRole.objects.select_related('context').get(
+            user=user,
+            status='pending'
+        )
+        context = user_context_role.context
 
-            if not invitation_token_generator.check_token(user, token):
-                logger.error(f"Token validation failed for user {user_id}")
-                return Response(
-                    {"error": "Invalid or expired invitation link"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            logger.info("Token validation successful")
-        except Users.DoesNotExist:
-            logger.error(f"User not found with ID: {user_id}")
-            return Response(
-                {"error": "Invalid user ID"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        with transaction.atomic():
+            # Get usage cycle and lock it
+            usage_entry = ModuleUsageCycle.objects.select_for_update().filter(
+                cycle__subscription__context=context,
+                feature_key='users_count'
+            ).order_by('-id').first()
 
-        # Get the pending user context role
-        try:
-            user_context_role = UserContextRole.objects.get(
-                user=user,
-                status='pending'
-            )
-            logger.info(f"Found pending invitation for context: {user_context_role.context.name}")
-        except UserContextRole.DoesNotExist:
-            logger.error(f"No pending invitation found for user {user_id}")
-            return Response(
-                {"error": "No pending invitation found"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            if usage_entry:
+                if usage_entry.actual_count != "unlimited":
+                    actual = int(usage_entry.actual_count or 0)
+                    usage = int(usage_entry.usage_count or 0)
 
-        # Activate the user context role
-        user_context_role.status = 'active'
-        user_context_role.save()
-        logger.info("User context role activated successfully")
+                    if usage >= actual:
+                        return Response(
+                            {"error": "User limit reached. Cannot accept invitation."},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
 
-        # For new users, update their status
-        if user.status in ['pending', 'invited'] and user.registration_flow in ['invited', 'standard']:
-            user.status = 'active'
-            user.registration_completed = True
-            user.is_active = True
-            user.active_context = user_context_role.context.id
-            user.save()
-            logger.info("New user status updated successfully")
+                    # Increment usage count
+                    usage_entry.usage_count = str(usage + 1)
+                    usage_entry.save()
+
+            # Activate user context role
+            user_context_role.status = 'active'
+            user_context_role.save()
+
+            if user.status in ['pending', 'invited'] and user.registration_flow in ['invited', 'standard']:
+                user.status = 'active'
+                user.registration_completed = True
+                user.is_active = True
+                user.active_context = context
+                user.save()
 
         return Response(
             {
-                "message": "Team invitation accepted successfully.",
+                "message": "You have successfully joined the organization.",
                 "user_id": user.id,
                 "email": user.email,
-                "context_id": user_context_role.context.id,
+                "context_id": context.id,
                 "role_id": user_context_role.role.id,
                 "role_name": user_context_role.role.name,
                 "is_new_user": user.registration_flow == 'invited'
@@ -533,12 +519,11 @@ def accept_team_invitation(request):
             status=status.HTTP_200_OK
         )
 
+    except UserContextRole.DoesNotExist:
+        return Response({"error": "No pending invitation found"}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.error(f"Failed to accept invitation: {str(e)}")
-        return Response(
-            {"error": f"Failed to accept invitation: {str(e)}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        return Response({"error": f"Failed to accept invitation: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])
