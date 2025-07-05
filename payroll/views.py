@@ -355,7 +355,7 @@ class PayrollOrgBusinessDetailView(APIView):
             # Check if PayrollOrg exists
             payroll_org = PayrollOrg.objects.filter(business=business_id).first()
             organisation_details = bool(payroll_org)
-
+            # Include sender_email
             response_data = {
                 "business": business.id,
                 "organisation_name": business.nameOfBusiness,
