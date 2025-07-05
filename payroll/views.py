@@ -363,7 +363,7 @@ class PayrollOrgBusinessDetailView(APIView):
                 # Checking existence of related objects
                 "organisation_details": organisation_details,
                 "payroll_id": payroll_org.id if organisation_details else None,
-                "sender_email": payroll_org.sender_email if payroll_org.sender_email else None,
+                "sender_email": payroll_org.sender_email if organisation_details else None,
                 "work_locations": WorkLocations.objects.filter(
                     payroll=payroll_org.id).exists() or payroll_org.work_location if organisation_details else False,
                 "departments": Departments.objects.filter(payroll=payroll_org.id).exists() or payroll_org.department

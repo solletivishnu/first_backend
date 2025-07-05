@@ -325,4 +325,6 @@ urlpatterns = [
     path('business-logo/', other_factors.upload_business_logo, name='upload_business_logo'),
     path('business-logo/<int:pk>/', other_factors.business_logo_detail, name='business_logo_detail'),
 
+    path("usage-summary/<int:context_id>/", views.get_usage_summary_by_context, name="usage-summary-by-context"),
+
 ]

@@ -5,21 +5,26 @@ from datetime import date
 from .models import SubscriptionCycle, ModuleUsageCycle, ModuleSubscription
 
 
-def get_usage_entry(context_id, feature_key):
+def get_usage_entry(context_id, feature_key, module_id=None):
     try:
-        # Get active subscription
-        subscription = ModuleSubscription.objects.filter(
-            context_id=context_id,
-            status__in=["active", "trial"]
-        ).first()
+        # Build subscription query
+        subscription_filters = {
+            "context_id": context_id,
+            "status__in": ["active", "trial"]
+        }
+        if module_id:
+            subscription_filters["module_id"] = module_id
+
+        # Get active or trial subscription
+        subscription = ModuleSubscription.objects.filter(**subscription_filters).first()
 
         if not subscription:
             return None, Response(
-                {"error": "No active subscription found for this context."},
+                {"error": "No active or trial subscription found for this context/module."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Get latest cycle
+        # Get latest subscription cycle
         cycle = SubscriptionCycle.objects.filter(subscription=subscription).order_by('-start_date').first()
         if not cycle:
             return None, Response(
@@ -27,11 +32,15 @@ def get_usage_entry(context_id, feature_key):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Fetch usage entry
-        usage_entry = ModuleUsageCycle.objects.filter(
-            cycle=cycle,
-            feature_key=feature_key
-        ).first()
+        # Build usage entry query
+        usage_filters = {
+            "cycle": cycle,
+            "feature_key": feature_key,
+        }
+        if module_id:
+            usage_filters["module_id"] = module_id  # Only include if your model supports this field
+
+        usage_entry = ModuleUsageCycle.objects.filter(**usage_filters).first()
 
         if not usage_entry:
             return None, Response(
@@ -39,13 +48,14 @@ def get_usage_entry(context_id, feature_key):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Validate usage limit
-        if usage_entry.actual_count != "unlimited":
-            if int(usage_entry.usage_count) >= int(usage_entry.actual_count):
+        # Check usage limit
+        actual_limit = str(usage_entry.actual_count).strip().lower()
+        if actual_limit != "unlimited":
+            if int(usage_entry.usage_count) >= int(actual_limit):
                 return None, Response(
                     {
-                        "error": f"Usage limit reached for '{usage_entry.feature_key}'. "
-                                 f"Please upgrade your subscription or contact the admin team to proceed."
+                        "error": f"Usage limit reached for '{feature_key}'.",
+                        "details": "Please upgrade your subscription or contact support."
                     },
                     status=status.HTTP_400_BAD_REQUEST
                 )
@@ -54,7 +64,7 @@ def get_usage_entry(context_id, feature_key):
 
     except Exception as e:
         return None, Response(
-            {"error": f"Failed to get usage entry: {str(e)}"},
+            {"error": "Failed to get usage entry", "details": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 

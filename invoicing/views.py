@@ -485,9 +485,8 @@ def create_invoice(request):
                 {"error": "No valid context found to track usage."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
         # Step 2: Check usage entry
-        usage_entry, error_response = get_usage_entry(context_id, 'invoices_count')
+        usage_entry, error_response = get_usage_entry(context_id, 'invoices_count', module_id=2)
         if error_response:
             return error_response
 
