@@ -11,6 +11,7 @@ from urllib.parse import urlparse, unquote
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponse
 import re
+from .helpers import *
 # CRUD operations for DocWallet
 
 
@@ -436,3 +437,32 @@ def fetch_document_data(request):
 
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+@api_view(['GET'])
+def context_file_autocomplete(request):
+    query = request.GET.get("q", "").strip()
+    print("Testing the Use case")
+    context_id = request.user.active_context_id  # or however you access current context
+
+    if not query:
+        return Response({"results": []})
+
+    if not context_id or context_id not in context_tries:
+        return Response({"results": [], "message": "No trie found for context"}, status=404)
+
+    suggestions = context_tries[context_id].search_prefix(query, limit=10)
+    return Response({"results": suggestions})
+
+@api_view(['GET'])
+def context_file_filter(request):
+    q = request.GET.get("q", "")
+    context_id = request.user.active_context_id
+
+    results = Document.objects.filter(
+        folder__wallet__context_id=context_id,
+        name__icontains=q
+    ).select_related('folder', 'folder__wallet')[:20]
+
+    serializer = DocumentSerializer(results, many=True)
+    return Response({"results": serializer.data})

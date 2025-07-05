@@ -22,7 +22,10 @@ from .models import (
     Role,
     SubscriptionPlan,
     UserFeaturePermission,
-    Users
+    Users,
+    SubscriptionCycle,
+    ModuleUsageCycle,
+    ModuleSubscription
 )
 from .serializers import (
     ModuleDetailSerializer,
@@ -450,3 +453,61 @@ This module contains views for handling user-related operations including:
 - Module management
 - Role management
 """
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def get_usage_summary_by_context(request, context_id):
+    """
+    Retrieve all usage entries for a given context ID.
+    Optional query param: module_id
+    """
+    try:
+        module_id = request.query_params.get("module_id")
+
+        # Filter subscriptions
+        sub_filters = {
+            "context_id": context_id,
+            "status__in": ["active", "trial"]
+        }
+        if module_id:
+            sub_filters["module_id"] = module_id
+
+        subscriptions = ModuleSubscription.objects.filter(**sub_filters)
+
+        if not subscriptions.exists():
+            return Response(
+                {"error": "No active/trial subscriptions found for the given context."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        usage_summary = []
+
+        for sub in subscriptions:
+            cycle = SubscriptionCycle.objects.filter(subscription=sub).order_by("-start_date").first()
+            if not cycle:
+                continue
+
+            usage_entries = ModuleUsageCycle.objects.filter(cycle=cycle)
+
+            for entry in usage_entries:
+                usage_summary.append({
+                    "module_id": sub.module_id,
+                    "feature_key": entry.feature_key,
+                    "usage_count": entry.usage_count,
+                    "actual_count": entry.actual_count,
+                    "is_limited": str(entry.actual_count).lower() != "unlimited"
+                })
+
+        return Response({
+            "success": True,
+            "context_id": context_id,
+            "data": usage_summary
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({
+            "success": False,
+            "error": "Failed to fetch usage summary.",
+            "details": str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+

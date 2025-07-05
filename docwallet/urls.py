@@ -26,4 +26,7 @@ urlpatterns = [
     path('wallet-info', views.retrieve_docwallet_info, name='docwallet-info'),
 
     path('fetch-document', views.fetch_document_data, name='fetch_document_data'),
+
+    path("files/search-autocomplete/", views.context_file_autocomplete),
+    path("files/search/", views.context_file_filter),
 ]
