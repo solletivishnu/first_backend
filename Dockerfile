@@ -1,4 +1,7 @@
-FROM python:3.12
+# ---------- STAGE 1: Builder ----------
+FROM python:3.12-slim AS builder
+
+WORKDIR /app
 
 # Install system dependencies including wkhtmltopdf
 RUN apt-get update && apt-get install -y \
@@ -12,19 +15,43 @@ RUN apt-get update && apt-get install -y \
     libxrender1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/* /var/cache/apt/*
 
-# Set working directory
+# Create virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# ---------- STAGE 2: Runtime ----------
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PATH="/opt/venv/bin:$PATH"
+
 WORKDIR /app
 
-# Upgrade pip and install Python dependencies
-COPY requirements.txt .
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
+# Install runtime dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    libpq5 \
+    curl && \
+    rm -rf /var/lib/apt/lists/*
 
-# Copy project code
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+
+# Copy application code
 COPY . .
 
 # Expose the port your app runs on
 EXPOSE 8000
 
-# Start the Django app with Gunicorn
-CMD ["gunicorn", "Tara.wsgi:application", "--bind", "0.0.0.0:8000", "--workers=2"]
+
+CMD ["gunicorn", "Tara.wsgi:application", \
+    "--bind", "0.0.0.0:8000", \
+    "--workers", "2"]
+
+
