@@ -996,35 +996,8 @@ def handle_payment_success(sender, instance, created, **kwargs):
                     amount=round(float(instance.amount), 2),
                     is_paid=True,
                     payment_id=instance.razorpay_payment_id,
-                    feature_usage={}  # Initialize empty feature usage
+                    feature_usage=instance.plan.features_enabled  # Initialize empty feature usage
                 )
-
-                # Initialize usage cycles for the new plan's features
-                if instance.plan.features_enabled:
-                    for feature_key, config in instance.plan.features_enabled.items():
-                        if isinstance(config, dict) and (config.get("limit") is not None
-                                                         or config.get("track") is True):
-                            ModuleUsageCycle.objects.create(
-                                cycle=new_cycle,
-                                feature_key=feature_key,
-                                usage_count=0
-                            )
-
-                # Handle add-ons if specified in payment notes
-                if instance.notes and 'add_ons' in instance.notes:
-                    for add_on in instance.notes['add_ons']:
-                        try:
-                            price_per_unit = round(float(add_on.get('price_per_unit', 0.00)), 2)
-                        except (TypeError, ValueError):
-                            price_per_unit = 0.00
-
-                        ModuleAddOn.objects.create(
-                            subscription=subscription,
-                            type=add_on.get('type', 'unknown'),
-                            quantity=add_on.get('quantity', 1),
-                            price_per_unit=price_per_unit,
-                            billing_cycle=add_on.get('billing_cycle', 'monthly')
-                        )
 
         except Exception as e:
             # Log the error but don't raise it to prevent signal failure
@@ -1095,7 +1068,18 @@ def create_module_usage_cycles(sender, instance, created, **kwargs):
                     usage_count = "unlimited"
                 elif limit_str.isdigit():
                     actual_count = str(limit)
-                    usage_count = "1" if normalized_key == "users_count" else "0"
+
+                    if normalized_key == "users_count":
+                        # ✅ Count users linked to the same context and marked active
+                        context = instance.subscription.context
+                        active_user_count = UserContextRole.objects.filter(
+                            context=context,
+                            status="active",
+                            user__is_active=True  # assumes your 'Users' model has this field
+                        ).count()
+                        usage_count = str(active_user_count)
+                    else:
+                        usage_count = "0"
                 else:
                     actual_count = None
                     usage_count = "0"
@@ -1294,7 +1278,7 @@ class Business(BaseModel):
         super().clean()
 
         # Check if MSME is registered but no registration number provided
-        if (self.is_msme_registered == True or self.is_msme_registered == True) and not self.msme_registration_number:
+        if (self.is_msme_registered==True or self.is_msme_registered==True) and not self.msme_registration_number:
             raise ValidationError({
                 'msme_registration_number': 'MSME registration number is required when business is MSME registered.'
             })
