@@ -988,16 +988,16 @@ def handle_payment_success(sender, instance, created, **kwargs):
                     subscription.end_date = timezone.now() + timedelta(days=instance.plan.billing_cycle_days)
                     subscription.save()
 
-                # Create new subscription cycle
-                new_cycle = SubscriptionCycle.objects.create(
-                    subscription=subscription,
-                    start_date=subscription.start_date,
-                    end_date=subscription.end_date,
-                    amount=round(float(instance.amount), 2),
-                    is_paid=True,
-                    payment_id=instance.razorpay_payment_id,
-                    feature_usage=instance.plan.features_enabled  # Initialize empty feature usage
-                )
+                    # Create new subscription cycle
+                    new_cycle = SubscriptionCycle.objects.create(
+                        subscription=subscription,
+                        start_date=subscription.start_date,
+                        end_date=subscription.end_date,
+                        amount=round(float(instance.amount), 2),
+                        is_paid=True,
+                        payment_id=instance.razorpay_payment_id,
+                        feature_usage=instance.plan.features_enabled  # Initialize empty feature usage
+                    )
 
         except Exception as e:
             # Log the error but don't raise it to prevent signal failure
