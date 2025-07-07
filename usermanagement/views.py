@@ -421,7 +421,7 @@ def update_module_permission(request, permission_id):
 @api_view(['DELETE'])
 def delete_module_permission(request, permission_id):
     """
-    API endpoint for deleting module permissions
+    API endpoint for deleting module permissions check
     """
     try:
         permission = UserFeaturePermission.objects.get(id=permission_id)
