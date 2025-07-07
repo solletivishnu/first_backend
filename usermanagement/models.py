@@ -1278,7 +1278,7 @@ class Business(BaseModel):
         super().clean()
 
         # Check if MSME is registered but no registration number provided
-        if (self.is_msme_registered == True or self.is_msme_registered == True) and not self.msme_registration_number:
+        if (self.is_msme_registered==True or self.is_msme_registered==True) and not self.msme_registration_number:
             raise ValidationError({
                 'msme_registration_number': 'MSME registration number is required when business is MSME registered.'
             })
