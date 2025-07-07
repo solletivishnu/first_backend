@@ -1034,7 +1034,7 @@ def handle_payment_success(sender, instance, created, **kwargs):
 
 
 @receiver(post_save, sender=ModuleSubscription)
-def create_initial_subscription_cycle(sender, instance, created, **kwargs):
+def create_subscription_cycle(sender, instance, created, **kwargs):
     if not created:
         return
 
@@ -1055,10 +1055,10 @@ def create_initial_subscription_cycle(sender, instance, created, **kwargs):
                 return
 
             # Step 2: Copy features
-            features = instance.plan.features_enabled or {}
+            features = instance.plan.features_enabled
 
             # Step 3: Create SubscriptionCycle
-            cycle = SubscriptionCycle.objects.create(
+            SubscriptionCycle.objects.create(
                 subscription=instance,
                 start_date=instance.start_date,
                 end_date=instance.end_date,
@@ -1067,15 +1067,25 @@ def create_initial_subscription_cycle(sender, instance, created, **kwargs):
                 feature_usage=features
             )
 
-            # Step 4: Prevent duplicates with lowercase key tracking
+    except Exception as e:
+        raise Exception(f"SubscriptionCycle creation failed: {str(e)}")
+
+
+@receiver(post_save, sender=SubscriptionCycle)
+def create_module_usage_cycles(sender, instance, created, **kwargs):
+    if not created:
+        return
+
+    try:
+        with transaction.atomic():
+            features = instance.feature_usage or {}
             seen_features = set()
 
             for feature_key, limit in features.items():
                 normalized_key = feature_key.lower()
 
                 if normalized_key in seen_features:
-                    continue  # skip duplicate in same transaction
-
+                    continue
                 seen_features.add(normalized_key)
 
                 limit_str = str(limit).lower()
@@ -1085,25 +1095,19 @@ def create_initial_subscription_cycle(sender, instance, created, **kwargs):
                     usage_count = "unlimited"
                 elif limit_str.isdigit():
                     actual_count = str(limit)
-
-                    # ✅ If it's 'users_count', start with 1
-                    if normalized_key == 'users_count':
-                        usage_count = "1"
-                    else:
-                        usage_count = "0"
+                    usage_count = "1" if normalized_key == "users_count" else "0"
                 else:
                     actual_count = None
                     usage_count = "0"
 
                 ModuleUsageCycle.objects.create(
-                    cycle=cycle,
+                    cycle=instance,
                     feature_key=feature_key,
                     actual_count=actual_count,
                     usage_count=usage_count
                 )
-
     except Exception as e:
-        raise Exception(f"Registration failed: {str(e)}")
+        raise Exception(f"ModuleUsageCycle creation failed: {str(e)}")
 
 
 class ModuleUsageCycle(models.Model):
