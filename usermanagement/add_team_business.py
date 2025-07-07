@@ -123,23 +123,24 @@ def add_team_member_to_business(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
             # ✅ Validate usage entry AFTER getting the context
-        # Get usage entry
-        usage_entry, error_response = get_usage_entry(context_id, "users_count")
-        if error_response:
-            return error_response
+        if not context.is_platform_context:
+            # Get usage entry
+            usage_entry, error_response = get_usage_entry(context_id, "users_count")
+            if error_response:
+                return error_response
 
-        # Count pending invites
-        pending_invites = UserContextRole.objects.filter(
-            context_id=context_id,
-            status='pending'
-        ).count()
+            # Count pending invites
+            pending_invites = UserContextRole.objects.filter(
+                context_id=context_id,
+                status='pending'
+            ).count()
 
-        remaining_slots = int(usage_entry.actual_count) - int(usage_entry.usage_count) - pending_invites
-        if remaining_slots <= 0:
-            return Response(
-                {"error": "User limit reached or pending invitations already occupy available slots."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            remaining_slots = int(usage_entry.actual_count) - int(usage_entry.usage_count) - pending_invites
+            if remaining_slots <= 0:
+                return Response(
+                    {"error": "User limit reached or pending invitations already occupy available slots."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
         # Get all active subscriptions for this context
         active_subscriptions = ModuleSubscription.objects.filter(
@@ -475,25 +476,26 @@ def accept_team_invitation(request):
 
         with transaction.atomic():
             # Get usage cycle and lock it
-            usage_entry = ModuleUsageCycle.objects.select_for_update().filter(
-                cycle__subscription__context=context,
-                feature_key='users_count'
-            ).order_by('-id').first()
+            if not context.is_platform_context:
+                usage_entry = ModuleUsageCycle.objects.select_for_update().filter(
+                    cycle__subscription__context=context,
+                    feature_key='users_count'
+                ).order_by('-id').first()
 
-            if usage_entry:
-                if usage_entry.actual_count != "unlimited":
-                    actual = int(usage_entry.actual_count or 0)
-                    usage = int(usage_entry.usage_count or 0)
+                if usage_entry:
+                    if usage_entry.actual_count != "unlimited":
+                        actual = int(usage_entry.actual_count or 0)
+                        usage = int(usage_entry.usage_count or 0)
 
-                    if usage >= actual:
-                        return Response(
-                            {"error": "User limit reached. Cannot accept invitation."},
-                            status=status.HTTP_400_BAD_REQUEST
-                        )
+                        if usage >= actual:
+                            return Response(
+                                {"error": "User limit reached. Cannot accept invitation."},
+                                status=status.HTTP_400_BAD_REQUEST
+                            )
 
-                    # Increment usage count
-                    usage_entry.usage_count = str(usage + 1)
-                    usage_entry.save()
+                        # Increment usage count
+                        usage_entry.usage_count = str(usage + 1)
+                        usage_entry.save()
 
             # Activate user context role
             user_context_role.status = 'active'
