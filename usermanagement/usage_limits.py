@@ -37,8 +37,6 @@ def get_usage_entry(context_id, feature_key, module_id=None):
             "cycle": cycle,
             "feature_key": feature_key,
         }
-        if module_id:
-            usage_filters["module_id"] = module_id  # Only include if your model supports this field
 
         usage_entry = ModuleUsageCycle.objects.filter(**usage_filters).first()
 

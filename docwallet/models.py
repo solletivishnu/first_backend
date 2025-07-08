@@ -6,6 +6,7 @@ from django.dispatch import receiver
 from storages.backends.s3boto3 import S3Boto3Storage
 from Tara.settings.default import AWS_PRIVATE_BUCKET_NAME
 from .helpers import context_tries
+from django.contrib.postgres.indexes import GinIndex
 # Create your models here.
 
 
@@ -57,6 +58,11 @@ class Document(models.Model):
     folder = models.ForeignKey(Folder, on_delete=models.CASCADE, related_name='documents')
     uploaded_at = models.DateTimeField(auto_now_add=True)
     accessed_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            GinIndex(fields=['name'], name='document_name_trgm_idx', opclasses=['gin_trgm_ops']),
+        ]
 
     def save(self, *args, **kwargs):
         # Automatically assign the filename from the uploaded file if 'name' is not provided

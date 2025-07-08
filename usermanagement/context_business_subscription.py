@@ -159,23 +159,20 @@ def create_business_context(request):
 @permission_classes([AllowAny])
 def add_subscription_to_business(request):
     """
-    Add a subscription plan to an existing business context.
-
-    Expected request data:
-    {
-        "context_id": 1,
-        "module_id": 1,
-        "subscription_plan_id": 1,
-        "added_by": 1  # User ID of the person adding the subscription
-    }
+        Add a subscription plan to an existing business context.
+        Expected request data:
+        {
+            "context_id": 1,
+            "module_id": 1,
+            "subscription_plan_id": 1,
+            "added_by": 1  # User ID of the person adding the subscription
+        }
     """
-    # Extract data from request
     context_id = request.data.get('context_id')
     module_id = request.data.get('module_id')
     subscription_plan_id = request.data.get('subscription_plan_id')
     added_by_id = request.data.get('added_by')
 
-    # Validate required fields
     if not all([context_id, module_id, subscription_plan_id, added_by_id]):
         return Response(
             {
@@ -186,78 +183,94 @@ def add_subscription_to_business(request):
 
     try:
         with transaction.atomic():
-            # Get context
+            # Fetch all required instances
+            context = Context.objects.get(id=context_id, context_type='business')
+            module = Module.objects.get(id=module_id)
+            subscription_plan = SubscriptionPlan.objects.get(id=subscription_plan_id)
+            added_by = Users.objects.get(id=added_by_id)
+
+            now = timezone.now()
+            billing_duration = relativedelta(days=subscription_plan.billing_cycle_days)
+            new_end_date = now + billing_duration
+
+            # Block re-use of trial plan
+            if subscription_plan.plan_type == 'trial':
+                trial_exists = ModuleSubscription.objects.filter(
+                    context=context,
+                    module=module,
+                    plan__plan_type='trial',
+                ).exists()
+
+                if trial_exists:
+                    return Response(
+                        {"error": "Trial plan has already been used for this context and module. Please choose a paid plan."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+            # Check if subscription exists and is active
             try:
-                context = Context.objects.get(id=context_id, context_type='business')
-            except Context.DoesNotExist:
-                return Response(
-                    {"error": "Business context not found."},
-                    status=status.HTTP_404_NOT_FOUND
+                module_subscription = ModuleSubscription.objects.get(
+                    context=context,
+                    module=module,
+                    status='active'
                 )
 
-            # Get module
-            try:
-                module = Module.objects.get(id=module_id)
-            except Module.DoesNotExist:
-                return Response(
-                    {"error": "Module not found."},
-                    status=status.HTTP_404_NOT_FOUND
+                if subscription_plan.plan_type == 'trial':
+                    return Response(
+                        {
+                            "error": "Trial plan can only be used once and cannot update an existing active subscription."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+                if module_subscription.end_date > now:
+                    module_subscription.end_date = new_end_date
+                else:
+                    module_subscription.start_date = now
+                    module_subscription.end_date = new_end_date
+
+                module_subscription.plan = subscription_plan
+                module_subscription.added_by = added_by
+                module_subscription.save()
+
+            except ModuleSubscription.DoesNotExist:
+                # Create new subscription
+                module_subscription = ModuleSubscription.objects.create(
+                    context=context,
+                    module=module,
+                    plan=subscription_plan,
+                    status='active',
+                    start_date=now,
+                    end_date=new_end_date,
+                    auto_renew=False,
+                    added_by=added_by
                 )
 
-            # Get subscription plan
-            try:
-                subscription_plan = SubscriptionPlan.objects.get(id=subscription_plan_id)
-            except SubscriptionPlan.DoesNotExist:
-                return Response(
-                    {"error": "Subscription plan not found."},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-
-            # Get user who is adding the subscription
-            try:
-                added_by = Users.objects.get(id=added_by_id)
-            except Users.DoesNotExist:
-                return Response(
-                    {"error": "User who is adding the subscription not found."},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-
-            # Create module subscription
-            module_subscription = ModuleSubscription.objects.create(
-                context=context,
-                module=module,
-                plan=subscription_plan,
-                status='active',
-                start_date=timezone.now(),
-                end_date=timezone.now() + relativedelta(days=subscription_plan.billing_cycle_days),
-                auto_renew=False,
-                added_by=added_by  # Add the user who added the subscription
-            )
-
-            # Get all features for the module
+            # Set up permissions
             module_features = ModuleFeature.objects.filter(module=module)
-
-            # Create feature permissions for all users in the context
             user_context_roles = UserContextRole.objects.filter(context=context)
-            for ucr in user_context_roles:
-                # Collect all unique service.action combinations
-                all_actions = []
-                for feature in module_features:
-                    action = f"{feature.service}.{feature.action}"
-                    if action not in all_actions:
-                        all_actions.append(action)
 
-                # Create a single user feature permission with all actions
-                UserFeaturePermission.objects.create(
+            actions = list({
+                f"{feature.service}.{feature.action}"
+                for feature in module_features
+            })
+
+            for ucr in user_context_roles:
+                ufp, created = UserFeaturePermission.objects.get_or_create(
                     user_context_role=ucr,
                     module=module,
-                    actions=all_actions,
-                    is_active=True,
-                    created_by=added_by  # Use the same user who added the subscription
+                    defaults={
+                        'actions': actions,
+                        'is_active': True,
+                        'created_by': added_by
+                    }
                 )
+                if not created:
+                    ufp.actions = actions
+                    ufp.is_active = True
+                    ufp.save()
 
             return Response({
-                "message": "Subscription added successfully",
+                "message": "Subscription added or updated successfully",
                 "module_subscription_id": module_subscription.id,
                 "start_date": module_subscription.start_date,
                 "end_date": module_subscription.end_date,

@@ -28,7 +28,7 @@ import json
 from Tara.settings.default import *
 import boto3
 from botocore.exceptions import ClientError, BotoCoreError
-from datetime import datetime
+from datetime import datetime, timezone
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import NotFound
@@ -46,6 +46,7 @@ from django.db.models.functions import TruncDate
 from .usage_limits import *
 # Create loggers for general and error logs
 logger = logging.getLogger(__name__)
+
 
 
 class Constants:
@@ -1109,7 +1110,7 @@ def gst_details_list_create(request):
 
     # Step 1: Get context from business or fallback to user's active_context
     context = None
-    business_id = data.get('business_id')
+    business_id = data.get('business')
 
     if business_id:
         try:
@@ -1127,7 +1128,7 @@ def gst_details_list_create(request):
         return Response({"error": "No context found from business or user."}, status=status.HTTP_400_BAD_REQUEST)
 
     # Step 2: Check usage entry for 'gstin'
-    usage_entry, error_response = get_usage_entry(context.id, 'gstin')
+    usage_entry, error_response = get_usage_entry(context.id, 'gstin', 2)
     if error_response:
         return error_response
 
