@@ -16,6 +16,9 @@ sudo docker rm $APP_NAME || true
 echo "🐳 Building Docker image..."
 sudo docker build -t $APP_NAME .
 
+echo "♻️ Pruning old unused images..."
+sudo docker image prune -f
+
 echo "🚀 Running Docker container..."
 sudo docker run -d \
   --env-file $ENV_FILE \

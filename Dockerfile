@@ -45,6 +45,7 @@ RUN apt-get update && \
     wkhtmltopdf \
     && rm -rf /var/lib/apt/lists/*
 
+
 # Copy virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv
 
@@ -54,6 +55,8 @@ COPY . .
 # Expose the port your app runs on
 EXPOSE 8000
 
+
 CMD ["gunicorn", "Tara.wsgi:application", \
     "--bind", "0.0.0.0:8000", \
     "--workers", "2"]
+
