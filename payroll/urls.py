@@ -4,6 +4,7 @@ from . import employee_management
 from . import generate_salary_upload_template
 from . import bulk_employee_upload
 from . import bulk_salary_details_upload
+from . import payroll_workflow
 
 urlpatterns = [
     # URL for listing and creating PayrollOrg instances
@@ -192,5 +193,11 @@ urlpatterns = [
     path('employees/upload/', bulk_employee_upload.upload_employee_excel, name='upload-employee-excel'),
 
     path('employee-salary-bulk-upload/', bulk_salary_details_upload.upload_employee_salary_excel, name='upload-bulk-salary-data'),
+
+    path('payroll-workflows/', payroll_workflow.payroll_workflow_list),
+    path('payroll-workflows/create/', payroll_workflow.payroll_workflow_create),
+    path('payroll-workflows/<int:pk>/update/', payroll_workflow.payroll_workflow_update),
+    path('payroll-workflows/<int:pk>/delete/', payroll_workflow.payroll_workflow_delete),
+    path('payroll-workflows/detail-or-create/', payroll_workflow.payroll_workflow_detail_or_create),
 
 ]

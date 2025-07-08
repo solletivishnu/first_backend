@@ -125,7 +125,7 @@ class Context(models.Model):
         on_delete=models.CASCADE,
         related_name='owned_contexts'
     )
-    business = models.ForeignKey(
+    business = models.OneToOneField(
         'Business',
         on_delete=models.CASCADE,
         null=True,

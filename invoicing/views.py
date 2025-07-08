@@ -35,6 +35,7 @@ from usermanagement.usage_limits import get_usage_entry, increment_usage
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 from datetime import date
 import requests
+from usermanagement.models import Context
 
 # Create loggers for general and error logs
 logger = logging.getLogger(__name__)
@@ -468,8 +469,10 @@ def create_invoice(request):
         context_id = None
         if invoicing_profile_id:
             try:
-                invoicing_profile = InvoicingProfile.objects.select_related('business__context').get(id=invoicing_profile_id)
-                context_id = invoicing_profile.business.context.id if invoicing_profile.business and invoicing_profile.business.context else None
+                invoicing_profile = InvoicingProfile.objects.select_related('business').get(id=invoicing_profile_id)
+                context = Context.objects.filter(business=invoicing_profile.business).first()
+                context_id = context.id if context else None
+
             except InvoicingProfile.DoesNotExist:
                 return Response(
                     {"error": "Invalid invoicing_profile ID provided."},

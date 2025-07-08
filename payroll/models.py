@@ -912,6 +912,40 @@ class EmployeeSalaryHistory(models.Model):
         return f"{self.employee.associate_id} - {self.change_date}"
 
 
+class PayrollWorkflow(models.Model):
+    STATUS_CHOICES = [
+        ('in progress', 'in progress'),
+        ('completed', 'completed'),
+        ('approved', 'approved'),
+    ]
+
+    payroll = models.ForeignKey(
+        'PayrollOrg',
+        on_delete=models.CASCADE,
+        related_name='payroll_workflow'
+    )
+
+    month = models.IntegerField(null=False)  # Month (1–12)
+    financial_year = models.CharField(max_length=10, null=False, blank=False)  # Format: "2024-2025"
+
+    new_joinees = models.CharField(max_length=20, choices=STATUS_CHOICES, default='in progress')
+    exits = models.CharField(max_length=20, choices=STATUS_CHOICES, default='in progress')
+    attendance = models.CharField(max_length=20, choices=STATUS_CHOICES, default='in progress')
+    bonuses = models.CharField(max_length=20, choices=STATUS_CHOICES, default='in progress')
+    salary_revision = models.CharField(max_length=20, choices=STATUS_CHOICES, default='in progress')
+    tds = models.CharField(max_length=20, choices=STATUS_CHOICES, default='in progress')
+    loans_and_advances = models.CharField(max_length=20, choices=STATUS_CHOICES, default='in progress')
+    finalize = models.BooleanField(default=False)  # Whether payroll is finalized
+    created_on = models.DateField(auto_now_add=True)  # Automatically set when created
+
+    def __str__(self):
+        return f"Payroll Workflow for {self.payroll.name} - {self.month}/{self.financial_year}"
+
+
+
+
+
+
 
 
 

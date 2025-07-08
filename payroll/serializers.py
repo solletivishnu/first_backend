@@ -32,12 +32,18 @@ class PayrollOrgSerializer(serializers.ModelSerializer):
         return instance
 
 
-
-
 class WorkLocationSerializer(serializers.ModelSerializer):
+    employee_count = serializers.SerializerMethodField(read_only=True)
+
     class Meta:
         model = WorkLocations
         fields = '__all__'
+
+    def get_employee_count(self, obj):
+        payroll_id = self.context.get('payroll_id')
+        if payroll_id:
+            return obj.employee_work_location.filter(payroll_id=payroll_id).count()
+        return obj.employee_work_location.count()
 
     def create(self, validated_data):
         """
@@ -58,9 +64,17 @@ class WorkLocationSerializer(serializers.ModelSerializer):
 
 
 class DepartmentsSerializer(serializers.ModelSerializer):
+    employee_count = serializers.SerializerMethodField(read_only=True)
+
     class Meta:
         model = Departments
         fields = '__all__'
+
+    def get_employee_count(self, obj):
+        payroll_id = self.context.get('payroll_id')
+        if payroll_id:
+            return obj.employee_department.filter(payroll_id=payroll_id).count()
+        return obj.employeemanagement_set.count()
 
     def create(self, validated_data):
         """
@@ -79,10 +93,19 @@ class DepartmentsSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
+
 class DesignationSerializer(serializers.ModelSerializer):
+    employee_count = serializers.SerializerMethodField(read_only=True)
+
     class Meta:
         model = Designation
-        fields = ['id', 'payroll', 'designation_name']
+        fields = ['id', 'payroll', 'designation_name', 'employee_count']
+
+    def get_employee_count(self, obj):
+        payroll_id = self.context.get('payroll_id')
+        if payroll_id:
+            return obj.employee_designation.filter(payroll_id=payroll_id).count()
+        return obj.employee_designation.count()
 
     def create(self, validated_data):
         """
@@ -904,4 +927,10 @@ class EmployeeSimpleSerializer(serializers.ModelSerializer):
         middle = obj.middle_name
         middle_part = f" {middle}" if middle and str(middle).lower() != 'nan' else ''
         return f"{obj.first_name}{middle_part} {obj.last_name}".strip()
+
+
+class PayrollWorkflowSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PayrollWorkflow
+        fields = '__all__'
 
