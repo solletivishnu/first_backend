@@ -63,11 +63,12 @@ def request_otp(request):
 
     special_emails = {'hr@finixco.in', 'cleoskinc@gmail.com', 'h.chahal@venturiq.com', 'accounts@ereena.co',
                       'Theholeinthewallcafehyd2@gmail.com', 'accounts@sashaclinics.com', 'admin@flexpilates.in',
-                      'karshakinfratech@gmail.com', 'camanisai@gmail.com', 'udaykiran256303@gmail.com'}
+                      'karshakinfratech@gmail.com', 'camanisai@gmail.com', 'udaykiran256303@gmail.com',
+                      'info@svpandco.com', 'akhila.tadisina@gmail.com'}
 
     # Send OTP email
     if email in special_emails:
-        send_otp_email("surya.prakash@tarafirst.com", otp_code)
+        send_otp_email("saikiranmekala@tarafirst.com", otp_code)
     else:
         send_otp_email(email, otp_code)
 
