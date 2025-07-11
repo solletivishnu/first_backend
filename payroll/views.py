@@ -3677,15 +3677,25 @@ def employee_monthly_salary_template(request):
                 if hasattr(salary_history.employee, 'statutory_components') else "",
 
             # Earnings
+            "basic_format": True if salary_history.basic_salary > 0 else False,
             "basic": format_with_commas(salary_history.basic_salary),
+            "hra_allowance_format": True if salary_history.hra > 0 else False,
             "hra_allowance": format_with_commas(salary_history.hra),
+            "conveyance_allowance_format": True if salary_history.conveyance_allowance > 0 else False,
             "conveyance_allowance": format_with_commas(salary_history.conveyance_allowance),
+            "travelling_allowance_format": True if salary_history.travelling_allowance > 0 else False,
             "travelling_allowance": format_with_commas(salary_history.travelling_allowance),
+            "bonus_format": True if salary_history.bonus > 0 else False,
             "bonus": format_with_commas(salary_history.bonus),
+            "commission_format": True if salary_history.commission > 0 else False,
             "commission": format_with_commas(salary_history.commission),
+            "children_education_allowance_format": True if salary_history.children_education_allowance > 0 else False,
             "children_education_allowance": format_with_commas(salary_history.children_education_allowance),
+            "overtime_allowance_format": True if salary_history.overtime_allowance > 0 else False,
             "overtime_allowance": format_with_commas(salary_history.overtime_allowance),
+            "transport_allowance_format": True if salary_history.transport_allowance > 0 else False,
             "transport_allowance": format_with_commas(salary_history.transport_allowance),
+            "fixed_allowance_format": True if salary_history.other_earnings > 0 else False,
             "fixed_allowance": format_with_commas(salary_history.other_earnings),
 
             # Salary Figures
@@ -3709,8 +3719,12 @@ def employee_monthly_salary_template(request):
 
             # Loan Details
             "loan_emi": format_with_commas(salary_history.loan_emi),
-            "loan_details": []  # Can be extended if you want loan records from another model
-        }
+            "loan_details": [],  # Can be extended if you want loan records from another model
+            "logo": getattr(getattr(salary_history.payroll.business, 'logos', None), 'logo', None).url
+                    if getattr(getattr(salary_history.payroll.business, 'logos', None), 'logo', None)
+                    else None,
+
+                    }
 
         template_name = "salary_template.html"
         document_generator = DocumentGenerator(request, salary_history, context)

@@ -40,34 +40,50 @@
           >
             <tbody>
               <tr>
-                <td style="width: 50%; vertical-align: top">
-                  <div style="font-size: 0.875rem; line-height: 1.25rem">
-                    <h2
-                      style="
-                        margin: 0 0 5px 0;
-                        white-space: nowrap;
-                        color: #5c6ac4;
-                      "
-                    >
-                      {{company_name}}
-                    </h2>
-                    <p style="margin: 0; color: #525252;">{{address}}</p>
-                  </div>
-                </td>
-                <td style="width: 50%; vertical-align: top">
-                  <div style="font-size: 0.875rem; line-height: 1.25rem">
-                    <p
-                      style="margin: 0; color: #525252;
-                        text-align: right"
-                    >
-                      Payslip For the Month
-                    </p>
-                    <h2 style="margin: 0 0 5px 0;white-space: nowrap; text-align: right; color: #5c6ac4;">
-                      {{pay_period}}
-                    </h2>
-                  </div>
-                </td>
-              </tr>
+              {% if logo %}
+              <td style="width: 15%; vertical-align: top">
+                <div style="font-size: 1.25rem; line-height: 1.25rem">
+                  <img
+                    src="{{ logo }}"
+                    alt="Company Logo"
+                    style="max-width: 220px;  max-height: 160px; height: 120px; width: 120px; object-fit: contain;"
+                  />
+                </div>
+              </td>
+              <td style="width: 50%; vertical-align: center">
+                <div style="font-size: 0.800rem; line-height: 1.25rem">
+                  <h2
+                    style="margin: 0 0 5px 0; white-space: nowrap; color: #5c6ac4;"
+                  >
+                    {{ company_name }}
+                  </h2>
+                  <p style="margin: 0; color: #525252;">{{ address }}</p>
+                </div>
+              </td>
+              {% else %}
+              <td colspan="2" style="width: 70%; vertical-align: top">
+                <div style="font-size: 0.800rem; line-height: 1.25rem">
+                  <h2
+                    style="margin: 0 0 5px 0; white-space: nowrap; color: #5c6ac4; text-align: left;"
+                  >
+                    {{ company_name }}
+                  </h2>
+                  <p style="margin: 0; color: #525252; text-align: left;">{{ address }}</p>
+                </div>
+              </td>
+              {% endif %}
+              <td style="width: 30%; vertical-align: center">
+                <div style="font-size: 0.800rem; line-height: 1.25rem">
+                  <p style="margin: 0; color: #525252; text-align: right;">
+                    Payslip For the Month
+                  </p>
+                  <h2 style="margin: 0 0 5px 0; white-space: nowrap; text-align: right; color: #5c6ac4;">
+                    {{ pay_period }}
+                  </h2>
+                </div>
+              </td>
+            </tr>
+
             </tbody>
           </table>
         </div>
@@ -460,6 +476,7 @@
                       </tr>
                     </thead>
                     <tbody>
+                      {% if basic_format %}
                       <tr style="border-bottom: 1px solid #e2e2e2">
                         <td
                           style="
@@ -479,6 +496,8 @@
                           {{basic}}
                         </td>
                       </tr>
+                      {% endif %}
+                      {% if hra_allowance_format %}
                       <tr style="border-bottom: 1px solid #e2e2e2">
                         <td
                           style="
@@ -498,6 +517,8 @@
                           {{hra_allowance}}
                         </td>
                       </tr>
+                      {% endif %}
+                      {% if conveyance_allowance_format %}
                       <tr style="border-bottom: 1px solid #e2e2e2">
                         <td
                           style="
@@ -517,6 +538,8 @@
                           {{conveyance_allowance}}
                         </td>
                       </tr>
+                      {% endif %}
+                      {% if travelling_allowance_format %}
                       <tr style="border-bottom: 1px solid #e2e2e2">
                         <td
                           style="
@@ -536,6 +559,8 @@
                           {{travelling_allowance}}
                         </td>
                       </tr>
+                      {% endif %}
+                      {% if fixed_allowance_format %}
                       <tr style="border-bottom: 1px solid #e2e2e2">
                         <td
                           style="
@@ -555,6 +580,8 @@
                           {{fixed_allowance}}
                         </td>
                       </tr>
+                      {% endif %}
+                      {% if bonus_format %}
                       <tr style="border-bottom: 1px solid #e2e2e2">
                         <td
                           style="
@@ -574,6 +601,8 @@
                           {{bonus}}
                         </td>
                       </tr>
+                      {% endif %}
+                      {% if commission_format %}
                       <tr style="border-bottom: 1px solid #e2e2e2">
                         <td
                           style="
@@ -593,6 +622,8 @@
                           {{commission}}
                         </td>
                       </tr>
+                      {% endif %}
+                      {% if children_education_allowance_format %}
                       <tr style="border-bottom: 1px solid #e2e2e2">
                         <td
                           style="
@@ -612,6 +643,8 @@
                           {{children_education_allowance}}
                         </td>
                       </tr>
+                      {% endif %}
+                      {% if overtime_allowance_format %}
                       <tr style="border-bottom: 1px solid #e2e2e2">
                         <td
                           style="
@@ -631,6 +664,8 @@
                           {{overtime_allowance}}
                         </td>
                       </tr>
+                      {% endif %}
+                      {% if transport_allowance_format %}
                       <tr style="border-bottom: 1px solid #e2e2e2">
                         <td
                           style="
@@ -650,6 +685,7 @@
                           {{transport_allowance}}
                         </td>
                       </tr>
+                      {% endif %}
                       <tr style="border-bottom: 1px solid #e2e2e2">
                         <td
                           style="
