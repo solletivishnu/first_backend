@@ -504,15 +504,20 @@ class EmployeeSalaryDetails(models.Model):
     created_on = models.DateField(auto_now_add=True)
     created_month = models.IntegerField(editable=False)
     created_year = models.IntegerField(editable=False)
+    is_variable_bonus = models.BooleanField(default=False)  # Indicates if the salary includes variable bonus
+    variable_bonus = models.JSONField(default=dict, blank=True)  # Stores variable bonus details
 
     def clean(self):
         """Ensure no open salary record exists before adding a new one."""
-        active_salary = EmployeeSalaryDetails.objects.filter(employee=self.employee, valid_to__isnull=True).exclude(
-            id=self.id).first()
+        active_salary = EmployeeSalaryDetails.objects.filter(
+            employee=self.employee,
+            valid_to__isnull=True
+        ).exclude(id=self.id).first()
 
         if active_salary:
             raise ValidationError(
-                "An active salary record already exists. Please close the existing record before adding a new one.")
+                "An active salary record already exists. Please close the existing record before adding a new one."
+            )
 
         # Validate earnings, benefits, and deductions
         for section_name, section in [('earnings', self.earnings), ('benefits', self.benefits),
@@ -533,6 +538,27 @@ class EmployeeSalaryDetails(models.Model):
                 raise ValidationError(f"{field_name} must be a dictionary.")
             if 'monthly' not in field_data or 'annually' not in field_data:
                 raise ValidationError(f"{field_name} must contain 'monthly' and 'annually' fields.")
+
+        # Validate variable bonus if marked as included
+        if self.is_variable_bonus:
+            if not isinstance(self.variable_bonus, dict):
+                raise ValidationError("Variable bonus must be a dictionary when 'is_variable_bonus' is True.")
+
+            required_bonus_fields = {'bonus_amount', 'pay_cycle_frequency'}
+            if not required_bonus_fields.issubset(self.variable_bonus):
+                raise ValidationError(f"Variable bonus must contain {required_bonus_fields}.")
+
+            # Validate pay_cycle_frequency
+            valid_frequencies = {'monthly', 'quarterly', 'half-yearly', 'annually'}
+            frequency = self.variable_bonus.get('pay_cycle_frequency')
+
+            if frequency not in valid_frequencies:
+                raise ValidationError(f"Invalid pay_cycle_frequency '{frequency}'. Must be one of {valid_frequencies}.")
+
+            # Validate bonus_amount
+            bonus_amount = self.variable_bonus.get('bonus_amount')
+            if not isinstance(bonus_amount, (int, float)):
+                raise ValidationError("bonus_amount must be a number.")
 
     def save(self, *args, **kwargs):
         """Ensure the previous salary is closed before adding a new record."""

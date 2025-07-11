@@ -18,10 +18,53 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Invoice</title>
+    <style>
+     @page {
+  size: A4;
+  margin: 0;
+}
+body {
+  margin: 0;
+  position: relative;
+}
+.footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: #f1f5f9;
+  color: #525252;
+  text-align: center;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  padding: 0.75rem;
+}
+.content {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding-bottom: 60px; /* Space for footer */
+}
+
+@media print {
+  body {
+    padding-bottom: 0;
+  }
+  .content {
+    padding-bottom: 0;
+    min-height: calc(100vh - 60px); /* Account for footer height */
+  }
+  .footer {
+    position: fixed;
+    bottom: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+    </style>
   </head>
 
-  <body style="margin: 0 !important; line-height: inherit">
-    <div>
+  <body>
+    <div class="content">
       <div style="padding-top: 1rem; padding-bottom: 1rem">
         <div
           style="
@@ -91,7 +134,7 @@
             padding-top: 1.5rem;
             padding-bottom: 1.5rem;
             font-size: 0.875rem;
-            line-height: 1.25rem;
+            line-height: 1rem;
           "
         >
           <table
@@ -103,7 +146,7 @@
                   <div
                     style="
                       font-size: 0.875rem;
-                      line-height: 1.25rem;
+                      line-height: 1rem;
                       color: #525252;
                     "
                   >
@@ -122,7 +165,7 @@
                   <div
                     style="
                       font-size: 0.875rem;
-                      line-height: 1.25rem;
+                      line-height: 1rem;
                       color: #525252;
                     "
                   >
@@ -143,10 +186,10 @@
           style="
             padding-left: 3.5rem;
             padding-right: 3.5rem;
-            padding-top: 2.5rem;
-            padding-bottom: 2.5rem;
+            padding-top: 2rem;
+            padding-bottom: 2rem;
             font-size: 0.875rem;
-            line-height: 1.25rem;
+            line-height: 1rem;
             color: #404040;
           "
         >
@@ -418,6 +461,12 @@
                   <h3 style="margin: 0; color: #5c6ac4; font-weight: 700">Terms and Conditions:</h3>
                   <p style="margin-top: 0.5rem; font-style: italic; color: #525252">{{terms_and_conditions}}</p>
                   {% endif %}
+                  {% if note and note != "" and note != "NA" %}
+                  <br /><br />
+                  <h3 style="margin: 0; color: #5c6ac4; font-weight: 700">Customer Notes:</h3>
+                  <p style="margin-top: 0.5rem; font-style: italic; color: #525252">{{note}}</p>
+                  {% endif %}
+
                 </td>
                 <td colspan="9">
                   <table
@@ -470,39 +519,6 @@
                                   </div>
                                 </td>
                               </tr>
-                              <!-- {% if discount != "0" and discount != "0.00" and discount != 0 %}
-                              <tr>
-                                <td
-                                  style="
-                                    border-bottom-width: 1px;
-                                    padding: 0.75rem;
-                                  "
-                                >
-                                  <div
-                                    style="white-space: nowrap; color: #94a3b8"
-                                  >
-                                    DISCOUNT:
-                                  </div>
-                                </td>
-                                <td
-                                  style="
-                                    border-bottom-width: 1px;
-                                    padding: 0.75rem;
-                                    text-align: right;
-                                  "
-                                >
-                                  <div
-                                    style="
-                                      white-space: nowrap;
-                                      font-weight: 700;
-                                      color: #5c6ac4;
-                                    "
-                                  >
-                                    {{discount}}
-                                  </div>
-                                </td>
-                              </tr>
-                              {% endif %} -->
                               {% if shipping != "0" and shipping != "0.00" and shipping != 0 %}
                               <tr>
                                 <td
@@ -532,6 +548,39 @@
                                     "
                                   >
                                     {{shipping}}
+                                  </div>
+                                </td>
+                              </tr>
+                              {% endif %}
+                              {% if shipping_tax != "0" and shipping_tax != "0.00" and shipping_tax != 0 %}
+                              <tr>
+                                <td
+                                  style="
+                                    border-bottom-width: 1px;
+                                    padding: 0.75rem;
+                                  "
+                                >
+                                  <div
+                                    style="white-space: nowrap; color: #94a3b8"
+                                  >
+                                    SHIPPING Tax:
+                                  </div>
+                                </td>
+                                <td
+                                  style="
+                                    border-bottom-width: 1px;
+                                    padding: 0.75rem;
+                                    text-align: right;
+                                  "
+                                >
+                                  <div
+                                    style="
+                                      white-space: nowrap;
+                                      font-weight: 700;
+                                      color: #5c6ac4;
+                                    "
+                                  >
+                                    {{shipping_tax}}
                                   </div>
                                 </td>
                               </tr>
@@ -661,7 +710,6 @@
           </table>
         </div>
 
-
         <div
           style="
             display: grid;
@@ -675,7 +723,7 @@
               padding-left: 3.5rem;
               padding-right: 3.5rem;
               font-size: 0.875rem;
-              line-height: 1.25rem;
+              line-height: 1rem;
               color: #404040;
             "
           >
@@ -691,7 +739,7 @@
               padding-left: 3.5rem;
               padding-right: 3.5rem;
               font-size: 0.875rem;
-              line-height: 1.25rem;
+              line-height: 1rem;
               color: #404040;
               text-align: right;
             "
@@ -706,44 +754,23 @@
             <p style="color: #5c6ac4; font-weight: 700">Authorized Signature</p>
           </div>
         </div>
-        <div
-          style="
-            padding-left: 3.5rem;
-            padding-right: 3.5rem;
-            padding-top: 2.5rem;
-            padding-bottom: 2.5rem;
-            font-size: 0.875rem;
-            line-height: 1.25rem;
-            color: #404040;
-            text-align: center;
-          "
-        >
-        </div>
-
-        <footer
-          style="
-        background-color: #f1f5f9;
-        color: #525252;
-        text-align: center;
-        font-size: 0.75rem;
-        line-height: 1rem;
-        padding-top: 0.75rem;
-        padding-bottom: 0.75rem;
-      "
-          >
-          Supplier Company
-          <span
-            style="color: #cbd5e1; padding-left: 0.5rem; padding-right: 0.5rem"
-            >|</span
-          >
-          {{company_name}}
-          <span
-            style="color: #cbd5e1; padding-left: 0.5rem; padding-right: 0.5rem"
-            >|</span
-          >
-          {{registration_number}}
-        </footer>
       </div>
     </div>
+
+    <footer class="footer">
+      Supplier Company
+      <span style="color: #cbd5e1; padding-left: 0.5rem; padding-right: 0.5rem">|</span>
+      {{company_name}}
+      <span style="color: #cbd5e1; padding-left: 0.5rem; padding-right: 0.5rem">|</span>
+      {{registration_number}}
+      {% if company_email != "NA" and company_email is not none %}
+        <span style="color: #cbd5e1; padding-left: 0.5rem; padding-right: 0.5rem">|</span>
+        {{company_email}}
+      {% endif %}
+      {% if company_mobile_number != "NA" and company_mobile_number is not none %}
+        <span style="color: #cbd5e1; padding-left: 0.5rem; padding-right: 0.5rem">|</span>
+        {{company_mobile_number}}
+      {% endif %}
+    </footer>
   </body>
 </html>

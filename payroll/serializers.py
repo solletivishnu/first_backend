@@ -3,7 +3,7 @@ from .models import *
 from datetime import date, datetime
 from calendar import monthrange
 from rest_framework.exceptions import ValidationError
-from django.db.models import Q
+from django.db.models import Q, Sum
 
 
 class PayrollOrgSerializer(serializers.ModelSerializer):
@@ -74,7 +74,7 @@ class DepartmentsSerializer(serializers.ModelSerializer):
         payroll_id = self.context.get('payroll_id')
         if payroll_id:
             return obj.employee_department.filter(payroll_id=payroll_id).count()
-        return obj.employeemanagement_set.count()
+        return obj.employee_department.count()
 
     def create(self, validated_data):
         """
@@ -779,21 +779,47 @@ class BonusIncentiveSerializer(serializers.ModelSerializer):
     designation = serializers.SerializerMethodField()
     associate_id = serializers.CharField(source='employee.associate_id', read_only=True)
 
+    committed_bonus = serializers.SerializerMethodField()
+    ytd = serializers.SerializerMethodField()
+    remaining_balance = serializers.SerializerMethodField()
+
     class Meta:
         model = BonusIncentive
-        fields = '__all__'
+        fields = [
+            'id',  # or whatever actual fields your model has
+            'employee', 'amount', 'financial_year', 'month', 'bonus_type',
+            'employee_name', 'department', 'designation', 'associate_id',
+            'committed_bonus', 'ytd', 'remaining_balance', 'remarks'
+        ]
 
     def get_employee_name(self, obj):
-        """Returns the formatted employee name"""
         return f"{obj.employee.first_name} {obj.employee.middle_name} {obj.employee.last_name}".strip()
 
     def get_department(self, obj):
-        """Fetch employee's department"""
         return obj.employee.department.dept_name
 
     def get_designation(self, obj):
-        """Fetch employee's designation"""
         return obj.employee.designation.designation_name
+
+    def get_committed_bonus(self, obj):
+        """Get committed bonus amount from EmployeeSalaryDetails if variable bonus is enabled"""
+        salary = EmployeeSalaryDetails.objects.filter(employee=obj.employee, valid_to__isnull=True).first()
+        if salary and salary.is_variable_bonus:
+            return salary.variable_bonus.get("bonus_amount", 0)
+        return 0
+
+    def get_ytd(self, obj):
+        """Get year-to-date total bonus paid to employee for the current financial year"""
+        total = BonusIncentive.objects.filter(
+            employee=obj.employee,
+            financial_year=obj.financial_year
+        ).aggregate(total_bonus=Sum('amount'))['total_bonus']
+        return total or 0
+
+    def get_remaining_balance(self, obj):
+        committed = self.get_committed_bonus(obj)
+        ytd = self.get_ytd(obj)
+        return committed - ytd
 
 
 class AdvanceLoanDetailSerializer(serializers.ModelSerializer):
