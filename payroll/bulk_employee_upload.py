@@ -249,7 +249,7 @@ def upload_employee_excel(request):
                         'designation_id': designation_obj.id,
                         'department_id': department_obj.id,
                         'enable_portal_access': bool(row['enable_portal_access']),
-                        'statutory_components': json.dumps(statutory_components),
+                        'statutory_components': statutory_components,
                         'employee_status': bool(row.get('employee_status', True)),
                     }
                 )

@@ -276,6 +276,7 @@ def to_decimal_2places(value):
         print(f"Error converting to decimal: {e}")
         return Decimal('0.00')
 
+
 def calculate_tds(regime_type, annual_salary, current_month, epf_value, ept_value):
 
     # Standard deductions
@@ -366,7 +367,6 @@ def calculate_tds(regime_type, annual_salary, current_month, epf_value, ept_valu
     monthly_tds = total_tax / month_left if month_left > 0 else 0
 
     return monthly_tds, taxable_income
-
 
 
 def logo_upload_path(instance, filename):

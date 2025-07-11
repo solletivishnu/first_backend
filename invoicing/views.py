@@ -780,6 +780,7 @@ def createDocument(request, id):
             ],
             'subtotal': "{:,}".format(round(float(getattr(invoice, 'subtotal_amount', 0)))),
             'shipping': f"{round(float(getattr(invoice, 'shipping_amount', 0)), 2):.2f}",
+            'shipping_tax': f"{round(float(getattr(invoice, 'shipping_tax', 0)), 2):.2f}",
             'cgst_amt': f"{round(float(getattr(invoice, 'total_cgst_amount', 0)), 2):.2f}",
             'sgst_amt': f"{round(float(getattr(invoice, 'total_sgst_amount', 0)), 2):.2f}",
             'total': "{:,}".format(round(float(getattr(invoice, 'total_amount', 0)))),
@@ -791,7 +792,9 @@ def createDocument(request, id):
             'terms_and_conditions': getattr(invoice, 'terms_and_conditions', ''),
             'note': getattr(invoice, 'notes', ''),
             'account_name': business_name,
-            'adjust_layout': adjust_layout
+            'adjust_layout': adjust_layout,
+            'company_email': invoice.invoicing_profile.business.email,
+            'company_mobile_number': invoice.invoicing_profile.business.mobile_number,
         }
 
         # Assuming you have a DocumentGenerator class that generates the PDF

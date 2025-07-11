@@ -80,3 +80,4 @@ PyJWT==2.8.0
 cryptography==45.0.4
 razorpay==1.4.2
 pandas==2.3.0
+jinja2==3.1.6
