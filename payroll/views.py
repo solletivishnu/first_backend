@@ -1433,7 +1433,7 @@ def calculate_esi_contributions(pf_wage, basic_monthly, esi_enabled):
     }
 
 
-def calculate_employee_deductions(pf_wage, basic_monthly, epf_enabled, esi_enabled, pt_enabled, basic_annual):
+def calculate_employee_deductions(pf_wage, basic_monthly, epf_enabled, esi_enabled, pt_enabled, gross_monthly):
     deductions = {}
 
     # EPF Employee Contribution
@@ -1445,19 +1445,19 @@ def calculate_employee_deductions(pf_wage, basic_monthly, epf_enabled, esi_enabl
 
     # ESI Employee Contribution
     deductions["ESI Employee Contribution"] = {
-        "monthly": 0.0075 * basic_annual,
-        "annually": (0.0075 * basic_annual) * 12,
+        "monthly": 0.0075 * gross_monthly,
+        "annually": (0.0075 * gross_monthly) * 12,
         "calculation_type": "Percentage (0.75%) of PF wage"
-    } if esi_enabled and basic_annual <= 21000 else (
+    } if esi_enabled and gross_monthly <= 21000 else (
         {"monthly": 0, "annually": 0, "calculation_type": "Not Applicable"}
         if esi_enabled else {"monthly": "NA", "annually": "NA", "calculation_type": "Not Applicable"}
     )
 
     # Professional Tax
     if pt_enabled:
-        if basic_annual <= 15000:
+        if gross_monthly <= 15000:
             pt_monthly = 0
-        elif 15001 <= basic_annual <= 20000:
+        elif 15001 <= gross_monthly <= 20000:
             pt_monthly = 150
         else:
             pt_monthly = 200
@@ -1589,7 +1589,7 @@ def calculate_payroll(request):
             gross_salary = safe_sum(item["annually"] for item in earnings)
 
             deductions = calculate_employee_deductions(pf_wage, basic_salary_monthly, epf_enabled, esi_enabled,
-                                                       pt_enabled, basic_annual)
+                                                       pt_enabled, basic_monthly)
             deductions["loan_emi"] = calculate_loan_deductions(employee_id) if employee_id else "NA"
 
             total_deductions = safe_sum(
