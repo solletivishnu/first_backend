@@ -3647,6 +3647,7 @@ def format_with_commas(number):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def employee_monthly_salary_template(request):
+    """ testing The payslip"""
     try:
         today = date.today()
         current_day = today.day
