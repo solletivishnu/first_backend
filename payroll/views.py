@@ -1587,9 +1587,10 @@ def calculate_payroll(request):
                     })
 
             gross_salary = safe_sum(item["annually"] for item in earnings)
+            gross_salary_monthly = gross_salary / 12
 
             deductions = calculate_employee_deductions(pf_wage, basic_salary_monthly, epf_enabled, esi_enabled,
-                                                       pt_enabled, basic_monthly)
+                                                       pt_enabled, gross_salary_monthly)
             deductions["loan_emi"] = calculate_loan_deductions(employee_id) if employee_id else "NA"
 
             total_deductions = safe_sum(
