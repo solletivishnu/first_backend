@@ -37,21 +37,20 @@ class UserDocumentDraftSerializer(serializers.ModelSerializer):
 
 
 class UserFavouriteDocumentSerializer(serializers.ModelSerializer):
-    document = serializers.SerializerMethodField()
 
     class Meta:
         model = UserFavouriteDocument
         fields = '__all__'
 
-    def get_document(self, obj):
-        if obj.document:
-            return {
-                'id': obj.document.id,
-                'document_name': obj.document.document_name,
-                'description': obj.document.description,
-                'template': obj.document.template,
-            }
-        return None
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['document'] = {
+            'id': instance.document.id,
+            'name': instance.document.document_name,
+            'description': instance.document.description,
+            'template': instance.document.template.url if instance.document.template else None,
+        }
+        return representation
 
 
 class EventInstanceSerializer(serializers.ModelSerializer):
@@ -159,7 +158,7 @@ class ContextWiseEventAndDocumentStatusSerializer(serializers.ModelSerializer):
         status_map = {
             'completed': 'Completed',
             'in_progress': 'Processed',
-            'draft': 'Declined',
+            'draft': 'Draft',
             'yet_to_start': 'Yet to Start',
         }
         return status_map.get(obj.status, obj.status.title())

@@ -95,7 +95,7 @@ class UserFavouriteDocument(models.Model):
         null=True,
         blank=True
     )
-    document = models.OneToOneField(
+    document = models.ForeignKey(
         Document,
         on_delete=models.CASCADE,
         related_name='favourited_by',
