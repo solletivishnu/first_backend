@@ -120,8 +120,13 @@ def document_detail(request, pk):
         return Response(serializer.data)
 
     elif request.method == 'PUT':
+        if 'template' in request.data and document.template:
+            # Delete the old template file if it exists
+            document.template.storage.delete(document.template.name)
+            print(document.template.name)
         serializer = DocumentSerializer(document, data=request.data, partial=True)
         if serializer.is_valid():
+
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -305,6 +310,8 @@ def draft_document_details_create(request):
             instance = serializer.save()
             if data.get('status') == 'completed':
                 # Process the draft and generate PDF if status is completed
+                if instance.file:
+                    instance.file.storage.delete(instance.file.name)
                 process_and_generate_draft_pdf(instance)
             return Response(DocumentDraftDetailSerializer(instance).data, status=status.HTTP_201_CREATED)
 
@@ -338,6 +345,8 @@ def draft_document_details(request, pk):
 
             if data.get('status') == 'completed':
                 # Process the draft and generate PDF if status is completed
+                if instance.file:
+                    instance.file.storage.delete(instance.file.name)
                 process_and_generate_draft_pdf(instance)
             return Response(DocumentDraftDetailSerializer(instance).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -532,7 +541,7 @@ def my_events_list(request):
         event_instance_ids = drafts.values_list('event_instance_id', flat=True).distinct()
 
         # Fetch corresponding event instances
-        event_instances = EventInstance.objects.filter(id__in=event_instance_ids)
+        event_instances = EventInstance.objects.filter(id__in=event_instance_ids).order_by('-id')
 
         serializer = EventInstanceSerializer(event_instances, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -599,3 +608,114 @@ def filter_documents_by_status(request):
 
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# 1. GET all and POST new
+@api_view(['GET', 'POST'])
+def favourite_document_list_create(request):
+    if request.method == 'GET':
+        favourites = UserFavouriteDocument.objects.all()
+        serializer = UserFavouriteDocumentSerializer(favourites, many=True)
+        return Response(serializer.data)
+
+    elif request.method == 'POST':
+        draft_id = request.data.get('draft')
+        if draft_id:
+            favourite_count = UserFavouriteDocument.objects.filter(draft_id=draft_id).count()
+            if favourite_count >= 5:
+                return Response(
+                    {"error": "You can only favourite up to 5 documents per draft."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        serializer = UserFavouriteDocumentSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# 2. GET, PUT, DELETE by pk
+@api_view(['GET', 'PUT', 'DELETE'])
+def favourite_document_detail(request, pk):
+    try:
+        favourite = UserFavouriteDocument.objects.get(pk=pk)
+    except UserFavouriteDocument.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        serializer = UserFavouriteDocumentSerializer(favourite)
+        return Response(serializer.data)
+
+    elif request.method == 'PUT':
+        serializer = UserFavouriteDocumentSerializer(favourite, data=request.data)
+        if serializer.is_valid():
+            draft_id = request.data.get('draft')
+            if draft_id:
+                current_count = UserFavouriteDocument.objects.filter(draft_id=draft_id).exclude(id=pk).count()
+                if current_count >= 5:
+                    return Response(
+                        {"error": "You can only favourite up to 5 documents per draft."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    elif request.method == 'DELETE':
+        favourite.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# 3. GET favourites by draft_id
+@api_view(['GET'])
+def favourite_documents_by_draft(request, draft_id):
+    favourites = UserFavouriteDocument.objects.filter(draft_id=draft_id)
+    serializer = UserFavouriteDocumentSerializer(favourites, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+def recent_events_by_context(request, context_id):
+    qs = (
+        ContextWiseEventAndDocument.objects
+        .filter(context_id=context_id, event_instance__isnull=False)
+        .select_related('event_instance__event')
+        .order_by('-updated_at')
+    )
+
+    seen_events = set()
+    unique_events = []
+    for item in qs:
+        event = item.event_instance.event if item.event_instance else None
+        if event and event.pk not in seen_events:
+            unique_events.append(event)
+            seen_events.add(event.pk)
+        if len(unique_events) == 5:
+            break
+
+    serializer = EventsSerializer(unique_events, many=True)  # define this serializer
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+def recent_documents_by_context(request, context_id):
+    qs = (
+        ContextWiseEventAndDocument.objects
+        .filter(context_id=context_id, document__isnull=False)
+        .select_related('document')
+        .order_by('-updated_at')
+    )
+
+    seen_docs = set()
+    unique_documents = []
+    for item in qs:
+        doc = item.document
+        if doc and doc.pk not in seen_docs:
+            unique_documents.append(doc)
+            seen_docs.add(doc.pk)
+        if len(unique_documents) == 5:
+            break
+
+    serializer = DocumentSerializer(unique_documents, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)

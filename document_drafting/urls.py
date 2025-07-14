@@ -45,4 +45,14 @@ urlpatterns = [
     path('documents-summary-by-context/', views.document_summary_by_context, name='documents-summary-by-context'),
     path('filtered-documents-by-status/', views.filter_documents_by_status, name='filtered-documents'),
 
+
+    path('favourites/', views.favourite_document_list_create, name='favourite-document-list-create'),
+    path('favourites/<int:pk>/', views.favourite_document_detail, name='favourite-document-detail'),
+    path('favourites/by-draft/<int:draft_id>/', views.favourite_documents_by_draft,
+         name='favourite-documents-by-draft'),
+
+    path('context/<int:context_id>/recent-documents/', views.recent_documents_by_context,
+         name='recent-documents-by-context'),
+    path('context/<int:context_id>/recent-events/', views.recent_events_by_context,
+         name='recent-events-by-context'),
 ]

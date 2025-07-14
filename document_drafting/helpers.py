@@ -25,7 +25,7 @@ def document_template_path(instance, filename):
     document_name = instance.document_name.replace(" ", "_").replace("/", "_")
 
     # Construct the file path
-    return os.path.join('document_template', document_name, filename)
+    return os.path.join('document_drafting', 'document_templates', document_name, filename)
 
 
 def process_and_generate_draft_pdf(instance):
@@ -48,6 +48,16 @@ def process_and_generate_draft_pdf(instance):
         print(f"[Error] Template fetch failed: {e}")
         return
 
+    options = {
+        'encoding': "UTF-8",
+        'page-size': 'A4',
+        'margin-top': '10mm',
+        'margin-bottom': '10mm',
+        'margin-left': '10mm',
+        'margin-right': '10mm',
+        'enable-local-file-access': '',  # if using local CSS/fonts
+    }
+
     try:
         # 3. Render HTML using Jinja2 with draft_data context
         context = instance.draft_data or {}
@@ -59,10 +69,10 @@ def process_and_generate_draft_pdf(instance):
 
     try:
         # 4. Generate PDF from rendered HTML using wkhtmltopdf via pdfkit
-        pdf_bytes = pdfkit.from_string(rendered_html, False)
+        pdf_bytes = pdfkit.from_string(rendered_html, False, options=options)
 
         # 5. Save the PDF to the file field of the model
-        filename = f"{document.document_name.replace(' ', '_')}_filled.pdf"
+        filename = f"{document.document_name.replace(' ', '_')}.pdf"
         instance.file.save(filename, ContentFile(pdf_bytes))
     except Exception as e:
         print(f"[Error] PDF generation failed: {e}")
