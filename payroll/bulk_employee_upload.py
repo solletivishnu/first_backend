@@ -68,8 +68,8 @@ def upload_employee_excel(request):
 
     # Required columns except payroll_id (removed from Excel)
     required_columns = [
-        'first_name', 'last_name', 'associate_id', 'doj', 'work_email',
-        'mobile_number', 'gender', 'work_location', 'designation', 'department',
+        'first_name', 'last_name', 'associate_id', 'doj', 'work_email', 'gender', 'work_location', 'designation',
+        'department',
         'enable_portal_access', 'epf_enabled', 'pf_account_number', 'uan',
         'esi_enabled', 'esi_number', 'professional_tax', 'employee_status',
         'dob', 'age', 'guardian_name', 'pan', 'aadhar', 'address_line1',
