@@ -3321,8 +3321,8 @@ def detail_employee_monthly_salary(request):
                         if all(ex not in name for ex in exclude_deductions):
                             other_deductions += prorate(value)
 
-                total_deductions = taxes + emi_deduction + employee_deductions + other_deductions + pt_amount
-                net_salary = earned_salary - total_deductions
+                # total_deductions = taxes + emi_deduction + employee_deductions + other_deductions + pt_amount
+                # net_salary = earned_salary - total_deductions
 
                 def get_component_amount(earnings_data, component_name):
                     for item in earnings_data:
@@ -3359,6 +3359,8 @@ def detail_employee_monthly_salary(request):
                 except EmployeeSalaryHistory.DoesNotExist:
                     tds_ytd = monthly_tds
                     annual_tds = annual_tds
+                total_deductions = taxes + emi_deduction + employee_deductions + other_deductions + pt_amount + monthly_tds
+                net_salary = earned_salary - total_deductions
 
                 # Create or update EmployeeSalaryHistory
                 pf = pf if employee.statutory_components.get("epf_enabled", False) else 0
@@ -3730,6 +3732,7 @@ def employee_monthly_salary_template(request):
             "epf_contribution": format_with_commas(salary_history.epf),
             "pt": salary_history.pt > 0,
             "professional_tax": format_with_commas(salary_history.pt),
+            'it': salary_history.tds > 0,
             "income_tax": format_with_commas(salary_history.tds),
             "esi": salary_history.esi > 0,
             "esi_employee_contribution": format_with_commas(salary_history.esi),
