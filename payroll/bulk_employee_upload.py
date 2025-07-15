@@ -84,8 +84,8 @@ def upload_employee_excel(request):
 
     # Mandatory fields except pan and uan
     mandatory_fields = [
-        'first_name', 'last_name', 'associate_id', 'doj', 'work_email',
-        'mobile_number', 'gender', 'work_location', 'designation', 'department',
+        'first_name', 'last_name', 'associate_id', 'doj', 'work_email', 'gender', 'work_location', 'designation',
+        'department',
         'enable_portal_access', 'epf_enabled',
         'esi_enabled', 'professional_tax', 'employee_status',
         'dob', 'age', 'guardian_name', 'aadhar', 'address_line1',
@@ -106,7 +106,7 @@ def upload_employee_excel(request):
         return Response({"error": errors}, status=status.HTTP_400_BAD_REQUEST)
 
     # Check duplicates inside the file for unique fields (work_email, uan, pan, aadhar, account_number)
-    unique_fields = ['work_email', 'uan', 'pan', 'aadhar', 'account_number']
+    unique_fields = ['work_email', 'uan', 'pan', 'account_number']
     for field in unique_fields:
         non_empty = df[field].dropna().astype(str).str.strip()
         duplicates = non_empty[non_empty.duplicated(keep=False)].index + 2
