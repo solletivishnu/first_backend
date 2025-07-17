@@ -3994,7 +3994,6 @@ def bonus_incentive_list(request):
         )
 
 
-
 @api_view(['POST'])
 def bonus_incentive_create(request):
     """
