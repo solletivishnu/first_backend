@@ -573,6 +573,18 @@ def generate_salary_upload_template(request, payroll_id):
         for row_idx in range(2, n_rows + 1):
             annual_ctc_cell = ws.cell(row=row_idx, column=col_index('Annual CTC')).coordinate
 
+            # Get employee id for this row
+            emp_id = ws.cell(row=row_idx, column=col_index('Employee Id')).value
+            # Fetch the EmployeeManagement instance to get statutory flags
+            try:
+                emp_obj = EmployeeManagement.objects.get(id=emp_id)
+                statutory = emp_obj.statutory_components or {}
+                epf_enabled = statutory.get('epf_enabled', False)
+                esi_enabled = statutory.get('esi_enabled', False)
+                professional_tax = statutory.get('professional_tax', False)
+            except Exception:
+                epf_enabled = esi_enabled = professional_tax = False
+
             # EARNINGS FORMULAS (dynamic for all earnings)
             # Remove hardcoded Basic, HRA, and 'other earnings' loop
             for earning in earnings:
@@ -662,6 +674,25 @@ def generate_salary_upload_template(request, payroll_id):
                     f"{get_column_letter(monthly_col)}{row_idx}*12, \"\")"
                 )
 
+
+
+
+
+            # SUMMARY FORMULAS
+            # Gross Salary (sum of all earnings)
+            earnings_sum = []
+            for earning in earnings:
+                monthly_col = col_index(f'Monthly ({earning["component_name"]})')
+                earnings_sum.append(
+                    f"IF(ISNUMBER({get_column_letter(monthly_col)}{row_idx}), {get_column_letter(monthly_col)}{row_idx}, 0)")
+
+            ws.cell(row=row_idx, column=col_index('Gross Salary (Monthly)')).value = (
+                    f"=IF(ISNUMBER({annual_ctc_cell}), SUM({', '.join(earnings_sum)}), \"\")"
+                )
+            ws.cell(row=row_idx, column=col_index('Gross Salary (Annually)')).value = (
+                f"=IF(ISNUMBER({get_column_letter(col_index('Gross Salary (Monthly)'))}{row_idx}), "
+                f"{get_column_letter(col_index('Gross Salary (Monthly)'))}{row_idx}*12, \"\")"
+            )
             # 3. Deductions Formulas
             for deduction_row in deduction_data:
                 monthly_col = col_index(f'Monthly ({deduction_row["deduction_name"]})')
@@ -682,69 +713,87 @@ def generate_salary_upload_template(request, payroll_id):
             # DEDUCTIONS FORMULAS
             # 1. EPF Employee Contribution (12% of PF wage)
             epf_employee_monthly_col = col_index('Monthly (EPF Employee Contribution)')
-            ws.cell(row=row_idx, column=epf_employee_monthly_col).value = (
-                f"=IF(ISNUMBER({get_column_letter(col_index('Monthly (Basic)'))}{row_idx}), "
-                f"MIN({get_column_letter(col_index('Monthly (Basic)'))}{row_idx},15000)*0.12, \"\")"
-            )
-            ws.cell(row=row_idx, column=col_index('Annually (EPF Employee Contribution)')).value = (
-                f"=IF(ISNUMBER({get_column_letter(epf_employee_monthly_col)}{row_idx}), "
-                f"{get_column_letter(epf_employee_monthly_col)}{row_idx}*12, \"\")"
-            )
+            if epf_enabled:
+                ws.cell(row=row_idx, column=epf_employee_monthly_col).value = (
+                    f"=IF(ISNUMBER({get_column_letter(col_index('Monthly (Basic)'))}{row_idx}), "
+                    f"MIN({get_column_letter(col_index('Monthly (Basic)'))}{row_idx},15000)*0.12, \"\")"
+                )
+                ws.cell(row=row_idx, column=col_index('Annually (EPF Employee Contribution)')).value = (
+                    f"=IF(ISNUMBER({get_column_letter(epf_employee_monthly_col)}{row_idx}), "
+                    f"{get_column_letter(epf_employee_monthly_col)}{row_idx}*12, \"\")"
+                )
+            else:
+                ws.cell(row=row_idx, column=epf_employee_monthly_col).value = "-"
+                ws.cell(row=row_idx, column=col_index('Annually (EPF Employee Contribution)')).value = "-"
 
             # 2. Professional Tax (Fixed Amount)
+            # pt_monthly_col = col_index('Monthly (Professional Tax (PT))')
+            # basic_monthly_col = col_index('Monthly (Basic)')
+            #
+            # if professional_tax:
+            #     ws.cell(row=row_idx, column=pt_monthly_col).value = (
+            #         f"=IF(ISNUMBER({annual_ctc_cell}), "
+            #         f"IF(AND(ISNUMBER({get_column_letter(basic_monthly_col)}{row_idx}), "
+            #         f"{get_column_letter(basic_monthly_col)}{row_idx}<=15000), 0, "
+            #         f"IF(AND({get_column_letter(basic_monthly_col)}{row_idx}>15000, "
+            #         f"{get_column_letter(basic_monthly_col)}{row_idx}<=20000), 150, "
+            #         f"IF({get_column_letter(basic_monthly_col)}{row_idx}>20000, 200, 0))), 0)"
+            #     )
+            #     ws.cell(row=row_idx, column=col_index('Annually (Professional Tax (PT))')).value = (
+            #         f"=IF(ISNUMBER({get_column_letter(pt_monthly_col)}{row_idx}), "
+            #         f"{get_column_letter(pt_monthly_col)}{row_idx}*12, \"\")"
+            #     )
+            # else:
+            #     ws.cell(row=row_idx, column=pt_monthly_col).value = "-"
+            #     ws.cell(row=row_idx, column=col_index('Annually (Professional Tax (PT))')).value = "-"
+
             pt_monthly_col = col_index('Monthly (Professional Tax (PT))')
-            ws.cell(row=row_idx, column=pt_monthly_col).value = (
-                f"=IF(ISNUMBER({annual_ctc_cell}), 200, \"\")"
-            )
-            ws.cell(row=row_idx, column=col_index('Annually (Professional Tax (PT))')).value = (
-                f"=IF(ISNUMBER({get_column_letter(pt_monthly_col)}{row_idx}), "
-                f"{get_column_letter(pt_monthly_col)}{row_idx}*12, \"\")"
-            )
-
-            esi_employer_monthly_col = col_index('Monthly (ESI Employer Contribution)')
-
-            ws.cell(row=row_idx, column=esi_employer_monthly_col).value = (
-                f"=IF(ISNUMBER({annual_ctc_cell}), "
-                f"IF(AND(ISNUMBER({get_column_letter(col_index('Monthly (Basic)'))}{row_idx}), "
-                f"{get_column_letter(col_index('Monthly (Basic)'))}{row_idx}<=21000), "
-                f"ROUND(MIN({get_column_letter(col_index('Monthly (Basic)'))}{row_idx},15000)*0.0325, 2), \"\"), \"\")"
-            )
-
-            ws.cell(row=row_idx, column=col_index('Annually (ESI Employer Contribution)')).value = (
-                f"=IF(ISNUMBER({get_column_letter(esi_employer_monthly_col)}{row_idx}), "
-                f"ROUND({get_column_letter(esi_employer_monthly_col)}{row_idx}*12, 2), \"\")"
-            )
-
-            # ESI Employee Contribution (0.75% when Basic <= 21000)
-            esi_employee_monthly_col = col_index('Monthly (ESI Employee Contribution)')
-
-            ws.cell(row=row_idx, column=esi_employee_monthly_col).value = (
-                f"=IF(ISNUMBER({annual_ctc_cell}), "
-                f"IF(AND(ISNUMBER({get_column_letter(col_index('Monthly (Basic)'))}{row_idx}), "
-                f"{get_column_letter(col_index('Monthly (Basic)'))}{row_idx}<=21000), "
-                f"ROUND(MIN({get_column_letter(col_index('Monthly (Basic)'))}{row_idx},15000)*0.0075, 2), \"\"), \"\")"
-            )
-
-            ws.cell(row=row_idx, column=col_index('Annually (ESI Employee Contribution)')).value = (
-                f"=IF(ISNUMBER({get_column_letter(esi_employee_monthly_col)}{row_idx}), "
-                f"ROUND({get_column_letter(esi_employee_monthly_col)}{row_idx}*12, 2), \"\")"
-            )
-
-            # SUMMARY FORMULAS
-            # Gross Salary (sum of all earnings)
-            earnings_sum = []
-            for earning in earnings:
-                monthly_col = col_index(f'Monthly ({earning["component_name"]})')
-                earnings_sum.append(
-                    f"IF(ISNUMBER({get_column_letter(monthly_col)}{row_idx}), {get_column_letter(monthly_col)}{row_idx}, 0)")
-
-            ws.cell(row=row_idx, column=col_index('Gross Salary (Monthly)')).value = (
-                    f"=IF(ISNUMBER({annual_ctc_cell}), SUM({', '.join(earnings_sum)}), \"\")"
+            if professional_tax:
+                ws.cell(row=row_idx, column=pt_monthly_col).value = (
+                    f"=IF(ISNUMBER({annual_ctc_cell}), 200, \"\")"
                 )
-            ws.cell(row=row_idx, column=col_index('Gross Salary (Annually)')).value = (
-                f"=IF(ISNUMBER({get_column_letter(col_index('Gross Salary (Monthly)'))}{row_idx}), "
-                f"{get_column_letter(col_index('Gross Salary (Monthly)'))}{row_idx}*12, \"\")"
-            )
+                ws.cell(row=row_idx, column=col_index('Annually (Professional Tax (PT))')).value = (
+                    f"=IF(ISNUMBER({get_column_letter(pt_monthly_col)}{row_idx}), "
+                    f"{get_column_letter(pt_monthly_col)}{row_idx}*12, \"\")"
+                )
+            else:
+                ws.cell(row=row_idx, column=pt_monthly_col).value = "-"
+                ws.cell(row=row_idx, column=col_index('Annually (Professional Tax (PT))')).value = "-"
+
+
+            # ESI Employer Contribution (Benefit, not deduction, but handled here for completeness)
+            esi_employer_monthly_col = col_index('Monthly (ESI Employer Contribution)')
+            if esi_enabled:
+                ws.cell(row=row_idx, column=esi_employer_monthly_col).value = (
+                        f"=IF(ISNUMBER({annual_ctc_cell}), "
+                        f"IF(AND(ISNUMBER({get_column_letter(col_index('Monthly (Basic)'))}{row_idx}), "
+                        f"{get_column_letter(col_index('Monthly (Basic)'))}{row_idx}<=21000), "
+                        f"ROUND({get_column_letter(col_index('Monthly (Basic)'))}{row_idx}*0.0325, 2), 0), 0)"
+                    )
+                ws.cell(row=row_idx, column=col_index('Annually (ESI Employer Contribution)')).value = (
+                        f"=IF(ISNUMBER({get_column_letter(esi_employer_monthly_col)}{row_idx}), "
+                        f"ROUND({get_column_letter(esi_employer_monthly_col)}{row_idx}*12, 2), \"\")"
+                    )
+            else:
+                ws.cell(row=row_idx, column=esi_employer_monthly_col).value = "-"
+                ws.cell(row=row_idx, column=col_index('Annually (ESI Employer Contribution)')).value = "-"
+            # ESI Employee Contribution (0.75% when Gross Salary (Monthly) <= 21000)
+            esi_employee_monthly_col = col_index('Monthly (ESI Employee Contribution)')
+            if esi_enabled:
+                # WARNING: ESI Employee Contribution is now calculated as 0.75% of Gross Salary (Monthly), not capped at 15,000. If your statutory logic is different, please review this formula.
+                ws.cell(row=row_idx, column=esi_employee_monthly_col).value = (
+                    f"=IF(ISNUMBER({annual_ctc_cell}), "
+                    f"IF(AND(ISNUMBER({get_column_letter(col_index('Monthly (Basic)'))}{row_idx}), "
+                    f"{get_column_letter(col_index('Monthly (Basic)'))}{row_idx}<=21000), "
+                    f"ROUND({get_column_letter(col_index('Monthly (Basic)'))}{row_idx}*0.0075, 2), 0), 0)"
+                )
+                ws.cell(row=row_idx, column=col_index('Annually (ESI Employee Contribution)')).value = (
+                    f"=IF(ISNUMBER({get_column_letter(esi_employee_monthly_col)}{row_idx}), "
+                    f"ROUND({get_column_letter(esi_employee_monthly_col)}{row_idx}*12, 2), \"\")"
+                )
+            else:
+                ws.cell(row=row_idx, column=esi_employee_monthly_col).value = "-"
+                ws.cell(row=row_idx, column=col_index('Annually (ESI Employee Contribution)')).value = "-"
 
             # Total CTC (Gross Salary + Benefits)
             benefits_sum = []

@@ -3707,6 +3707,57 @@ def format_with_commas(number):
         return str(number)
 
 
+def number_to_words_in_indian_format(number):
+    if number == 0:
+        return "zero"
+
+    units = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
+    teens = ["ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen",
+             "seventeen", "eighteen", "nineteen"]
+    tens = ["", "ten", "twenty", "thirty", "forty", "fifty", "sixty", "seventy",
+            "eighty", "ninety"]
+
+    def convert_less_than_hundred(num):
+        if num < 10:
+            return units[num]
+        elif 10 <= num < 20:
+            return teens[num - 10]
+        else:
+            return tens[num // 10] + (" " + units[num % 10] if num % 10 != 0 else "")
+
+    def convert_less_than_thousand(num):
+        if num < 100:
+            return convert_less_than_hundred(num)
+        hundred = units[num // 100] + " hundred"
+        remainder = num % 100
+        if remainder:
+            return hundred + " and " + convert_less_than_hundred(remainder)
+        return hundred
+
+    parts = []
+    crore = number // 10000000
+    remainder = number % 10000000
+
+    if crore > 0:
+        parts.append(convert_less_than_thousand(crore) + " crore")
+
+    lakh = remainder // 100000
+    remainder = remainder % 100000
+
+    if lakh > 0:
+        parts.append(convert_less_than_thousand(lakh) + " lakh")
+
+    thousand = remainder // 1000
+    remainder = remainder % 1000
+
+    if thousand > 0:
+        parts.append(convert_less_than_hundred(thousand) + " thousand")
+
+    if remainder > 0:
+        parts.append(convert_less_than_thousand(remainder))
+
+    return ' '.join(parts).strip()
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def employee_monthly_salary_template(request):
@@ -3737,8 +3788,17 @@ def employee_monthly_salary_template(request):
         except EmployeeSalaryHistory.DoesNotExist:
             return Response({"message": "No salary history record found"}, status=status.HTTP_200_OK)
 
+        bonus_incentives = BonusIncentive.objects.filter(
+            employee_id=employee_id,
+            month=month,
+            financial_year=financial_year
+        )
+        total_bonus_amount = bonus_incentives.aggregate(total_amount=Sum('amount'))['total_amount'] or 0
+
+        net_pay_total = salary_history.net_salary + total_bonus_amount
+
         # Convert net salary to words
-        total_in_words = num2words(round(salary_history.net_salary)).title() + ' Rupees Only'
+        total_in_words = number_to_words_in_indian_format(net_pay_total).title() + " Rupees Only"
 
         context = {
             "company_name": getattr(salary_history.payroll.business, "nameOfBusiness", ""),
@@ -3756,9 +3816,9 @@ def employee_monthly_salary_template(request):
             "pay_period": f"{month_name} {year_}",
             "pay_date": "",
             "bank_account_number": salary_history.employee.employee_bank_details.account_number
-                if hasattr(salary_history.employee, 'employee_bank_details') else "",
+            if hasattr(salary_history.employee, 'employee_bank_details') else "",
             "uan_number": salary_history.employee.statutory_components.get('employee_provident_fund', {}).get('uan', '')
-                if hasattr(salary_history.employee, 'statutory_components') else "",
+            if hasattr(salary_history.employee, 'statutory_components') else "",
 
             # Earnings
             "basic_format": True if salary_history.basic_salary > 0 else False,
@@ -3784,8 +3844,9 @@ def employee_monthly_salary_template(request):
 
             # Salary Figures
             "gross_earnings": format_with_commas(salary_history.earned_salary),
+            "total_benefits_format": total_bonus_amount > 0,
+            "bonus_incentive": total_bonus_amount,
             "salary_adjustments": 0,
-
             # Deductions
             "epf": salary_history.epf > 0,
             "epf_contribution": format_with_commas(salary_history.epf),
@@ -3797,7 +3858,7 @@ def employee_monthly_salary_template(request):
             "esi_employee_contribution": format_with_commas(salary_history.esi),
             "total_deduction": format_with_commas(salary_history.total_deductions),
 
-            "net_pay": format_with_commas(salary_history.net_salary),
+            "net_pay": format_with_commas(net_pay_total),
             "paid_days": salary_history.paid_days,
             "lop_days": salary_history.lop,
             "amount_in_words": total_in_words,
