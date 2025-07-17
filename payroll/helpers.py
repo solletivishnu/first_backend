@@ -207,6 +207,53 @@ default_earnings = [
 
 ]
 
+default_deductions = [
+    {
+        "deduction_name": "NPS Contribution",
+        "component_type": "Fixed",
+        "calculation_type": {
+            "type": "Flat Amount",
+            "value": 0
+        },
+        "is_active": True,
+        "includes_epf_contribution": True,
+        "includes_esi_contribution": True,
+      },
+    {
+        "deduction_name": "Group Insurance premium",
+        "component_type": "Fixed",
+        "calculation_type": {
+            "type": "Flat Amount",
+            "value": 0
+        },
+        "is_active": True,
+        "includes_epf_contribution": True,
+        "includes_esi_contribution": True,
+    },
+    {
+        "deduction_name": "Loan Repayment",
+        "component_type": "Fixed",
+        "calculation_type": {
+            "type": "Flat Amount",
+            "value": 0
+        },
+        "is_active": True,
+        "includes_epf_contribution": True,
+        "includes_esi_contribution": True,
+    },
+    {
+        "deduction_name": "Meal coupon deduction",
+        "component_type": "Fixed",
+        "calculation_type": {
+            "type": "Flat Amount",
+            "value": 0
+        },
+        "is_active": True,
+        "includes_epf_contribution": True,
+        "includes_esi_contribution": True,
+    }
+]
+
 
 default_leave_management = [
     {
@@ -366,7 +413,7 @@ def calculate_tds(regime_type, annual_salary, current_month, epf_value, ept_valu
 
     monthly_tds = total_tax / month_left if month_left > 0 else 0
 
-    return monthly_tds, taxable_income
+    return monthly_tds, total_tax
 
 
 def logo_upload_path(instance, filename):

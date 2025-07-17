@@ -9,7 +9,7 @@ from collections import OrderedDict
 from django.db.models.signals import pre_save, post_save
 from dateutil.relativedelta import relativedelta
 from datetime import date, datetime
-
+from django.contrib.auth.hashers import make_password, check_password
 
 
 def validate_pincode(value):
@@ -264,13 +264,15 @@ class Benefits(models.Model):
 
 class Deduction(models.Model):
     payroll = models.ForeignKey('PayrollOrg', on_delete=models.CASCADE, related_name='deductions')
-    deduction_type = models.CharField(max_length=150)  # Type of deduction (e.g., tax, insurance)
-    payslip_name = models.CharField(max_length=60, unique=True)  # Display name in the payslip (unique)
-    is_active = models.BooleanField(default=True)  # Whether the deduction is active
-    frequency = models.CharField(max_length=120)  # Frequency of deduction (e.g., monthly, yearly)
+    component_type = models.CharField(max_length=60, default='Fixed')
+    deduction_name = models.CharField(max_length=150)  # Type of deduction (e.g., tax, insurance)
+    calculation_type = JSONField(default=dict)
+    includes_epf_contribution = models.BooleanField(default=False)  # EPF contribution
+    includes_esi_contribution = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"{self.deduction_type} ({self.payslip_name})"
+        return f"{self.deduction_name} "
 
 
 class Reimbursement(models.Model):
@@ -419,7 +421,7 @@ class EmployeeManagement(BaseModel):
     employee_status = models.BooleanField(default=True)
 
     def __str__(self):
-        return f"{self.employee_id} ({self.gender})"
+        return f"{self.associate_id} ({self.gender})"
 
 
 @receiver(post_save, sender=EmployeeManagement)
@@ -549,7 +551,7 @@ class EmployeeSalaryDetails(models.Model):
                 raise ValidationError(f"Variable bonus must contain {required_bonus_fields}.")
 
             # Validate pay_cycle_frequency
-            valid_frequencies = {'Monthly', 'Quarterly', 'Half-yearly', 'Annually'}
+            valid_frequencies = {'Monthly', 'Quarterly', 'HalfYearly', 'Yearly'}
             frequency = self.variable_bonus.get('pay_cycle_frequency')
 
             if frequency not in valid_frequencies:
@@ -620,9 +622,9 @@ def create_salary_revision_history(sender, instance, **kwargs):
                 
                 # Get or create revision history for current month/year
                 revision_history, created = EmployeeSalaryRevisionHistory.objects.get_or_create(
-                    employee = instance.employee,
-                    revision_month = payroll_month,
-                    revision_year = payroll_year,
+                    employee=instance.employee,
+                    revision_month=payroll_month,
+                    revision_year=payroll_year,
                     defaults={
                         'previous_ctc': old_instance.annual_ctc,
                         'current_ctc': instance.annual_ctc,
@@ -924,7 +926,7 @@ class EmployeeSalaryHistory(models.Model):
     tds = models.FloatField(null=False)  # Tax Deducted at Source
     tds_ytd = models.FloatField(null=False)  # cummulative tds
     
-    annual_tds=models.FloatField(null=False) #Yearly Tds
+    annual_tds=models.FloatField(null=False) # Yearly Tds
     
     loan_emi = models.FloatField(null=False)  # Loan EMI
     other_deductions = models.FloatField(null=False)  # Other Deductions
@@ -966,6 +968,97 @@ class PayrollWorkflow(models.Model):
 
     def __str__(self):
         return f"Payroll Workflow for {self.payroll.name} - {self.month}/{self.financial_year}"
+
+
+class EmployeeCredentials(models.Model):
+    employee = models.OneToOneField(
+        'EmployeeManagement', on_delete=models.CASCADE, related_name='employee_credentials'
+    )
+    username = models.CharField(max_length=150, unique=True)  # Unique username for the employee
+    password = models.CharField(max_length=128)  # Password field (hashed)
+    last_login = models.DateTimeField(null=True, blank=True)  # Last login timestamp
+
+    def set_password(self, raw_password):
+        self.password = make_password(raw_password)
+
+    def check_password(self, raw_password):
+        return check_password(raw_password, self.password)
+
+    def __str__(self):
+        return f"{self.employee.associate_id} - {self.username}"
+
+    @property
+    def is_authenticated(self):
+        """Allows DRF to treat this object as an authenticated user"""
+        return True
+
+
+class AttendanceLog(models.Model):
+    CHECKIN_TYPES = [
+        ('manual', 'Manual'),
+        ('geo', 'Geo Location'),
+        ('face', 'Face Recognition'),
+        ('qr', 'QR Code'),
+        ('timesheet', 'Timesheet'),
+        ('biometric', 'Biometric Device'),
+        ('auto', 'System Auto'),
+    ]
+    employee = models.ForeignKey(EmployeeCredentials, on_delete=models.CASCADE, related_name='attendance_logs')
+    date = models.DateField()
+    check_in = models.DateTimeField()
+    check_out = models.DateTimeField(null=True, blank=True)
+    check_in_type = models.CharField(max_length=20, choices=CHECKIN_TYPES)
+    location = models.CharField(max_length=255, blank=True)
+    device_info = models.TextField(blank=True)
+    verified = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.employee.associate_id} - {self.date} ({self.check_in_type})"
+
+
+# class LeaveApplication(models.Model):
+#     LEAVE_TYPE_CHOICES = [
+#         ('CL', 'Casual Leave'),
+#         ('SL', 'Sick Leave'),
+#         ('EL', 'Earned Leave'),
+#         ('LOP', 'Loss of Pay'),
+#     ]
+#
+#     STATUS_CHOICES = [
+#         ('pending', 'Pending'),
+#         ('approved', 'Approved'),
+#         ('rejected', 'Rejected'),
+#         ('cancelled', 'Cancelled'),
+#     ]
+#
+#     employee = models.ForeignKey(EmployeeCredentials, on_delete=models.CASCADE, related_name='leave_applications')
+#     leave_type = models.CharField(max_length=10, choices=LEAVE_TYPE_CHOICES)
+#     start_date = models.DateField()
+#     end_date = models.DateField()
+#     reason = models.TextField(blank=True)
+#
+#     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+#     applied_on = models.DateTimeField(auto_now_add=True)
+#
+#     reviewer = models.ForeignKey(
+#         EmployeeCredentials,
+#         on_delete=models.SET_NULL,
+#         null=True,
+#         blank=True,
+#         related_name='reviewed_leaves'
+#     )
+#     reviewed_on = models.DateTimeField(null=True, blank=True)
+#     reviewer_comment = models.TextField(blank=True)
+#
+#     def __str__(self):
+#         return f"{self.employee} - {self.leave_type} - {self.start_date} to {self.end_date}"
+
+
+
+
+
+
+
 
 
 

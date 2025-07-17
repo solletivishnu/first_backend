@@ -46,7 +46,7 @@ def upload_to_s3(pdf_data, bucket_name, object_key):
         return s3_path
     except Exception as e:
         return Response({'error_message': str(e), 'status_cd': 1},
-                        status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # def generate_presigned_url(s3_key, expiration=3600):
@@ -73,7 +73,6 @@ class PayrollOrgList(APIView):
     """
     List all PayrollOrg instances or create a new PayrollOrg.
     """
-
     def get(self, request):
         payroll_orgs = PayrollOrg.objects.all()
         serializer = PayrollOrgSerializer(payroll_orgs, many=True)
@@ -185,7 +184,7 @@ def business_payroll_check(request):
                 ]),
                 payroll_org.salary_template or SalaryTemplate.objects.filter(payroll=payroll_org.id).exists(),
                 payroll_org.pay_schedule or PaySchedule.objects.filter(payroll=payroll_org.id).exists(),
-                payroll_org.leave_management or LeaveManagement.objects.filter(payroll=payroll_org.id).exists(),
+                payroll_org.leave_management or LeaveManagement.objects.filter(payroll=payroll_org.id).exists() ,
                 payroll_org.holiday_management or HolidayManagement.objects.filter(payroll=payroll_org.id).exists(),
                 payroll_org.employee_master or EmployeeManagement.objects.filter(payroll=payroll_org.id).exists(),
             ])
@@ -276,7 +275,7 @@ def update_payroll_org(request, business_id):
     # Split the data to update PayrollOrg and Business separately
     payroll_org_data = {}
     business_data = {}
-
+    
     # Process non-file fields
     for key, value in request.data.items():
         if key in payroll_org_fields:
@@ -389,16 +388,16 @@ class PayrollOrgBusinessDetailView(APIView):
                     payroll_org.salary_component
                     if payroll_org.salary_component is True
                     else (
-                        Earnings.objects.filter(payroll=payroll_org.id).exists()
-                        # and Benefits.objects.filter(payroll=payroll_org.id).exists()
-                        # and Deduction.objects.filter(payroll=payroll_org.id).exists()
-                        # and Reimbursement.objects.filter(payroll=payroll_org.id).exists()
+                            Earnings.objects.filter(payroll=payroll_org.id).exists()
+                            # and Benefits.objects.filter(payroll=payroll_org.id).exists()
+                            # and Deduction.objects.filter(payroll=payroll_org.id).exists()
+                            # and Reimbursement.objects.filter(payroll=payroll_org.id).exists()
                     )
                 ) if organisation_details else False,
                 "pay_schedule": payroll_org.pay_schedule or PaySchedule.objects.filter(payroll=payroll_org.id).exists()
                 if organisation_details else False,
                 "leave_and_attendance": (LeaveManagement.objects.filter(payroll=payroll_org.id).exists()) and (
-                    HolidayManagement.objects.filter(payroll=payroll_org.id).exists()) if organisation_details
+                            HolidayManagement.objects.filter(payroll=payroll_org.id).exists()) if organisation_details
                 else False,
                 "employee_master": (payroll_org.employee_master or
                                     EmployeeManagement.objects.filter(payroll=payroll_org.id).exists())
@@ -406,9 +405,9 @@ class PayrollOrgBusinessDetailView(APIView):
                 "salary_template": payroll_org.salary_template or
                                    SalaryTemplate.objects.filter(payroll=payroll_org.id).exists()
                 if organisation_details else False
-            }
+                }
 
-            return Response(response_data, status=status.HTTP_200_OK)
+            return Response(response_data,  status=status.HTTP_200_OK)
 
         except Business.DoesNotExist:
             return Response({"error": "Business does not exists, Please set up the Business"}, status=404)
@@ -523,8 +522,7 @@ def bulk_work_location_upload(request):
     for serializer in valid_data:
         serializer.save()
 
-    return Response({"status": "success", "message": f"{len(valid_data)} locations uploaded successfully."},
-                    status=status.HTTP_201_CREATED)
+    return Response({"status": "success", "message": f"{len(valid_data)} locations uploaded successfully."}, status=status.HTTP_201_CREATED)
 
 
 # Retrieve a specific WorkLocation by ID
@@ -647,6 +645,7 @@ def bulk_department_upload(request):
         else:  # xlsx
             records = pd.read_excel(file).to_dict(orient='records')
 
+        import math
         errors = []
         valid_departments = []
         seen_in_file = set()
@@ -658,8 +657,25 @@ def bulk_department_upload(request):
 
         # Process records
         for idx, record in enumerate(records):
-            dept_name = record.get('dept_name', '').strip()
-            dept_code = record.get('dept_code', '').strip()
+            dept_name = record.get('dept_name', '')
+            if isinstance(dept_name, float) and math.isnan(dept_name):
+                dept_name = ''
+            dept_name = str(dept_name).strip()
+
+            dept_code_raw = record.get('dept_code', '')
+            if isinstance(dept_code_raw, float) and math.isnan(dept_code_raw):
+                dept_code_raw = ''
+            dept_code = str(dept_code_raw).strip()
+
+            description = record.get('description', None)
+            # Handle NaN for description
+            if description is not None:
+                if isinstance(description, float) and math.isnan(description):
+                    description = None
+                else:
+                    description = str(description).strip()
+                    if description == '':
+                        description = None
 
             if not dept_name:
                 errors.append({"row": idx + 2, "error": "Missing department name"})
@@ -684,11 +700,12 @@ def bulk_department_upload(request):
                 errors.append({"row": idx + 2, "error": f"Department code '{dept_code}' already exists in database"})
                 continue
 
-            # Create model instance
+            # Create model instance, include description if present
             valid_departments.append(Departments(
                 payroll=payroll_org,
                 dept_name=dept_name,
-                dept_code=dept_code
+                dept_code=dept_code,
+                description=description
             ))
 
         if errors:
@@ -889,8 +906,7 @@ def epf_list(request):
                 serializer = EPFSerializer(epf_details)
                 return Response(serializer.data, status=status.HTTP_200_OK)
             except EPF.DoesNotExist:
-                return Response({"error": "EPF details not found for the given payroll ID."},
-                                status=status.HTTP_404_NOT_FOUND)
+                return Response({"error": "EPF details not found for the given payroll ID."}, status=status.HTTP_404_NOT_FOUND)
         else:
             # Retrieve all EPF details if no payroll_id is provided
             epf_details = EPF.objects.all()
@@ -904,8 +920,7 @@ def epf_list(request):
                 # Ensure there is no existing EPF record for the given payroll_id
                 payroll_id = serializer.validated_data.get('payroll').id
                 if EPF.objects.filter(payroll_id=payroll_id).exists():
-                    return Response({"error": "EPF details already exist for this payroll ID."},
-                                    status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"error": "EPF details already exist for this payroll ID."}, status=status.HTTP_400_BAD_REQUEST)
 
                 serializer.save()
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -924,7 +939,7 @@ def epf_detail(request, pk):
 
     if request.method == 'GET':
         serializer = EPFSerializer(epf)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.data,  status=status.HTTP_200_OK)
 
     elif request.method == 'PUT':
         serializer = EPFSerializer(epf, data=request.data)
@@ -951,8 +966,7 @@ def esi_list(request):
                 serializer = ESISerializer(esi_details)
                 return Response(serializer.data, status=status.HTTP_200_OK)
             except ESI.DoesNotExist:
-                return Response({"error": "ESI details not found for the given payroll ID."},
-                                status=status.HTTP_404_NOT_FOUND)
+                return Response({"error": "ESI details not found for the given payroll ID."}, status=status.HTTP_404_NOT_FOUND)
         else:
             # Retrieve all ESI details if no payroll_id is provided
             esi_details = ESI.objects.all()
@@ -966,8 +980,7 @@ def esi_list(request):
                 # Ensure there is no existing ESI record for the given payroll_id
                 payroll_id = serializer.validated_data.get('payroll').id
                 if ESI.objects.filter(payroll_id=payroll_id).exists():
-                    return Response({"error": "ESI details already exist for this payroll ID."},
-                                    status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"error": "ESI details already exist for this payroll ID."}, status=status.HTTP_400_BAD_REQUEST)
 
                 serializer.save()
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -1204,15 +1217,13 @@ def benefits_list_create(request):
             benefits = benefits.filter(payslip_name=payslip_name)
 
         serializer = BenefitsSerializer(benefits, many=True)
-        return Response({"data": serializer.data, "message": "Benefits retrieved successfully."},
-                        status=status.HTTP_200_OK)
+        return Response({"data": serializer.data, "message": "Benefits retrieved successfully."}, status=status.HTTP_200_OK)
 
     elif request.method == 'POST':
         serializer = BenefitsSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
-            return Response({"data": serializer.data, "message": "Benefit created successfully."},
-                            status=status.HTTP_201_CREATED)
+            return Response({"data": serializer.data, "message": "Benefit created successfully."}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -1248,25 +1259,87 @@ def benefits_detail_update_delete(request, benefit_id):
 
 
 @api_view(['GET', 'POST'])
-def deduction_list_create(request):
+def deductions_list_create(request):
+    """
+    List all Deduction records, or create a new one.
+    """
     if request.method == 'GET':
-        payroll_id = request.query_params.get('payroll_id')  # Get payroll_id from query parameters
+        try:
+            payroll_id = request.query_params.get('payroll_id')
 
-        if payroll_id:
-            # Filter designations by payroll_id
-            deductions = Deduction.objects.filter(payroll_id=payroll_id)
-        else:
-            # Retrieve all designations if no payroll_id is provided
-            deductions = Deduction.objects.all()
-        serializer = DeductionSerializer(deductions, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+            if not payroll_id:
+                return Response({"error": "payroll_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-    if request.method == 'POST':
-        serializer = DeductionSerializer(data=request.data)
+            try:
+                payroll_instance = PayrollOrg.objects.get(id=int(payroll_id))
+            except PayrollOrg.DoesNotExist:
+                return Response({"error": "Invalid payroll_id"}, status=status.HTTP_400_BAD_REQUEST)
+
+            deductions = Deduction.objects.filter(payroll=payroll_instance)
+            if not deductions.exists():
+                created_deductions = []
+                try:
+                    with transaction.atomic():
+                        for deduction_data in default_deductions:
+                            deduction_data['payroll'] = payroll_instance.id
+
+                            serializer = DeductionSerializer(data=deduction_data)
+                            if serializer.is_valid(raise_exception=True):
+                                created_deduction = serializer.save()
+                                created_deductions.append(created_deduction)
+                            else:
+                                raise DatabaseError("Deduction data is invalid, transaction will be rolled back.")
+                except (ValidationError, DatabaseError) as e:
+                    for deduction in created_deductions:
+                        deduction.delete()
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+                except Exception as e:
+                    for deduction in created_deductions:
+                        deduction.delete()
+                    return Response({"error": f"Unexpected error occurred: {str(e)}"},
+                                    status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+                deductions = Deduction.objects.filter(payroll=payroll_instance)
+
+            serializer = DeductionSerializer(deductions, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": f"Unexpected error occurred: {str(e)}"},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    elif request.method == 'POST':
+        data = request.data.copy()
+        payroll_id = data.get('payroll')
+        if not payroll_id:
+            return Response({"error": "payroll_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = DeductionSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+def deductions_in_payslip(request):
+    """
+    API to retrieve deductions where `is_included_in_payslip=True` for a specific payroll.
+    """
+    payroll_id = request.query_params.get('payroll_id')
+
+    if not payroll_id:
+        return Response({"error": "payroll_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    payroll_instance = get_object_or_404(PayrollOrg, id=payroll_id)
+
+    deductions = Deduction.objects.filter(payroll=payroll_instance)
+
+    if not deductions.exists():
+        return Response({"message": "No deductions found for the given payroll with is_included_in_payslip=True"},
+                        status=status.HTTP_404_NOT_FOUND)
+
+    serializer = DeductionSerializer(deductions, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET', 'PUT', 'DELETE'])
@@ -1587,10 +1660,9 @@ def calculate_payroll(request):
                     })
 
             gross_salary = safe_sum(item["annually"] for item in earnings)
-            gross_monthly = gross_salary / 12
 
             deductions = calculate_employee_deductions(pf_wage, basic_salary_monthly, epf_enabled, esi_enabled,
-                                                       pt_enabled, gross_monthly)
+                                                       pt_enabled, basic_monthly)
             deductions["loan_emi"] = calculate_loan_deductions(employee_id) if employee_id else "NA"
 
             total_deductions = safe_sum(
@@ -1955,6 +2027,7 @@ def employee_list(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+
 @api_view(['GET', 'PUT', 'DELETE'])
 def employee_detail(request, pk):
     employee = get_object_or_404(EmployeeManagement, pk=pk)
@@ -1973,12 +2046,13 @@ def employee_detail(request, pk):
     elif request.method == 'DELETE':
         employee.delete()
         return Response({"message": "Employee data Removed Successfully.",
-                         "status": "Success"},
+                         "status":"Success"},
                         status=status.HTTP_204_NO_CONTENT)
 
 
 @api_view(['GET'])
 def employee_tds_list(request):
+    
     def get_required_params():
         data = request.query_params
         try:
@@ -1995,8 +2069,7 @@ def employee_tds_list(request):
     try:
         payroll_id, month, financial_year = get_required_params()
 
-        tds_records = EmployeeSalaryHistory.objects.filter(payroll_id=payroll_id, month=month,
-                                                           financial_year=financial_year)
+        tds_records = EmployeeSalaryHistory.objects.filter(payroll_id=payroll_id,month=month,financial_year=financial_year)
 
         serializer = EmployeeSalaryHistorySerializer(tds_records, many=True)
         data = []
@@ -2298,8 +2371,7 @@ def employee_exit_list(request):
             except Exception as e:
                 return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response({"errors": serializer.errors, "message": "Invalid data provided."},
-                        status=status.HTTP_400_BAD_REQUEST)
+        return Response({"errors": serializer.errors, "message": "Invalid data provided."}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET', 'PUT', 'DELETE'])
@@ -2385,12 +2457,12 @@ def payroll_exit_settlement_details(request):
 
             if pay_schedule:
                 if (weekday == 0 and pay_schedule.monday) or \
-                        (weekday == 1 and pay_schedule.tuesday) or \
-                        (weekday == 2 and pay_schedule.wednesday) or \
-                        (weekday == 3 and pay_schedule.thursday) or \
-                        (weekday == 4 and pay_schedule.friday) or \
-                        (weekday == 5 and pay_schedule.saturday) or \
-                        (weekday == 6 and pay_schedule.sunday):
+                   (weekday == 1 and pay_schedule.tuesday) or \
+                   (weekday == 2 and pay_schedule.wednesday) or \
+                   (weekday == 3 and pay_schedule.thursday) or \
+                   (weekday == 4 and pay_schedule.friday) or \
+                   (weekday == 5 and pay_schedule.saturday) or \
+                   (weekday == 6 and pay_schedule.sunday):
                     off_days.add(date_obj)
 
                 # Handle Second & Fourth Saturday
@@ -2404,8 +2476,7 @@ def payroll_exit_settlement_details(request):
         paid_days = max(0, paid_days)  # Ensure no negative values
 
         # Calculate Final Settlement (Assume F&F is Gross Salary / Total Days * Paid Days)
-        gross_salary = salary_details.gross_salary.get('monthly',
-                                                       0) if salary_details and salary_details.gross_salary else 0
+        gross_salary = salary_details.gross_salary.get('monthly', 0) if salary_details and salary_details.gross_salary else 0
         final_settlement = (gross_salary / total_days_in_month) * paid_days if gross_salary else 0
 
         # Append Data
@@ -2453,8 +2524,7 @@ def advance_loan_list(request):
             except Exception as e:
                 return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response({"errors": serializer.errors, "message": "Invalid data provided."},
-                        status=status.HTTP_400_BAD_REQUEST)
+        return Response({"errors": serializer.errors, "message": "Invalid data provided."}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET', 'PUT', 'DELETE'])
@@ -2512,7 +2582,7 @@ def payroll_advance_loans(request):
         loans = AdvanceLoan.objects.filter(
             employee__payroll=payroll_id,
             start_month__lte=selected_month,  # Loan must have started before or in the selected month
-            end_month__gte=selected_month  # Loan must end after or in the selected month
+            end_month__gte=selected_month     # Loan must end after or in the selected month
         )
 
         if not loans.exists():
@@ -2596,8 +2666,7 @@ def employee_attendance_filtered(request):
 
     # Validate required parameters
     if not payroll_id or not financial_year or not month:
-        return Response({"error": "payroll_id, financial_year, and month are required."},
-                        status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "payroll_id, financial_year, and month are required."}, status=status.HTTP_400_BAD_REQUEST)
 
     # Filter records
     attendance_records = EmployeeAttendance.objects.filter(
@@ -2743,9 +2812,9 @@ def generate_next_month_attendance(request):
 
                     # Check individually if attendance already exists
                     if EmployeeAttendance.objects.filter(
-                            employee=employee,
-                            financial_year=financial_year,
-                            month=next_month
+                        employee=employee,
+                        financial_year=financial_year,
+                        month=next_month
                     ).exists():
                         logger.info(f"[SKIP] Attendance already exists for Employee {employee.id}")
                         continue
@@ -2898,13 +2967,12 @@ def generate_current_month_attendance(request):
         financial_year = request.query_params.get("financial_year")
 
         today = date.today()
-
+        
         # Determine financial year if not provided
         if not financial_year:
             financial_year = f"{today.year}-{today.year + 1}" if current_month >= 4 else f"{today.year - 1}-{today.year}"
 
-        current_year = int(financial_year.split('-')[1]) if 1 <= current_month <= 3 else int(
-            financial_year.split('-')[0])
+        current_year = int(financial_year.split('-')[1]) if 1 <= current_month <= 3 else int(financial_year.split('-')[0])
 
         # Calculate month boundaries
         first_day_current_month = date(current_year, current_month, 1)
@@ -2916,7 +2984,7 @@ def generate_current_month_attendance(request):
                 payroll__payroll_year__gte=first_day_current_month,
                 payroll__payroll_year__lte=last_day_current_month
             ).values_list('payroll_id', flat=True).distinct())
-
+            
             if not payroll_ids:
                 return Response(
                     {"error": "No payroll IDs found for the current month and financial year."},
@@ -2978,7 +3046,7 @@ def generate_current_month_attendance(request):
 
                 # Calculate holidays and week-offs once per payroll
                 holiday_data = calculate_holidays_and_week_offs(current_payroll_id, current_year, current_month)
-
+                
                 if "error" in holiday_data:
                     payroll_results[current_payroll_id] = {
                         "created": [],
@@ -3030,7 +3098,7 @@ def generate_current_month_attendance(request):
                             loss_of_pay=0
                         )
                     )
-
+                    
                     created_employees.append({
                         "associate_id": employee.associate_id,
                         "employee_name": f"{employee.first_name} {employee.last_name}".strip(),
@@ -3066,6 +3134,7 @@ def generate_current_month_attendance(request):
         return Response({
             "error": f"Failed to generate attendance: {str(e)}"
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 """
@@ -3182,11 +3251,11 @@ def is_valid_number(value):
         return False
 
 
+
 import traceback
-
-
 @api_view(['GET'])
 def detail_employee_monthly_salary(request):
+
     try:
         today = date.today()
         current_day = today.day
@@ -3215,8 +3284,7 @@ def detail_employee_monthly_salary(request):
 
         for salary_record in salary_records:
             employee = salary_record.employee
-            salary_history = EmployeeSalaryHistory.objects.filter(employee=employee, payroll=payroll_id, month=month,
-                                                                  financial_year=financial_year).first()
+            salary_history = EmployeeSalaryHistory.objects.filter( employee=employee, payroll=payroll_id, month=month, financial_year=financial_year).first()
             if not salary_history:
                 # Exclude exited employees
                 exit_obj = EmployeeExit.objects.filter(employee=employee).last()
@@ -3228,8 +3296,7 @@ def detail_employee_monthly_salary(request):
                         continue
 
                 try:
-                    attendance = EmployeeAttendance.objects.get(employee=employee, financial_year=financial_year,
-                                                                month=month)
+                    attendance = EmployeeAttendance.objects.get(employee=employee, financial_year=financial_year, month=month)
                 except EmployeeAttendance.DoesNotExist:
                     continue
 
@@ -3286,8 +3353,7 @@ def detail_employee_monthly_salary(request):
                         end_month__gte=date(today.year, month, 1)
                     ).first()
                     if active_loan:
-                        emi_deduction = float(active_loan.emi_amount) if isinstance(active_loan.emi_amount,
-                                                                                    (int, float)) else 0
+                        emi_deduction = float(active_loan.emi_amount) if isinstance(active_loan.emi_amount, (int, float)) else 0
 
                 exclude_deductions = {"epf_employee_contribution", "esi_employee_contribution", "pt", "tds", "loan_emi"}
 
@@ -3307,22 +3373,19 @@ def detail_employee_monthly_salary(request):
                         value = deduction.get("monthly", 0)
                         value = value if isinstance(value, (int, float)) else 0  # Ensure numeric
                         if "tax" not in name:
-                            if name == "epf_employee_contribution" and employee.statutory_components.get("epf_enabled",
-                                                                                                         False):
+                            if name == "epf_employee_contribution" and employee.statutory_components.get("epf_enabled", False):
                                 employee_deductions += value
-                            elif name == "esi_employee_contribution" and employee.statutory_components.get(
-                                    "esi_enabled", False):
+                            elif name == "esi_employee_contribution" and employee.statutory_components.get("esi_enabled", False):
                                 employee_deductions += value
-                            elif name == "pt" and employee.statutory_components.get("professional_tax",
-                                                                                    False) and pt_amount == 0:
-                                pt_amount = prorate(value)
+                            elif name == "pt" and employee.statutory_components.get("professional_tax", False) and pt_amount == 0:
+                                pt_amount= prorate(value)
                             elif name == "tds":
                                 employee_deductions += value
                         if all(ex not in name for ex in exclude_deductions):
                             other_deductions += prorate(value)
 
-                # total_deductions = taxes + emi_deduction + employee_deductions + other_deductions + pt_amount
-                # net_salary = earned_salary - total_deductions
+                total_deductions = taxes + emi_deduction + employee_deductions + other_deductions + pt_amount
+                net_salary = earned_salary - total_deductions
 
                 def get_component_amount(earnings_data, component_name):
                     for item in earnings_data:
@@ -3330,16 +3393,15 @@ def detail_employee_monthly_salary(request):
                             return item.get("monthly", 0)
                     return 0
 
-                FINANCIAL_MONTH_MAP = {1: 10, 2: 11, 3: 12, 4: 1, 5: 2, 6: 3, 7: 4, 8: 5, 9: 6, 10: 7, 11: 8, 12: 9}
+
+                FINANCIAL_MONTH_MAP = {1: 10, 2: 11, 3: 12, 4: 1, 5: 2, 6: 3,7: 4, 8: 5, 9: 6, 10: 7, 11: 8, 12: 9}
 
                 current_month = FINANCIAL_MONTH_MAP.get(month, 1)
 
-                annual_gross = int(round(earned_salary, 2)) * 12
+                annual_gross=int(round(earned_salary, 2))*12
 
-                monthly_tds, annual_tds = calculate_tds(regime_type=salary_record.tax_regime_opted,
-                                                        annual_salary=annual_gross,
-                                                        current_month=current_month, epf_value=epf_value,
-                                                        ept_value=pt_amount)
+                monthly_tds,annual_tds=calculate_tds(regime_type=salary_record.tax_regime_opted,annual_salary=annual_gross,
+                                                     current_month=current_month, epf_value=epf_value, ept_value = pt_amount)
                 tds_ytd = 0
                 try:
                     entry = EmployeeSalaryHistory.objects.filter(
@@ -3359,8 +3421,6 @@ def detail_employee_monthly_salary(request):
                 except EmployeeSalaryHistory.DoesNotExist:
                     tds_ytd = monthly_tds
                     annual_tds = annual_tds
-                total_deductions = taxes + emi_deduction + employee_deductions + other_deductions + pt_amount + monthly_tds
-                net_salary = earned_salary - total_deductions
 
                 # Create or update EmployeeSalaryHistory
                 pf = pf if employee.statutory_components.get("epf_enabled", False) else 0
@@ -3468,13 +3528,13 @@ def calculate_component_amounts(earnings, total_working_days, total_days_of_mont
 
 from django.db.models import Sum, Q
 from django.db.models.functions import ExtractMonth, ExtractYear
-
-
 @api_view(['GET'])
 def payroll_summary_view(request):
     financial_year = request.query_params.get('financial_year')
     payroll_id = request.query_params.get('payroll_id')
     month = request.query_params.get('month')
+
+
 
     if not (financial_year and payroll_id and month):
         return Response(
@@ -3650,7 +3710,6 @@ def format_with_commas(number):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def employee_monthly_salary_template(request):
-    """ remodifing entire code"""
     try:
         today = date.today()
         current_day = today.day
@@ -3702,25 +3761,15 @@ def employee_monthly_salary_template(request):
                 if hasattr(salary_history.employee, 'statutory_components') else "",
 
             # Earnings
-            "basic_format": True if salary_history.basic_salary > 0 else False,
             "basic": format_with_commas(salary_history.basic_salary),
-            "hra_allowance_format": True if salary_history.hra > 0 else False,
             "hra_allowance": format_with_commas(salary_history.hra),
-            "conveyance_allowance_format": True if salary_history.conveyance_allowance > 0 else False,
             "conveyance_allowance": format_with_commas(salary_history.conveyance_allowance),
-            "travelling_allowance_format": True if salary_history.travelling_allowance > 0 else False,
             "travelling_allowance": format_with_commas(salary_history.travelling_allowance),
-            "bonus_format": True if salary_history.bonus > 0 else False,
             "bonus": format_with_commas(salary_history.bonus),
-            "commission_format": True if salary_history.commission > 0 else False,
             "commission": format_with_commas(salary_history.commission),
-            "children_education_allowance_format": True if salary_history.children_education_allowance > 0 else False,
             "children_education_allowance": format_with_commas(salary_history.children_education_allowance),
-            "overtime_allowance_format": True if salary_history.overtime_allowance > 0 else False,
             "overtime_allowance": format_with_commas(salary_history.overtime_allowance),
-            "transport_allowance_format": True if salary_history.transport_allowance > 0 else False,
             "transport_allowance": format_with_commas(salary_history.transport_allowance),
-            "fixed_allowance_format": True if salary_history.other_earnings > 0 else False,
             "fixed_allowance": format_with_commas(salary_history.other_earnings),
 
             # Salary Figures
@@ -3732,7 +3781,6 @@ def employee_monthly_salary_template(request):
             "epf_contribution": format_with_commas(salary_history.epf),
             "pt": salary_history.pt > 0,
             "professional_tax": format_with_commas(salary_history.pt),
-            'it': salary_history.tds > 0,
             "income_tax": format_with_commas(salary_history.tds),
             "esi": salary_history.esi > 0,
             "esi_employee_contribution": format_with_commas(salary_history.esi),
@@ -3745,12 +3793,8 @@ def employee_monthly_salary_template(request):
 
             # Loan Details
             "loan_emi": format_with_commas(salary_history.loan_emi),
-            "loan_details": [],  # Can be extended if you want loan records from another model
-            "logo": getattr(getattr(salary_history.payroll.business, 'logos', None), 'logo', None).url
-                    if getattr(getattr(salary_history.payroll.business, 'logos', None), 'logo', None)
-                    else None,
-
-                    }
+            "loan_details": []  # Can be extended if you want loan records from another model
+        }
 
         template_name = "salary_template.html"
         document_generator = DocumentGenerator(request, salary_history, context)
@@ -3766,18 +3810,19 @@ def employee_monthly_salary_template(request):
 def bonus_incentive_list(request):
     """
     GET:
-        - Input: payroll_id, month, financial_year
-        - Returns all bonus incentives (existing + newly created).
-        - Creates zero-amount entries only for eligible employees missing bonus record.
+        - Input: payroll_id, month, financial_year, type [variable | adhoc]
+        - If type='variable': create zero-amount bonuses for missing employees
+        - If type='adhoc': return all bonus records where bonus_type != 'Variable Bonus'
     """
     try:
         payroll_id = request.query_params.get('payroll_id')
         month = request.query_params.get('month')
         financial_year = request.query_params.get('financial_year')
+        bonus_type = request.query_params.get('type', '').lower()
 
-        if not all([payroll_id, month, financial_year]):
+        if not all([payroll_id, month, financial_year, bonus_type]):
             return Response(
-                {"error": "Missing query params: payroll_id, month, financial_year are required."},
+                {"error": "Missing query params: payroll_id, month, financial_year, and type are required."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -3785,77 +3830,94 @@ def bonus_incentive_list(request):
             month = int(month)
             start_year, end_year = map(int, financial_year.split('-'))
             computed_year = start_year if month >= 4 else end_year
-            bonus_cycle_date = date(computed_year, month, 1)
+            today = date.today()
+            bonus_cycle_date = date(computed_year, month, today.day)
         except (ValueError, TypeError):
             return Response(
                 {"error": "Invalid format for month or financial_year. Use month=1-12, financial_year='YYYY-YYYY'."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        employees = list(EmployeeManagement.objects.filter(payroll_id=payroll_id))
-        if not employees:
-            return Response({"error": "No employees found for the given payroll_id."}, status=status.HTTP_404_NOT_FOUND)
+        if bonus_type == "variable":
+            employees = list(EmployeeManagement.objects.filter(payroll_id=payroll_id))
+            if not employees:
+                return Response({"error": "No employees found for the given payroll_id."},
+                                status=status.HTTP_404_NOT_FOUND)
 
-        # Fetch eligible salary records with variable bonus
-        salary_details = list(
-            EmployeeSalaryDetails.objects.filter(
-                employee__in=employees,
-                is_variable_bonus=True,
-                valid_to__isnull=True,
-                valid_from__lte=bonus_cycle_date
-            ).select_related('employee')
-        )
-
-        if not salary_details:
-            return Response(
-                {"message": "No employees with variable bonus active during this month."},
-                status=status.HTTP_204_NO_CONTENT
+            salary_details = list(
+                EmployeeSalaryDetails.objects.filter(
+                    employee__in=employees,
+                    is_variable_bonus=True,
+                    valid_to__isnull=True,
+                    valid_from__lte=bonus_cycle_date
+                ).select_related('employee')
             )
 
-        # Get existing bonuses for the requested month/year
-        existing_bonuses = BonusIncentive.objects.filter(
-            employee__in=[s.employee for s in salary_details],
-            month=month,
-            financial_year=financial_year
-        )
-        existing_employee_ids = set(existing_bonuses.values_list('employee_id', flat=True))
+            if not salary_details:
+                return Response(
+                    {"message": "No employees with variable bonus active during this month."},
+                    status=status.HTTP_204_NO_CONTENT
+                )
 
-        # Filter only those who don't already have a bonus entry
-        missing_bonus_salaries = [
-            s for s in salary_details if s.employee.id not in existing_employee_ids
-        ]
-
-        # Create new bonus records
-        bonus_data = [
-            BonusIncentive(
-                employee=record.employee,
-                amount=0,
-                financial_year=financial_year,
+            existing_bonuses = BonusIncentive.objects.filter(
+                employee__in=[s.employee for s in salary_details],
                 month=month,
-                year=computed_year,
+                financial_year=financial_year,
                 bonus_type="Variable Bonus"
             )
-            for record in missing_bonus_salaries
-        ]
+            existing_employee_ids = set(existing_bonuses.values_list('employee_id', flat=True))
 
-        if bonus_data:
-            with transaction.atomic():
-                BonusIncentive.objects.bulk_create(bonus_data)
+            missing_bonus_salaries = [
+                s for s in salary_details if s.employee.id not in existing_employee_ids
+            ]
 
-        # Return all bonus records for the month (existing + new)
-        all_bonuses = BonusIncentive.objects.filter(
-            employee__in=[s.employee for s in salary_details],
-            month=month,
-            financial_year=financial_year
-        )
-        serializer = BonusIncentiveSerializer(all_bonuses, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+            bonus_data = [
+                BonusIncentive(
+                    employee=record.employee,
+                    amount=0,
+                    financial_year=financial_year,
+                    month=month,
+                    year=computed_year,
+                    bonus_type="Variable Bonus"
+                )
+                for record in missing_bonus_salaries
+            ]
+
+            if bonus_data:
+                with transaction.atomic():
+                    BonusIncentive.objects.bulk_create(bonus_data)
+
+            all_bonuses = BonusIncentive.objects.filter(
+                employee__in=[s.employee for s in salary_details],
+                month=month,
+                financial_year=financial_year,
+                bonus_type="Variable Bonus"
+            )
+            serializer = BonusIncentiveSerializer(all_bonuses, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        elif bonus_type == "adhoc":
+            bonuses = BonusIncentive.objects.filter(
+                employee__payroll_id=payroll_id,
+                month=month,
+                financial_year=financial_year
+            ).exclude(bonus_type="Variable Bonus")
+
+            serializer = BonusIncentiveSerializer(bonuses, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        else:
+            return Response(
+                {"error": "Invalid type. Must be one of: variable, adhoc"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
     except Exception as e:
         return Response(
             {"error": "Unexpected error occurred.", "details": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
 
 
 @api_view(['POST'])
@@ -3977,6 +4039,7 @@ def bonus_incentive_detail(request, pk):
 #
 #     except Exception as e:
 #         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 # @api_view(['GET'])
@@ -4139,7 +4202,7 @@ def bonus_incentive_detail(request, pk):
 def download_template_xlsx(request):
     try:
         template_type = request.query_params.get('type', 'work_location').lower()
-
+        
         if template_type == 'work_location':
             template_data = {
                 'location_name': ['Example Location 1', 'Example Location 2'],
@@ -4207,12 +4270,11 @@ def download_template_xlsx(request):
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
 @api_view(['GET'])
 def download_template_csv(request):
     try:
         template_type = request.query_params.get('type', 'work_location').lower()
-
+        
         if template_type == 'work_location':
             template_data = {
                 'location_name': ['Example Location 1', 'Example Location 2'],
@@ -4242,7 +4304,7 @@ def download_template_csv(request):
 
         df = pd.DataFrame(template_data)
         output = io.BytesIO()
-
+        
         # Write the actual data
         df.to_csv(output, index=False)
         output.seek(0)
@@ -4281,3 +4343,27 @@ def salary_revision_list(request):
         return Response(serializer.data, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['DELETE'])
+def delete_employees_by_payroll(request):
+    """
+    DELETE all EmployeeManagement records associated with a given payroll_id.
+    """
+    payroll_id = request.query_params.get('payroll_id')
+
+    if not payroll_id:
+        return Response({"error": "payroll_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        payroll_instance = PayrollOrg.objects.get(id=payroll_id)
+    except PayrollOrg.DoesNotExist:
+        return Response({"error": "Invalid payroll_id"}, status=status.HTTP_404_NOT_FOUND)
+
+    # Delete all employees under the given payroll
+    deleted_count, _ = EmployeeManagement.objects.filter(payroll=payroll_instance).delete()
+
+    return Response(
+        {"message": f"Deleted {deleted_count} employee(s) associated with payroll_id {payroll_id}."},
+        status=status.HTTP_200_OK
+    )

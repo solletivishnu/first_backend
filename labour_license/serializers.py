@@ -6,6 +6,8 @@ from .models import (
 
 
 class BusinessIdentityStructureSerializer(serializers.ModelSerializer):
+    number_of_employees = serializers.JSONField(required=False, allow_null=True)
+
     class Meta:
         model = BusinessIdentityStructure
         fields = '__all__'

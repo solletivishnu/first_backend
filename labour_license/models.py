@@ -28,6 +28,7 @@ class BusinessIdentityStructure(models.Model):
     business_pan = models.FileField(upload_to=business_identity_structure_pan,
                                     null=True, blank=True, storage=PrivateS3Storage())
     date_of_commencement = models.DateField(null=False, blank=False)
+    number_of_employees = models.JSONField(default=dict, blank=True, null=True)
     status = models.CharField(max_length=20, choices=[('in progress', 'In Progress'), ('completed', 'Completed'),
                                                       ('sent for approval', 'Sent for Approval'),
                                                       ('revoked', 'Revoked')], null=False, blank=False)

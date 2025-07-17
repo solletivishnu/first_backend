@@ -67,6 +67,7 @@ class DocumentFields(models.Model):
     label = models.CharField(max_length=255, help_text="Label for the field")
     field_type = models.CharField(max_length=50, help_text="Type of the field (e.g., text, number, date)")
     is_required = models.BooleanField(default=False, help_text="Indicates if the field is required")
+    metadata = JSONField(blank=True, null=True, help_text="Additional metadata related to the field")
     created_at = models.DateField(auto_now_add=True, help_text="Timestamp when the field was created")
     updated_at = models.DateField(auto_now=True, help_text="Timestamp when the field was last updated")
 
@@ -176,6 +177,12 @@ class ContextWiseEventAndDocument(models.Model):
         null=True,
         blank=True
     )
+    file_name = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Name of the file associated with this document"
+    )
     status = models.CharField(
         max_length=50,
         choices=[
@@ -245,6 +252,8 @@ def update_document_status(sender, instance, created, **kwargs):
     """
     # Update the EventDocument status based on draft changes
     if instance.status != instance.draft.status:
+        if instance.status == 'draft' and instance.draft.event_instance:
+            instance.draft.event_instance.status = 'in_progress'
         instance.draft.status = instance.status
         instance.draft.save()
 
@@ -260,6 +269,8 @@ def update_event_instance_progress(sender, instance, **kwargs):
 
     total = related_docs.count()
     completed = related_docs.filter(status='completed').count()
+    in_progress = related_docs.exclude(status="yet_to_start").count()
+
 
     # Calculate new progress
     progress = (completed / total) * 100 if total > 0 else 0
@@ -267,7 +278,7 @@ def update_event_instance_progress(sender, instance, **kwargs):
     # Determine new status
     if completed == total:
         status = 'completed'
-    elif completed > 0:
+    elif completed > 0 or in_progress > 0:
         status = 'in_progress'
     else:
         status = 'yet_to_start'
