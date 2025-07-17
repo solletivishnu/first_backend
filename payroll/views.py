@@ -3791,6 +3791,7 @@ def employee_monthly_salary_template(request):
             "epf_contribution": format_with_commas(salary_history.epf),
             "pt": salary_history.pt > 0,
             "professional_tax": format_with_commas(salary_history.pt),
+            "it": salary_history.tds > 0,
             "income_tax": format_with_commas(salary_history.tds),
             "esi": salary_history.esi > 0,
             "esi_employee_contribution": format_with_commas(salary_history.esi),
