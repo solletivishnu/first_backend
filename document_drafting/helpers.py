@@ -5,6 +5,10 @@ import pdfkit
 from io import BytesIO
 from jinja2 import Template
 from django.core.files.base import ContentFile
+from datetime import date, datetime
+from dateutil.parser import parse as parse_date
+
+
 
 def draft_document_file(instance, filename):
     """
@@ -28,7 +32,7 @@ def document_template_path(instance, filename):
     return os.path.join('document_drafting', 'document_templates', document_name, filename)
 
 
-def process_and_generate_draft_pdf(instance):
+def process_and_generate_draft_pdf(instance, file_name=None):
     """
     Fetch HTML template, render it using draft_data, convert to PDF, and save to instance.file.
     """
@@ -71,8 +75,14 @@ def process_and_generate_draft_pdf(instance):
         # 4. Generate PDF from rendered HTML using wkhtmltopdf via pdfkit
         pdf_bytes = pdfkit.from_string(rendered_html, False, options=options)
 
-        # 5. Save the PDF to the file field of the model
-        filename = f"{document.document_name.replace(' ', '_')}.pdf"
+        # 5. Determine file name
+        if file_name:
+            filename = file_name if file_name.lower().endswith(".pdf") else f"{file_name}.pdf"
+        else:
+            filename = f"{document.document_name.replace(' ', '_')}.pdf"
+
+        # 6. Save the PDF to the file field of the model
         instance.file.save(filename, ContentFile(pdf_bytes))
     except Exception as e:
         print(f"[Error] PDF generation failed: {e}")
+

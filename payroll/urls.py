@@ -5,6 +5,8 @@ from . import generate_salary_upload_template
 from . import bulk_employee_upload
 from . import bulk_salary_details_upload
 from . import payroll_workflow
+from . import attendance_controller
+from . import employeecredentials
 
 urlpatterns = [
     # URL for listing and creating PayrollOrg instances
@@ -86,7 +88,7 @@ urlpatterns = [
     # URL for retrieving, updating, or deleting a specific Earnings record by its ID
     path('earnings/<int:pk>', views.earnings_detail, name='earnings_detail'),
 
-    path('deductions/', views.deduction_list_create, name='deduction-list-create'),
+    path('deductions/', views.deductions_list_create, name='deduction-list-create'),
     path('deductions/<int:id>/', views.deduction_detail, name='deduction-detail'),
 
     # Reimbursement Endpoints
@@ -184,6 +186,8 @@ urlpatterns = [
 
     path("salary-revision", views.salary_revision_list, name="salary-revision-list"),
 
+    path("employees/delete/", views.delete_employees_by_payroll, name="delete-employees-by-payroll"),
+
     path('download-template/<int:payroll_id>/', employee_management.generate_employee_upload_template,
          name='download_employee_template'),
 
@@ -199,5 +203,25 @@ urlpatterns = [
     path('payroll-workflows/<int:pk>/update/', payroll_workflow.payroll_workflow_update),
     path('payroll-workflows/<int:pk>/delete/', payroll_workflow.payroll_workflow_delete),
     path('payroll-workflows/detail-or-create/', payroll_workflow.payroll_workflow_detail_or_create),
+
+# Manual check-in/check-out
+
+    path('manual-checkin/', attendance_controller.manual_check_in, name='manual-check-in'),
+    path('manual-checkout/', attendance_controller.manual_check_out, name='manual-check-out'),
+
+    # Face recognition check-in/check-out
+    # path('face-checkin/', attendance_controller.face_checkin_checkout, name='face-checkin'),
+
+    # Get today's attendance
+    path('today/', attendance_controller.today_attendance_status, name='today-attendance'),
+
+    # Monthly report
+    path('report/', attendance_controller.truetime_monthly_view, name='monthly-report'),
+
+    path("credentials/", employeecredentials.credentials_list_create, name="credentials-list-create"),
+    path("credentials/<int:pk>/", employeecredentials.credentials_detail, name="credentials-detail"),
+
+    # ───────────── Employee Login (JWT) ─────────────
+    path("auth/employee-login/", employeecredentials.employee_login, name="employee-login"),
 
 ]

@@ -19,7 +19,16 @@ def business_identity_structure_list(request):
         serializer = BusinessIdentityStructureSerializer(records, many=True)
         return Response(serializer.data)
     elif request.method == 'POST':
-        serializer = BusinessIdentityStructureSerializer(data=request.data)
+        data = request.data.copy()
+
+        if 'number_of_employees' in data and isinstance(data['number_of_employees'], str):
+            try:
+                data['number_of_employees'] = json.dumps(json.loads(data['number_of_employees']))
+            except ValueError:
+                return Response({"error": "Invalid JSON format for number_of_persons_employed"},
+                                status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = BusinessIdentityStructureSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -66,7 +75,15 @@ def business_identity_structure_detail(request, pk):
         serializer = BusinessIdentityStructureSerializer(record)
         return Response(serializer.data)
     elif request.method == 'PUT':
-        serializer = BusinessIdentityStructureSerializer(record, data=request.data, partial=True)
+        data = request.data.copy()
+        if 'number_of_employees' in data and isinstance(data['number_of_employees'], str):
+            try:
+                data['number_of_employees'] = json.dumps(json.loads(data['number_of_employees']))
+            except ValueError:
+                return Response({"error": "Invalid JSON format for number_of_persons_employed"},
+                                status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = BusinessIdentityStructureSerializer(record, data=data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)

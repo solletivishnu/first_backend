@@ -4,13 +4,21 @@ from rest_framework.response import Response
 from rest_framework import status
 import pandas as pd
 from datetime import datetime
-from .models import EmployeeSalaryDetails, EmployeeManagement
-from .generate_salary_upload_template import default_earnings, default_benefits, default_deductions
+from .models import EmployeeSalaryDetails, EmployeeManagement, PayrollOrg, Earnings
+from .generate_salary_upload_template import default_earnings, default_benefits, default_deductions, Deduction
+from .serializers import EarningsSerializer, DeductionSerializer
 
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def upload_employee_salary_excel(request):
+    payroll_id = request.data.get('payroll_id')
+    if not payroll_id:
+        return Response({"error": "Payroll ID is required."}, status=status.HTTP_400_BAD_REQUEST)
+    payroll = PayrollOrg.objects.get(pk=payroll_id)
+    if not payroll:
+        return Response({"error": "Invalid Payroll ID."}, status=status.HTTP_400_BAD_REQUEST)
+
     file_obj = request.FILES.get('file')
     if not file_obj:
         return Response({"error": "No file uploaded."}, status=status.HTTP_400_BAD_REQUEST)
@@ -64,8 +72,10 @@ def upload_employee_salary_excel(request):
             "employee": EmployeeManagement.objects.get(pk=get(row, "Employee Id", None)),
         }
 
+        earnings = EarningsSerializer(Earnings.objects.filter(payroll=payroll).order_by('id'), many=True).data
+
         # Process Earnings
-        for earning in default_earnings:
+        for earning in earnings:
             component = earning['component_name']
             ct = earning['calculation_type']['type']
 
@@ -116,6 +126,7 @@ def upload_employee_salary_excel(request):
             component = deduction['component_name']
             ct = deduction['calculation_type']['type']
 
+
             deduction_data = {
                 "component_name": component,
                 "monthly": get(row, f"Monthly ({component})", "NA"),
@@ -137,6 +148,29 @@ def upload_employee_salary_excel(request):
                 })
 
             record["deductions"].append(deduction_data)
+        deduction_data = DeductionSerializer(Deduction.objects.filter(payroll=payroll).order_by('id'), many=True).data
+
+        for deduction_row in deduction_data:
+            # Get component and calculation type
+            component = deduction_row['deduction_name']
+            ct = deduction_row['calculation_type']['type']
+            if ct == "Percentage of CTC":
+                input_col = f"{component} (% of CTC)"
+            elif ct == "Percentage of Basic":
+                input_col = f"{component} (% of Basic)"
+            elif ct == "Flat Amount":
+                input_col = f"{component} (Flat Amount)"
+            else:
+                input_col = component
+
+            deduction_data = {
+                "component_name": component,
+                "monthly": get(row, f"Monthly ({component})", "NA"),
+                "annually": get(row, f"Annually ({component})", "NA"),
+                "calculation_type": get(row, input_col, 0)
+            }
+            if deduction_data['monthly'] or deduction_data['annually']:
+                record["deductions"].append(deduction_data)
 
         return record
 

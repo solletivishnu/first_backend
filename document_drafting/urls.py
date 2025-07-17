@@ -55,4 +55,11 @@ urlpatterns = [
          name='recent-documents-by-context'),
     path('context/<int:context_id>/recent-events/', views.recent_events_by_context,
          name='recent-events-by-context'),
+
+    path('file-name-exists/', views.file_name_is_already_exists_or_not, name='file-name-exists'),
+
+    # New filter dropdown data endpoint
+    path('filter-dropdown-data/', views.get_filter_dropdown_data, name='filter-dropdown-data'),
+    # New filtered documents endpoint
+    path('filtered-documents/<int:context_id>/', views.get_filtered_documents, name='filtered-documents'),
 ]
