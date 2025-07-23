@@ -133,10 +133,11 @@ def upload_employee_salary_excel(request):
         for deduction in default_deductions:
             component = deduction['component_name']
             ct = deduction['calculation_type']['type']
+            component_name = "PT" if component == "Professional Tax (PT)" else component
 
 
             deduction_data = {
-                "component_name": component,
+                "component_name": component_name,
                 "monthly": get(row, f"Monthly ({component})", "NA"),
                 "annually": get(row, f"Annually ({component})", "NA"),
                 "calculation_type": ct if ct != "Not Applicable" else "Not Applicable"
