@@ -1762,7 +1762,7 @@ def calculate_payroll(request):
             monthly_gross_salary = gross_salary / 12
 
             deductions = calculate_employee_deductions(pf_wage, basic_salary_monthly,
-                                                       basic_salary_monthly, pt_enabled, data.get("payroll"))
+                                                       monthly_gross_salary, pt_enabled, data.get("payroll"))
             deductions["loan_emi"] = calculate_loan_deductions(employee_id) if employee_id else "NA"
 
             total_deductions = safe_sum(
@@ -2771,7 +2771,7 @@ def employee_attendance_filtered(request):
     # Filter records
     attendance_records = EmployeeAttendance.objects.filter(
         employee__payroll_id=payroll_id, financial_year=financial_year, month=month
-    )
+    ).order_by('-id')
 
     if not attendance_records.exists():
         return Response({"message": "No records found for the given criteria."}, status=status.HTTP_404_NOT_FOUND)

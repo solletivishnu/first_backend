@@ -69,8 +69,8 @@ def employee_login(request):
 
             return Response({
                 "message": "Login successful",
-                "access": str(refresh.access_token),
-                "refresh": str(refresh),
+                "access_token": str(refresh.access_token),
+                "refresh_token": str(refresh),
                 "employee": {
                     "id": creds.employee.id,
                     "associate_id": creds.employee.associate_id,
