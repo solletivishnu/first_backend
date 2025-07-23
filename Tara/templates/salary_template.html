@@ -560,27 +560,6 @@
                         </td>
                       </tr>
                       {% endif %}
-                      {% if fixed_allowance_format %}
-                      <tr style="border-bottom: 1px solid #e2e2e2">
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0 0.75rem 0.75rem;
-                          "
-                        >
-                          Fixed Allowances
-                        </td>
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0.75rem 0.75rem 0;
-                            text-align: right;
-                          "
-                        >
-                          {{fixed_allowance}}
-                        </td>
-                      </tr>
-                      {% endif %}
                       {% if bonus_format %}
                       <tr style="border-bottom: 1px solid #e2e2e2">
                         <td
@@ -686,6 +665,29 @@
                         </td>
                       </tr>
                       {% endif %}
+                      {% for item in other_earnings_breakdown %}
+                        {% for component, amount in item.items %}
+                          <tr style="border-bottom: 1px solid #e2e2e2">
+                            <td
+                              style="
+                                border-bottom-width: 1px;
+                                padding: 0.75rem 0 0.75rem 0.75rem;
+                              "
+                            >
+                              {{ component|title }}
+                            </td>
+                            <td
+                              style="
+                                border-bottom-width: 1px;
+                                padding: 0.75rem 0.75rem 0.75rem 0;
+                                text-align: right;
+                              "
+                            >
+                              {{ amount }}
+                            </td>
+                          </tr>
+                        {% endfor %}
+                      {% endfor %}
                       <tr style="border-bottom: 1px solid #e2e2e2">
                         <td
                           style="
@@ -893,6 +895,29 @@
                         </td>
                       </tr>
                       {% endif %}
+                      {% for item in other_deductions_breakdown %}
+                        {% for component, amount in item.items %}
+                          <tr style="border-bottom: 1px solid #e2e2e2">
+                            <td
+                              style="
+                                border-bottom-width: 1px;
+                                padding: 0.75rem 0 0.75rem 0.75rem;
+                              "
+                            >
+                              {{ component|title }}
+                            </td>
+                            <td
+                              style="
+                                border-bottom-width: 1px;
+                                padding: 0.75rem 0.75rem 0.75rem 0;
+                                text-align: right;
+                              "
+                            >
+                              {{ amount }}
+                            </td>
+                          </tr>
+                        {% endfor %}
+                      {% endfor %}
                       <tr style="border-bottom: 1px solid #e2e2e2">
                         <td
                           style="

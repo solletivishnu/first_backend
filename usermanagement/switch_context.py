@@ -70,6 +70,7 @@ def generate_user_profile_response(user):
             "created_at": ucr_context.created_at,
             "is_active": ucr_context.id == user.active_context.id if user.active_context else False,
             "business_id": ucr_context.business_id,
+            "legal_name": ucr_context.business.legal_name if ucr_context.business and ucr_context.business.legal_name else None,
             "role": {
                 "id": ucr.role.id,
                 "name": ucr.role.name,
@@ -99,6 +100,7 @@ def generate_user_profile_response(user):
             "profile_status": context.profile_status,
             "created_at": context.created_at,
             "business_id": context.business_id,
+            "legal_name": context.business.legal_name if context.business and context.business.legal_name else None,
         },
         "all_contexts": all_contexts,
         "user_role": {
