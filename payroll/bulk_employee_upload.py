@@ -5,6 +5,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework import status
+import re
 
 # Import your models accordingly
 from .models import (
@@ -68,8 +69,8 @@ def upload_employee_excel(request):
 
     # Required columns except payroll_id (removed from Excel)
     required_columns = [
-        'first_name', 'last_name', 'associate_id', 'doj', 'work_email', 'gender', 'work_location', 'designation',
-        'department',
+        'first_name', 'last_name', 'associate_id', 'doj', 'work_email',
+        'mobile_number', 'gender', 'work_location', 'designation', 'department',
         'enable_portal_access', 'epf_enabled', 'pf_account_number', 'uan',
         'esi_enabled', 'esi_number', 'professional_tax', 'employee_status',
         'dob', 'age', 'guardian_name', 'pan', 'aadhar', 'address_line1',
@@ -84,8 +85,8 @@ def upload_employee_excel(request):
 
     # Mandatory fields except pan and uan
     mandatory_fields = [
-        'first_name', 'last_name', 'associate_id', 'doj', 'work_email', 'gender', 'work_location', 'designation',
-        'department',
+        'first_name', 'last_name', 'associate_id', 'doj', 'work_email',
+        'mobile_number', 'gender', 'work_location', 'designation', 'department',
         'enable_portal_access', 'epf_enabled',
         'esi_enabled', 'professional_tax', 'employee_status',
         'dob', 'age', 'guardian_name', 'aadhar', 'address_line1',
@@ -106,7 +107,7 @@ def upload_employee_excel(request):
         return Response({"error": errors}, status=status.HTTP_400_BAD_REQUEST)
 
     # Check duplicates inside the file for unique fields (work_email, uan, pan, aadhar, account_number)
-    unique_fields = ['work_email', 'uan', 'pan', 'account_number']
+    unique_fields = ['work_email', 'uan', 'pan', 'aadhar', 'account_number']
     for field in unique_fields:
         non_empty = df[field].dropna().astype(str).str.strip()
         duplicates = non_empty[non_empty.duplicated(keep=False)].index + 2
@@ -119,6 +120,58 @@ def upload_employee_excel(request):
     # Strip and filter unique values to check against DB
     def clean_unique_vals(series):
         return list(set(series.dropna().astype(str).str.strip()))
+
+
+    # Validate pf_account_number format: 5 letters followed by 10-14 digits
+    def is_valid_pf_account_number(pf):
+        if pd.isna(pf) or str(pf).strip() == '':
+            return True  # Allow blank, as it's not always mandatory
+        pf = str(pf).strip()
+        return bool(re.fullmatch(r'[A-Za-z]{5}\d{10,14}', pf))
+
+    invalid_pf_rows = []
+    for idx, row in df.iterrows():
+        pf = row.get('pf_account_number', '')
+        if not is_valid_pf_account_number(pf):
+            invalid_pf_rows.append(idx + 2)  # Excel row number
+
+    if invalid_pf_rows:
+        return Response({
+            "error": [
+                f"Invalid pf_account_number format in rows: {invalid_pf_rows}. It must be exactly 5 letters followed by 10-14 digits (e.g., ABCDE1234567890)."]
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    def is_valid_email(email):
+        if pd.isna(email) or str(email).strip() == '':
+            return False
+        email = str(email).strip()
+        return bool(re.fullmatch(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email))
+
+    def is_valid_mobile_number(mobile):
+        if pd.isna(mobile) or str(mobile).strip() == '':
+            return False
+        mobile = str(mobile).strip()
+        return bool(re.fullmatch(r'\d{10}', mobile))
+
+    invalid_email_rows = []
+    invalid_mobile_rows = []
+    for idx, row in df.iterrows():
+        email = row.get('work_email', '')
+        mobile = row.get('mobile_number', '')
+        if not is_valid_email(email):
+            invalid_email_rows.append(idx + 2)
+        if not is_valid_mobile_number(mobile):
+            invalid_mobile_rows.append(idx + 2)
+
+    if invalid_email_rows:
+        return Response({
+            "error": [f"Invalid work_email format in rows: {invalid_email_rows}. Please provide a valid email address."]
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    if invalid_mobile_rows:
+        return Response({
+            "error": [f"Invalid mobile_number format in rows: {invalid_mobile_rows}. It must be exactly 10 digits."]
+        }, status=status.HTTP_400_BAD_REQUEST)
 
     work_emails = clean_unique_vals(df['work_email'])
     uans = [val for val in clean_unique_vals(df['uan']) if val]
@@ -161,133 +214,153 @@ def upload_employee_excel(request):
     departments_map = {dep.dept_name.strip().lower(): dep for dep in Departments.objects.filter(dept_name__in=department_names, payroll=payroll_id)}
 
     success_count = 0
+    errors = []
+    failed_row_index = None
 
-    for idx, row in df.iterrows():
-        row_num = idx + 2
+    from django.db import IntegrityError
 
-        # Validate address JSON
-        address_json = {
-            "address_line1": row.get('address_line1', '').strip(),
-            "address_line2": row.get('address_line2', '').strip() if not pd.isna(row.get('address_line2')) else "",
-            "address_city": row.get('address_city', '').strip(),
-            "address_state": row.get('address_state', '').strip(),
-            "address_pinCode": str(row.get('address_pinCode', '')).strip()
-        }
+    try:
+        with transaction.atomic():
+            for idx, row in df.iterrows():
+                row_num = idx + 2
 
-        missing_address_fields = [k for k, v in address_json.items() if k != "address_line2" and not v]
-        if missing_address_fields:
-            errors.append(f"Row {row_num}: Missing required address fields: {missing_address_fields}")
-            continue
-
-        try:
-            # FK validation from cached maps by name (case-insensitive)
-            work_location_obj = work_locations_map.get(str(row['work_location']).strip().lower())
-            designation_obj = designations_map.get(str(row['designation']).strip().lower())
-            department_obj = departments_map.get(str(row['department']).strip().lower())
-
-            if not work_location_obj:
-                errors.append(f"Row {row_num}: WorkLocation '{row['work_location']}' not found.")
-                continue
-            if not designation_obj:
-                errors.append(f"Row {row_num}: Designation '{row['designation']}' not found.")
-                continue
-            if not department_obj:
-                errors.append(f"Row {row_num}: Department '{row['department']}' not found.")
-                continue
-
-            with transaction.atomic():
-                def get_numeric_or_none(value):
-                    try:
-                        val = str(int(value))
-                        return val if val else None
-                    except (ValueError, TypeError):
-                        return None
-
-                statutory_components = {
-                    "epf_enabled": bool(row.get('epf_enabled')),
-                    "esi_enabled": bool(row.get('esi_enabled')),
-                    "professional_tax": bool(row.get('professional_tax')),
-                    "employee_provident_fund": {
-                        "uan": get_numeric_or_none(row.get('uan')),
-                        "pf_account_number":  get_numeric_or_none(row.get('pf_account_number'))
-                    },
-                    "employee_state_insurance": {
-                        "esi_number": get_numeric_or_none(row.get('esi_number'))
-                    }
+                # Validate address JSON
+                address_json = {
+                    "address_line1": row.get('address_line1', '').strip(),
+                    "address_line2": row.get('address_line2', '').strip() if not pd.isna(row.get('address_line2')) else "",
+                    "address_city": row.get('address_city', '').strip(),
+                    "address_state": row.get('address_state', '').strip(),
+                    "address_pinCode": str(row.get('address_pinCode', '')).strip()
                 }
 
-                epf = {
-                    k: v for k, v in {
-                        "pf_account_number": get_numeric_or_none(row.get('pf_account_number')),
-                        "uan": get_numeric_or_none(row.get('uan'))
-                    }.items() if v is not None
-                }
-                if epf:
-                    statutory_components["employee_provident_fund"] = epf
+                missing_address_fields = [k for k, v in address_json.items() if k != "address_line2" and not v]
+                if missing_address_fields:
+                    errors.append(f"Row {row_num}: Missing required address fields: {missing_address_fields}")
+                    failed_row_index = idx
+                    raise IntegrityError("Rolling back due to error in row processing")
 
-                esi = {
-                    k: v for k, v in {
-                        "esi_number": get_numeric_or_none(row.get('esi_number'))
-                    }.items() if v is not None
-                }
-                if esi:
-                    statutory_components["employee_state_insurance"] = esi
+                # FK validation from cached maps by name (case-insensitive)
+                work_location_obj = work_locations_map.get(str(row['work_location']).strip().lower())
+                designation_obj = designations_map.get(str(row['designation']).strip().lower())
+                department_obj = departments_map.get(str(row['department']).strip().lower())
 
-                employee, _ = EmployeeManagement.objects.update_or_create(
-                    associate_id=row['associate_id'],
-                    payroll_id=payroll_obj_id,
-                    defaults={
-                        'first_name': row['first_name'],
-                        'middle_name': None if pd.isna(row.get('middle_name')) or str(
-                            row.get('middle_name')).strip().lower() == 'nan' or None else row.get('middle_name'),
-                        'last_name': row['last_name'],
-                        'doj': parse_excel_date(row.get('doj')),
-                        'work_email': row['work_email'],
-                        'mobile_number': str(row['mobile_number']),
-                        'gender': row['gender'],
-                        'work_location_id': work_location_obj.id,
-                        'designation_id': designation_obj.id,
-                        'department_id': department_obj.id,
-                        'enable_portal_access': bool(row['enable_portal_access']),
-                        'statutory_components': statutory_components,
-                        'employee_status': bool(row.get('employee_status', True)),
+                if not work_location_obj:
+                    errors.append(f"Row {row_num}: WorkLocation '{row['work_location']}' not found.")
+                    failed_row_index = idx
+                    raise IntegrityError("Rolling back due to error in row processing")
+                if not designation_obj:
+                    errors.append(f"Row {row_num}: Designation '{row['designation']}' not found.")
+                    failed_row_index = idx
+                    raise IntegrityError("Rolling back due to error in row processing")
+                if not department_obj:
+                    errors.append(f"Row {row_num}: Department '{row['department']}' not found.")
+                    failed_row_index = idx
+                    raise IntegrityError("Rolling back due to error in row processing")
+
+                try:
+                    def get_numeric_or_none(value):
+                        try:
+                            val = str(int(value))
+                            return val if val else None
+                        except (ValueError, TypeError):
+                            return None
+
+                    statutory_components = {
+                        "epf_enabled": bool(row.get('epf_enabled')),
+                        "esi_enabled": bool(row.get('esi_enabled')),
+                        "professional_tax": bool(row.get('professional_tax')),
                     }
-                )
 
-                EmployeePersonalDetails.objects.update_or_create(
-                    employee=employee,
-                    defaults={
-                        'dob': parse_excel_date(row.get('dob')),
-                        'age': int(row['age']),
-                        'guardian_name': row['guardian_name'],
-                        'pan': row.get('pan', '') or '',
-                        'aadhar': row['aadhar'],
-                        'address': address_json,
-                        'alternate_contact_number': row.get('alternate_contact_number', '') or '',
-                        'marital_status': row['marital_status'],
-                        'blood_group': row['blood_group']
+                    epf = {
+                        k: v for k, v in {
+                            "pf_account_number": str(row.get('pf_account_number')),
+                            "uan": get_numeric_or_none(row.get('uan'))
+                        }.items() if v is not None
                     }
-                )
+                    if epf:
+                        statutory_components["employee_provident_fund"] = epf
 
-                EmployeeBankDetails.objects.update_or_create(
-                    employee=employee,
-                    defaults={
-                        'account_holder_name': row['account_holder_name'],
-                        'bank_name': row['bank_name'],
-                        'account_number': str(row['account_number']),
-                        'ifsc_code': row['ifsc_code'],
-                        'branch_name': row.get('branch_name', '') or '',
-                        "is_active": True
+                    esi = {
+                        k: v for k, v in {
+                            "esi_number": get_numeric_or_none(row.get('esi_number'))
+                        }.items() if v is not None
                     }
-                )
+                    if esi:
+                        statutory_components["employee_state_insurance"] = esi
 
-                success_count += 1
+                    employee, _ = EmployeeManagement.objects.update_or_create(
+                        associate_id=row['associate_id'],
+                        payroll_id=payroll_obj_id,
+                        defaults={
+                            'first_name': row['first_name'],
+                            'middle_name': None if pd.isna(row.get('middle_name')) or str(
+                                row.get('middle_name')).strip().lower() == 'nan' or None else row.get('middle_name'),
+                            'last_name': row['last_name'],
+                            'doj': parse_excel_date(row.get('doj')),
+                            'work_email': row['work_email'],
+                            'mobile_number': str(row['mobile_number']),
+                            'gender': row['gender'],
+                            'work_location_id': work_location_obj.id,
+                            'designation_id': designation_obj.id,
+                            'department_id': department_obj.id,
+                            'enable_portal_access': bool(row['enable_portal_access']),
+                            'statutory_components': statutory_components,
+                            'employee_status': bool(row.get('employee_status', True)),
+                        }
+                    )
 
-        except Exception as e:
-            errors.append(f"Row {row_num}: Error saving record - {str(e)}")
+                    EmployeePersonalDetails.objects.update_or_create(
+                        employee=employee,
+                        defaults={
+                            'dob': parse_excel_date(row.get('dob')),
+                            'age': int(row['age']),
+                            'guardian_name': row['guardian_name'],
+                            'pan': row.get('pan', '') or '',
+                            'aadhar': row['aadhar'],
+                            'address': address_json,
+                            'alternate_contact_number': row.get('alternate_contact_number', '') or '',
+                            'marital_status': row['marital_status'],
+                            'blood_group': row['blood_group']
+                        }
+                    )
 
+                    EmployeeBankDetails.objects.update_or_create(
+                        employee=employee,
+                        defaults={
+                            'account_holder_name': row['account_holder_name'],
+                            'bank_name': row['bank_name'],
+                            'account_number': str(row['account_number']),
+                            'ifsc_code': row['ifsc_code'],
+                            'branch_name': row.get('branch_name', '') or '',
+                            "is_active": True
+                        }
+                    )
+
+                    success_count += 1
+                except Exception as e:
+                    errors.append(f"Row {row_num}: Error saving record - {str(e)}")
+                    failed_row_index = idx
+                    raise IntegrityError("Rolling back due to error in row processing")
+    except IntegrityError:
+        # If a failure occurred, check the remaining records for errors
+        if failed_row_index is not None:
+            for idx in range(failed_row_index + 1, len(df)):
+                row = df.iloc[idx]
+                row_num = idx + 2
+                # You can add more validation here as needed for the remaining records
+                # For now, just report that these records were not processed due to earlier error
+                errors.append(f"Row {row_num}: Not processed due to earlier error in batch.")
+        return Response({
+            "success_count": 0,
+            "error_count": len(errors),
+            "errors": errors,
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # If we reach here, all records succeeded
     return Response({
+        "success": True,
+        "message": f"All {success_count} employee records uploaded successfully! 🎉",
         "success_count": success_count,
-        "error_count": len(errors),
-        "errors": errors,
-    }, status=status.HTTP_200_OK if success_count > 0 else status.HTTP_400_BAD_REQUEST)
+        "error_count": 0,
+        "errors": [],
+    }, status=status.HTTP_200_OK)

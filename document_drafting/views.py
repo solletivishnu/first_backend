@@ -575,7 +575,7 @@ def my_events_list(request):
         event_instance_ids = drafts.values_list('event_instance_id', flat=True).distinct()
 
         # Fetch corresponding event instances
-        event_instances = EventInstance.objects.filter(id__in=event_instance_ids).order_by('-id')
+        event_instances = EventInstance.objects.filter(id__in=event_instance_ids).order_by('-updated_at')
 
         serializer = EventInstanceSerializer(event_instances, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -803,7 +803,7 @@ def get_filter_dropdown_data(request):
     event_names = list(Events.objects.values_list('event_name', flat=True).distinct())
     category_names = list(Category.objects.values_list('category_name', flat=True).distinct())
     # Statuses (from model choices or hardcoded)
-    statuses = ['yet_to_start', 'draft', 'in_progress', 'completed']
+    statuses = ['yet_to_start', 'draft', 'completed']
 
     # created_by filtered by context
     created_by = []
@@ -843,25 +843,25 @@ def get_filtered_documents(request, context_id):
     # Remove any None values from the filters
     filters = {k: v for k, v in filters.items() if v}
 
-    queryset = ContextWiseEventAndDocument.objects.filter(context_id=context_id, **filters).order_by('id')
+    queryset = ContextWiseEventAndDocument.objects.filter(context_id=context_id, **filters).order_by('-updated_at')
 
     # Handle created_by (name split logic)
     created_by_val = request.query_params.get('created_by')
     if created_by_val:
         name_parts = created_by_val.split()
         if len(name_parts) == 1:
-            queryset = queryset.filter(created_by__first_name__icontains=name_parts[0]).order_by('id')
+            queryset = queryset.filter(created_by__first_name__icontains=name_parts[0]).order_by('-updated_at')
         elif len(name_parts) == 2:
             queryset = queryset.filter(
                 created_by__first_name__icontains=name_parts[0],
                 created_by__last_name__icontains=name_parts[1]
-            ).order_by('id')
+            ).order_by('-updated_at')
         elif len(name_parts) == 3:
             queryset = queryset.filter(
                 created_by__first_name__icontains=name_parts[0],
                 created_by__middle_name__icontains=name_parts[1],
                 created_by__last_name__icontains=name_parts[2]
-            ).order_by('id')
+            ).order_by('-updated_at')
 
     serializer = ContextWiseEventAndDocumentStatusSerializer(queryset, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)

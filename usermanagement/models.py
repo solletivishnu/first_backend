@@ -189,7 +189,7 @@ class Context(models.Model):
             'entityType',
             'pan',
             'business_nature',
-            'trade_name',
+            'legal_name',
             'mobile_number',
             'email',
             'dob_or_incorp_date',
@@ -271,7 +271,7 @@ class Context(models.Model):
                     'entity_type': self.business.entityType,
                     'pan': self.business.pan,
                     'business_nature': self.business.business_nature,
-                    'trade_name': self.business.trade_name,
+                    'legal_name': self.business.legal_name,
                     'mobile_number': self.business.mobile_number,
                     'email': self.business.email,
                     'dob_or_incorp_date': self.business.dob_or_incorp_date,
@@ -1254,6 +1254,7 @@ class Business(BaseModel):
         ('Web Designing', 'Web Designing'),
         ('Web Development', 'Web Development'),
         ('Writers', 'Writers'),
+        ('Software Services', 'Software Services'),
     ]
 
     client = models.ForeignKey(Users, on_delete=models.CASCADE, related_name='business_clients_id')
@@ -1265,13 +1266,14 @@ class Business(BaseModel):
     business_nature = models.CharField(
         max_length=50, choices=business_nature_choices, null=True, blank=True, default=None
     )  # Default as None
-    trade_name = models.CharField(max_length=100, null=True, blank=True, default=None)
     mobile_number = models.CharField(max_length=15, null=True, blank=True, default=None)
     email = models.EmailField(null=True, blank=True, default=None)
     dob_or_incorp_date = models.DateField(null=True, blank=True, default=None)
     is_msme_registered = models.BooleanField(default=False, help_text="Is the business MSME registered?")
     msme_registration_type = models.CharField(max_length=100, null=True, blank=True)
     msme_registration_number = models.CharField(max_length=100, null=True, blank=True)
+    legal_name = models.CharField(max_length=100, null=True, blank=True, default=None)
+
 
     def clean(self):
         """Validate model data before saving"""
@@ -1547,3 +1549,20 @@ class Consultation(models.Model):
         return f"{self.first_name} {self.last_name} - {self.email}"
 
 
+@receiver(post_save, sender=Business)
+def update_gst_tds_on_business_change(sender, instance, created, **kwargs):
+    if created:
+        return
+
+    try:
+        original = Business.objects.only("nameOfBusiness", "legal_name").get(pk=instance.pk)
+    except Business.DoesNotExist:
+        return
+
+    updates = {}
+    updates["trade_name"] = instance.nameOfBusiness
+    updates["legal_name"] = instance.legal_name
+
+    if updates:
+        GSTDetails.objects.filter(business=instance).update(**updates)
+        TDSDetails.objects.filter(business=instance).update(**updates)

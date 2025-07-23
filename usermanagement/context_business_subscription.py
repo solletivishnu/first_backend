@@ -37,7 +37,7 @@ def create_business_context(request):
         },
         "pan": "ABCDE1234F",
         "business_nature": "Technology",
-        "trade_name": "MyTrade",
+        "legal_name": "MyTrade",
         "mobile_number": "+1234567890",
         "email": "business@example.com",
         "dob_or_incorp_date": "2020-01-01"
@@ -53,7 +53,7 @@ def create_business_context(request):
     head_office = request.data.get('head_office')
     pan = request.data.get('pan')
     business_nature = request.data.get('business_nature')
-    trade_name = request.data.get('trade_name')
+    legal_name = request.data.get('legal_name')
     mobile_number = request.data.get('mobile_number')
     email = request.data.get('email')
     dob_or_incorp_date = request.data.get('dob_or_incorp_date')
@@ -96,7 +96,7 @@ def create_business_context(request):
                         'head_office': head_office,
                         'pan': pan,
                         'business_nature': business_nature,
-                        'trade_name': trade_name,
+                        'legal_name': legal_name,
                         'mobile_number': mobile_number,
                         'email': email,
                         'dob_or_incorp_date': dob_or_incorp_date
@@ -128,7 +128,7 @@ def create_business_context(request):
                     business.headOffice = head_office
                     business.pan = pan
                     business.business_nature = business_nature
-                    business.trade_name = trade_name
+                    business.legal_name = legal_name
                     business.mobile_number = mobile_number
                     business.email = email
                     business.dob_or_incorp_date = dob_or_incorp_date

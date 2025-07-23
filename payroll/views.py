@@ -1463,87 +1463,181 @@ def get_statutory_settings(employee):
     }
 
 
-def calculate_pf_contributions(pf_wage, basic_monthly):
+def calculate_pf_contributions(pf_wage, basic_monthly, payroll_id=None):
+    # Default EPF contribution values
+    epf_monthly = 0.12 * min(basic_monthly, 15000)
+    epf_annually = epf_monthly * 12
+
+    # Initialize benefits with default 'Not Applicable'
     benefits = {
         "EPF Employer Contribution": {
-            "monthly": 0.12 * min(basic_monthly, 15000),
-            "annually": (0.12 * min(basic_monthly, 15000)) * 12,
-            "calculation_type": "Percentage (12%) of PF wage"
+            "monthly": "NA",
+            "annually": "NA",
+            "calculation_type": "Not Applicable"
+        },
+        "EDLI Employer Contribution": {
+            "monthly": "NA",
+            "annually": "NA",
+            "calculation_type": "Not Applicable"
+        },
+        "EPF admin charges": {
+            "monthly": "NA",
+            "annually": "NA",
+            "calculation_type": "Not Applicable"
         }
     }
 
-    if basic_monthly <= 15000:
-        for name in ["EDLI Employer Contribution", "EPF admin charges"]:
-            benefits[name] = {
-                "monthly": 0.005 * basic_monthly,
-                "annually": (0.005 * basic_monthly) * 12,
-                "calculation_type": "Percentage (0.5%) of PF wage"
-            }
-    else:
-        for name in ["EDLI Employer Contribution", "EPF admin charges"]:
-            benefits[name] = {
-                "monthly": 75,
-                "annually": 900,
-                "calculation_type": "Fixed Amount"
-            }
+    # Proceed only if payroll_id is provided
+    if payroll_id:
+        try:
+            payroll = PayrollOrg.objects.get(id=payroll_id)
+            if hasattr(payroll, 'epf_details') and payroll.epf_details:
+                epf_details = payroll.epf_details
+
+                # Check for EPF Employer Contribution inclusion
+                if epf_details.include_employer_contribution_in_ctc:
+                    benefits["EPF Employer Contribution"] = {
+                        "monthly": epf_monthly,
+                        "annually": epf_annually,
+                        "calculation_type": "Percentage (12%) of PF wage"
+                    }
+
+                # EDLI calculation
+                if epf_details.employer_edil_contribution_in_ctc:
+                    edli_amount = 0.005 * basic_monthly if basic_monthly <= 15000 else 75
+                    benefits["EDLI Employer Contribution"] = {
+                        "monthly": edli_amount,
+                        "annually": edli_amount * 12,
+                        "calculation_type": "Percentage (0.5%) of PF wage" if basic_monthly <= 15000 else "Fixed Amount"
+                    }
+
+                # Admin Charges calculation
+                if epf_details.admin_charge_in_ctc:
+                    admin_amount = 0.005 * basic_monthly if basic_monthly <= 15000 else 75
+                    benefits["EPF admin charges"] = {
+                        "monthly": admin_amount,
+                        "annually": admin_amount * 12,
+                        "calculation_type": "Percentage (0.5%) of PF wage" if basic_monthly <= 15000 else "Fixed Amount"
+                    }
+
+        except PayrollOrg.DoesNotExist:
+            pass
+
     return benefits
 
 
-def calculate_esi_contributions(pf_wage, basic_monthly, esi_enabled):
-    if not esi_enabled:
-        return {"monthly": "NA", "annually": "NA", "calculation_type": "Not Applicable"}
-
-    if basic_monthly <= 21000:
-        return {
-            "monthly": 0.0325 * basic_monthly,
-            "annually": (0.0325 * basic_monthly) * 12,
-            "calculation_type": "Percentage (3.25%) of PF wage"
-        }
-    return {
-        "monthly": 0,
-        "annually": 0,
+def calculate_esi_contributions(basic_monthly, payroll_id=None):
+    # Default response
+    benefits = {
+        "monthly": "NA",
+        "annually": "NA",
         "calculation_type": "Not Applicable"
     }
 
+    if not payroll_id:
+        return benefits
 
-def calculate_employee_deductions(pf_wage, basic_monthly, epf_enabled, esi_enabled, pt_enabled, gross_monthly):
-    deductions = {}
+    try:
+        payroll = PayrollOrg.objects.get(id=payroll_id)
 
-    # EPF Employee Contribution
-    deductions["EPF Employee Contribution"] = {
-        "monthly": 0.12 * min(basic_monthly, 15000),
-        "annually": (0.12 * min(basic_monthly, 15000)) * 12,
-        "calculation_type": "Percentage (12%) of PF wage"
-    } if epf_enabled else {"monthly": "NA", "annually": "NA", "calculation_type": "Not Applicable"}
+        # Check if payroll has ESI settings and employer contributes
+        if hasattr(payroll, 'esi_details') and payroll.esi_details:
+            esi_details = payroll.esi_details
 
-    # ESI Employee Contribution
-    deductions["ESI Employee Contribution"] = {
-        "monthly": 0.0075 * gross_monthly,
-        "annually": (0.0075 * gross_monthly) * 12,
-        "calculation_type": "Percentage (0.75%) of PF wage"
-    } if esi_enabled and gross_monthly <= 21000 else (
-        {"monthly": 0, "annually": 0, "calculation_type": "Not Applicable"}
-        if esi_enabled else {"monthly": "NA", "annually": "NA", "calculation_type": "Not Applicable"}
-    )
+            if esi_details.employer_contribution and esi_details.include_employer_contribution_in_ctc:
+                if basic_monthly <= 21000:
+                    monthly = 0.0325 * basic_monthly
+                    return {
+                        "monthly": monthly,
+                        "annually": monthly * 12,
+                        "calculation_type": "Percentage (3.25%) of PF wage"
+                    }
+                else:
+                    return {
+                        "monthly": 0,
+                        "annually": 0,
+                        "calculation_type": "Not Applicable"
+                    }
 
-    # Professional Tax
-    if pt_enabled:
-        if gross_monthly <= 15000:
-            pt_monthly = 0
-        elif 15001 <= gross_monthly <= 20000:
-            pt_monthly = 150
-        else:
-            pt_monthly = 200
+    except PayrollOrg.DoesNotExist:
+        pass
 
-        deductions["PT"] = {
-            "monthly": pt_monthly,
-            "annually": pt_monthly * 12,
-            "calculation_type": "Slab-based Professional Tax"
+    return benefits
+
+
+def calculate_employee_deductions(pf_wage, basic_monthly, gross_monthly, pt_enabled, payroll_id=None):
+    deductions = {
+        "EPF Employee Contribution": {
+            "monthly": "NA",
+            "annually": "NA",
+            "calculation_type": "Not Applicable"
+        },
+        "ESI Employee Contribution": {
+            "monthly": "NA",
+            "annually": "NA",
+            "calculation_type": "Not Applicable"
+        },
+        "PT": {
+            "monthly": "NA",
+            "annually": "NA",
+            "calculation_type": "Not Applicable"
         }
-    else:
-        deductions["PT"] = {
-            "monthly": "NA", "annually": "NA", "calculation_type": "Not Applicable"
-        }
+    }
+
+    if not payroll_id:
+        return deductions
+
+    try:
+        payroll = PayrollOrg.objects.get(id=payroll_id)
+
+        # --- EPF Employee Contribution ---
+        if (
+            hasattr(payroll, 'epf_details') and payroll.epf_details and
+            payroll.epf_details.include_employer_contribution_in_ctc
+        ):
+            epf_monthly = 0.12 * min(basic_monthly, 15000)
+            deductions["EPF Employee Contribution"] = {
+                "monthly": epf_monthly,
+                "annually": epf_monthly * 12,
+                "calculation_type": "Percentage (12%) of PF wage"
+            }
+
+        # --- ESI Employee Contribution ---
+        if (
+            hasattr(payroll, 'esi_details') and payroll.esi_details and
+            payroll.esi_details.include_employer_contribution_in_ctc
+        ):
+            if basic_monthly <= 21000:
+                esi_monthly = 0.0075 * basic_monthly
+                deductions["ESI Employee Contribution"] = {
+                    "monthly": esi_monthly,
+                    "annually": esi_monthly * 12,
+                    "calculation_type": "Percentage (0.75%) of PF wage"
+                }
+            else:
+                deductions["ESI Employee Contribution"] = {
+                    "monthly": 0,
+                    "annually": 0,
+                    "calculation_type": "Not Applicable"
+                }
+
+        # --- Professional Tax (PT) ---
+        if PT.objects.filter(payroll=payroll).exists() and pt_enabled:
+            if gross_monthly <= 15000:
+                pt_monthly = 0
+            elif 15001 <= gross_monthly <= 20000:
+                pt_monthly = 150
+            else:
+                pt_monthly = 200
+
+            deductions["PT"] = {
+                "monthly": pt_monthly,
+                "annually": pt_monthly * 12,
+                "calculation_type": "Slab-based Professional Tax"
+            }
+
+    except PayrollOrg.DoesNotExist:
+        pass
 
     return deductions
 
@@ -1599,11 +1693,14 @@ def calculate_payroll(request):
             epf_enabled, esi_enabled, pt_enabled = statutory.values()
         else:
             payroll = PayrollOrg.objects.get(id=data.get("payroll"))
-            epf_enabled = hasattr(payroll,
-                                  'epf_details') and payroll.epf_details and not payroll.epf_details.is_disabled
-            esi_enabled = hasattr(payroll,
-                                  'esi_details') and payroll.esi_details and not payroll.esi_details.is_disabled
-            pt_enabled = payroll.pt_details.exists() or False
+            epf_enabled = (hasattr(payroll,
+                                  'epf_details') and payroll.epf_details and not
+            payroll.epf_details.include_employer_contribution_in_ctc)
+            esi_enabled = (hasattr(payroll,
+                                  'esi_details') and payroll.esi_details and not
+            payroll.esi_details.include_employer_contribution_in_ctc)
+            pt_enabled = PT.objects.filter(payroll=payroll).exists()
+
 
         # Case 1: Basic salary < 15,000 and no statutory components
         if basic_salary_monthly < 15000 and not (epf_enabled or esi_enabled or pt_enabled):
@@ -1639,13 +1736,15 @@ def calculate_payroll(request):
             total_ctc = annual_ctc
         else:
             # Case 2: Regular calculation with statutory components
-            benefits = calculate_pf_contributions(pf_wage, basic_salary_monthly) if epf_enabled else {
+            benefits = calculate_pf_contributions(pf_wage, basic_salary_monthly, data.get("payroll")) if epf_enabled \
+                else {
                 name: {"monthly": "NA", "annually": "NA", "calculation_type": "Not Applicable"}
                 for name in ["EPF Employer Contribution", "EDLI Employer Contribution", "EPF admin charges"]
             }
 
-            benefits["ESI Employer Contribution"] = calculate_esi_contributions(pf_wage, basic_salary_monthly,
-                                                                                esi_enabled)
+            benefits["ESI Employer Contribution"] = calculate_esi_contributions(
+                basic_salary_monthly, data.get("payroll")
+            )
             total_benefits = safe_sum(item["annually"] for item in benefits.values() if isinstance(item, dict))
 
             total_earnings = safe_sum(
@@ -1660,9 +1759,10 @@ def calculate_payroll(request):
                     })
 
             gross_salary = safe_sum(item["annually"] for item in earnings)
+            monthly_gross_salary = gross_salary / 12
 
-            deductions = calculate_employee_deductions(pf_wage, basic_salary_monthly, epf_enabled, esi_enabled,
-                                                       pt_enabled, basic_monthly)
+            deductions = calculate_employee_deductions(pf_wage, basic_salary_monthly,
+                                                       basic_salary_monthly, pt_enabled, data.get("payroll"))
             deductions["loan_emi"] = calculate_loan_deductions(employee_id) if employee_id else "NA"
 
             total_deductions = safe_sum(
@@ -3363,28 +3463,43 @@ def detail_employee_monthly_salary(request):
                 component_amounts = calculate_component_amounts(
                     salary_record.earnings, total_working_days, attendance.total_days_of_month
                 )
-
-                epf_value = pf
+                epf_value = 0
                 other_deductions = 0
                 employee_deductions = 0
+                other_deductions_breakdown = []
                 if salary_record.deductions:
                     for deduction in salary_record.deductions:
                         name = deduction.get("component_name", "").lower().replace(" ", "_")
                         value = deduction.get("monthly", 0)
                         value = value if isinstance(value, (int, float)) else 0  # Ensure numeric
                         if "tax" not in name:
-                            if name == "epf_employee_contribution" and employee.statutory_components.get("epf_enabled", False):
-                                employee_deductions += value
+                            if name == "epf_employee_contribution" and employee.statutory_components.get("epf_enabled",
+                                                                                                         False):
+                                # Get the full month basic salary (unprorated)
+                                full_month_basic = component_amounts['basic']
+
+                                if full_month_basic > 15000:
+                                    # For basic > 15,000: Fixed 12% of 15,000 (no proration)
+                                    epf_contribution = 1800  # 15000 × 12% = 1800
+                                else:
+                                    # For basic <= 15,000: Prorate based on working days
+                                    epf_contribution = round(full_month_basic * 0.12, 2)
+
+                                employee_deductions += epf_contribution
+                                epf_value = epf_contribution
+
                             elif name == "esi_employee_contribution" and employee.statutory_components.get("esi_enabled", False):
-                                employee_deductions += value
+                                pass
                             elif name == "pt" and employee.statutory_components.get("professional_tax", False) and pt_amount == 0:
-                                pt_amount= prorate(value)
+                                pt_amount= value
                             elif name == "tds":
                                 employee_deductions += value
                         if all(ex not in name for ex in exclude_deductions):
                             other_deductions += prorate(value)
+                        if all(ex not in name for ex in exclude_deductions) and value > 0:
+                            other_deductions_breakdown.append({name: round(prorate(value), 2)})
 
-                total_deductions = taxes + emi_deduction + employee_deductions + other_deductions + pt_amount
+                total_deductions = taxes + emi_deduction + employee_deductions + other_deductions + pt_amount +esi
                 net_salary = earned_salary - total_deductions
 
                 def get_component_amount(earnings_data, component_name):
@@ -3393,39 +3508,83 @@ def detail_employee_monthly_salary(request):
                             return item.get("monthly", 0)
                     return 0
 
+                bonus_incentives = BonusIncentive.objects.filter(
+                    employee_id=employee,
+                    month=month,
+                    financial_year=financial_year
+                )
+                total_bonus_amount = bonus_incentives.aggregate(total_amount=Sum('amount'))['total_amount'] or 0
 
                 FINANCIAL_MONTH_MAP = {1: 10, 2: 11, 3: 12, 4: 1, 5: 2, 6: 3,7: 4, 8: 5, 9: 6, 10: 7, 11: 8, 12: 9}
 
                 current_month = FINANCIAL_MONTH_MAP.get(month, 1)
 
-                annual_gross=int(round(earned_salary, 2))*12
-
-                monthly_tds,annual_tds=calculate_tds(regime_type=salary_record.tax_regime_opted,annual_salary=annual_gross,
-                                                     current_month=current_month, epf_value=epf_value, ept_value = pt_amount)
+                # annual_gross=int(round(earned_salary, 2))*12
+                #
+                # annual_gross = annual_gross + total_bonus_amount
+                #
+                # monthly_tds,annual_tds=calculate_tds(regime_type=salary_record.tax_regime_opted,annual_salary=annual_gross,
+                #                                      current_month=current_month, epf_value=epf_value, ept_value = pt_amount)
                 tds_ytd = 0
-                try:
-                    entry = EmployeeSalaryHistory.objects.filter(
-                        employee=employee,
-                        payroll_id=payroll_id,
-                        financial_year=financial_year
-                    ).order_by('-month').first()
-                    if entry:
+                annual_gross = int(round(per_day_salary * attendance.total_days_of_month, 2)) * 12
+
+                # Get the latest salary history entry (if any)
+                entry = EmployeeSalaryHistory.objects.filter(
+                    employee=employee,
+                    payroll_id=payroll_id,
+                    financial_year=financial_year
+                ).order_by('-month').first()
+
+                # Determine if TDS recalculation is needed
+                recalculate_tds = False
+                if entry:
+                    recalculate_tds = (
+                            entry.ctc != salary_record.annual_ctc or
+                            total_bonus_amount > 0 or
+                            (attendance.loss_of_pay > 0 and lop_amount > 0)
+                    )
+
+                if entry and not recalculate_tds:
+                    try:
+                        monthly_fixed_tds = entry.monthly_fixed_tds if entry.monthly_fixed_tds not in (None,
+                                                                                                       0) else entry.tds
+                        monthly_tds = monthly_fixed_tds
                         tds_ytd = entry.tds_ytd + monthly_tds
-                        if entry.ctc != salary_record.annual_ctc:
-                            annual_tds = annual_tds
-                        else:
-                            annual_tds = entry.annual_tds
+                        annual_tds = entry.annual_tds
+                    except Exception as e:
+                        return Response({"message": "Error calculating TDS: " + str(e)},
+                                        status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    # Adjust gross if bonus/loss exists
+                    if total_bonus_amount:
+                        annual_gross += total_bonus_amount
+                    if attendance.loss_of_pay > 0 and lop_amount > 0:
+                        annual_gross -= lop_amount
+
+                    monthly_tds, annual_tds = calculate_tds(
+                        regime_type=salary_record.tax_regime_opted,
+                        annual_salary=annual_gross,
+                        current_month=current_month,
+                        epf_value=epf_value,
+                        ept_value=pt_amount,
+                        bonus_or_revisions=recalculate_tds
+                    )
+
+                    if entry:
+                        # Adjust for YTD TDS already paid
+                        monthly_tds = round(max(0, (annual_tds - entry.tds_ytd)) / (13 - current_month))
+                        tds_ytd = entry.tds_ytd + monthly_tds
                     else:
                         tds_ytd = monthly_tds
-                        annual_tds = annual_tds
-                except EmployeeSalaryHistory.DoesNotExist:
-                    tds_ytd = monthly_tds
-                    annual_tds = annual_tds
+
+                    monthly_fixed_tds = monthly_tds
 
                 # Create or update EmployeeSalaryHistory
-                pf = pf if employee.statutory_components.get("epf_enabled", False) else 0
+                total_deductions = total_deductions + monthly_tds
+                epf_value = epf_value if employee.statutory_components.get("epf_enabled", False) else 0
                 esi = esi if employee.statutory_components.get("esi_enabled", False) else 0
                 pt_amount = pt_amount if employee.statutory_components.get("professional_tax", False) else 0
+                net_salary = net_salary - monthly_tds
                 EmployeeSalaryHistory.objects.create(
                     employee=employee,
                     payroll=employee.payroll,
@@ -3436,18 +3595,19 @@ def detail_employee_monthly_salary(request):
                     paid_days=total_working_days,
                     ctc=salary_record.annual_ctc,
                     gross_salary=gross_salary,
-                    earned_salary=round(earned_salary, 2),
-                    basic_salary=round(component_amounts['basic'], 2),
-                    hra=round(component_amounts['hra'], 2),
-                    conveyance_allowance=round(component_amounts.get('conveyance_allowance', 0), 2),
-                    travelling_allowance=round(component_amounts.get('travelling_allowance', 0), 2),
-                    commission=round(component_amounts.get('commission', 0), 2),
-                    children_education_allowance=round(component_amounts.get('children_education_allowance', 0), 2),
-                    overtime_allowance=round(component_amounts.get('overtime_allowance', 0), 2),
-                    transport_allowance=round(component_amounts.get('transport_allowance', 0), 2),
-                    special_allowance=round(component_amounts['special_allowance'], 2),
-                    bonus=round(component_amounts['bonus'], 2),
-                    other_earnings=round(component_amounts['other_earnings'], 2),
+                    earned_salary=round(earned_salary),
+                    basic_salary=round(component_amounts['basic']),
+                    hra=round(component_amounts['hra']),
+                    conveyance_allowance=round(component_amounts.get('conveyance_allowance', 0)),
+                    travelling_allowance=round(component_amounts.get('travelling_allowance', 0)),
+                    commission=round(component_amounts.get('commission', 0)),
+                    children_education_allowance=round(component_amounts.get('children_education_allowance', 0)),
+                    overtime_allowance=round(component_amounts.get('overtime_allowance', 0)),
+                    transport_allowance=round(component_amounts.get('transport_allowance', 0)),
+                    special_allowance=round(component_amounts['special_allowance']),
+                    bonus=round(component_amounts['bonus']),
+                    other_earnings = 0 if 0 <= component_amounts['other_earnings'] < 1 else
+                                    round(component_amounts['other_earnings']),
                     benefits_total=int(round(
                         sum(component_amounts[key] for key in [
                             'basic', 'hra', 'special_allowance', 'bonus', 'other_earnings',
@@ -3455,18 +3615,22 @@ def detail_employee_monthly_salary(request):
                             'children_education_allowance', 'overtime_allowance', 'transport_allowance'
                         ]), 2
                     )),
-                    epf=pf,
-                    esi=esi,
+                    bonus_incentive = round(total_bonus_amount),
+                    epf=round(epf_value),
+                    esi=round(esi),
                     pt=pt_amount,
-                    tds=monthly_tds,
+                    monthly_fixed_tds = round(monthly_fixed_tds),
+                    tds=round(monthly_tds),
                     tds_ytd=tds_ytd,
                     annual_tds=annual_tds,
-                    loan_emi=round(emi_deduction, 2),
-                    other_deductions=round(other_deductions, 2),
-                    total_deductions=round(total_deductions, 2),
-                    net_salary=int(round(net_salary, 2)),
+                    loan_emi=round(emi_deduction),
+                    other_deductions=round(other_deductions),
+                    total_deductions=round(total_deductions),
+                    net_salary=int(round(net_salary)),
                     is_active=True,
-                    notes="Salary processed from API"
+                    notes="Salary processed from API",
+                    other_deductions_breakdown=other_deductions_breakdown,
+                    other_earnings_breakdown=component_amounts['other_earnings_breakdown']
                 )
 
         salary_records = EmployeeSalaryHistory.objects.filter(
@@ -3509,6 +3673,7 @@ def calculate_component_amounts(earnings, total_working_days, total_days_of_mont
     exclude_earnings = {"basic", "hra", "special_allowance", "bonus", "conveyance_allowance",
                         "travelling_allowance", "commission", "children_education_allowance",
                         "overtime_allowance", "transport_allowance"}
+    other_earnings_breakdown = []
 
     # Calculate standard components
     for component in basic_components:
@@ -3519,10 +3684,16 @@ def calculate_component_amounts(earnings, total_working_days, total_days_of_mont
     other_earnings = 0
     for earning in earnings:
         name = earning.get("component_name", "").lower().replace(" ", "_")
-        if name not in exclude_earnings:
-            other_earnings += prorate(earning.get("monthly", 0))
+        monthly_amount = earning.get("monthly", 0)
+        if name not in exclude_earnings and monthly_amount > 0:  # Added check for positive amounts
+            prorated_amount = round(prorate(monthly_amount))  # Round the prorated amount first
+            other_earnings_breakdown.append({
+                name: prorated_amount  # Use the already rounded value
+            })
+            other_earnings += prorated_amount
 
     component_amounts['other_earnings'] = other_earnings
+    component_amounts['other_earnings_breakdown'] = other_earnings_breakdown
     return component_amounts
 
 
@@ -3700,11 +3871,32 @@ class DocumentGenerator:
             raise
 
 
+import re
+
 def format_with_commas(number):
     try:
-        return "{:,.2f}".format(float(number)).replace(".00", "")
+        number = float(number)
+        is_negative = number < 0
+        number = abs(number)
+
+        int_part, dot, dec_part = f"{number:.2f}".partition(".")
+
+        # Apply Indian-style comma formatting to the integer part
+        if len(int_part) > 3:
+            int_part = int_part[-3:]  # last 3 digits
+            prefix = re.findall(r'\d{1,2}', f"{int(number):,}"[:-3][::-1])
+            if prefix:
+                int_part = ",".join(x[::-1] for x in prefix[::-1]) + "," + int_part
+
+        formatted = f"{int_part}.{dec_part}"
+        if dec_part == "00":
+            formatted = int_part
+
+        return f"-{formatted}" if is_negative else formatted
+
     except (ValueError, TypeError):
         return str(number)
+
 
 
 def number_to_words_in_indian_format(number):
@@ -3800,6 +3992,17 @@ def employee_monthly_salary_template(request):
         # Convert net salary to words
         total_in_words = number_to_words_in_indian_format(net_pay_total).title() + " Rupees Only"
 
+        def format_breakdown(items):
+            formatted = []
+            for item in items:
+                for key, value in item.items():
+                    if value > 0:
+                        formatted.append({
+                            'name': key.replace('_', ' ').title(),
+                            'value': value
+                        })
+            return formatted
+
         context = {
             "company_name": getattr(salary_history.payroll.business, "nameOfBusiness", ""),
             "address": f"{getattr(salary_history.payroll, 'filling_address_line1', '')}, "
@@ -3839,8 +4042,12 @@ def employee_monthly_salary_template(request):
             "overtime_allowance": format_with_commas(salary_history.overtime_allowance),
             "transport_allowance_format": True if salary_history.transport_allowance > 0 else False,
             "transport_allowance": format_with_commas(salary_history.transport_allowance),
-            "fixed_allowance_format": True if salary_history.other_earnings > 0 else False,
-            "fixed_allowance": format_with_commas(salary_history.other_earnings),
+            "other_earnings_breakdown": [
+                {k.replace('_', ' ').title(): format_with_commas(v)}
+                for item in getattr(salary_history, 'other_earnings_breakdown', [])
+                for k, v in item.items()
+                if v > 0
+            ] if hasattr(salary_history, 'other_earnings_breakdown') else [],
 
             # Salary Figures
             "gross_earnings": format_with_commas(salary_history.earned_salary),
@@ -3857,6 +4064,12 @@ def employee_monthly_salary_template(request):
             "esi": salary_history.esi > 0,
             "esi_employee_contribution": format_with_commas(salary_history.esi),
             "total_deduction": format_with_commas(salary_history.total_deductions),
+            "other_deductions_breakdown": [
+                {k.replace('_', ' ').title(): format_with_commas(v)}
+                for item in getattr(salary_history, 'other_deductions_breakdown', [])
+                for k, v in item.items()
+                if v > 0
+            ] if hasattr(salary_history, 'other_deductions_breakdown') else [],
 
             "net_pay": format_with_commas(net_pay_total),
             "paid_days": salary_history.paid_days,

@@ -76,7 +76,7 @@ INSTALLED_APPS = [
     'docwallet',
     'servicetasks',
     'income_tax_returns',
-    'document_drafting'
+    'document_drafting.apps.DocumentDraftingConfig',
 ]
 
 MIDDLEWARE = [
@@ -131,6 +131,8 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # In Tara/settings/default.py
 AUTH_USER_MODEL = 'usermanagement.Users'
 
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -150,21 +152,14 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
-# Internationalization
-# https://docs.djangoproject.com/en/4.2/topics/i18n/
-
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Kolkata'
 
 USE_I18N = True
 
 USE_TZ = True
 
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = '/static/'
 
@@ -185,10 +180,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Tara/settings/default.py
 
 # Disable migrations for certain built-in apps
-MIGRATION_MODULES = {
-    'auth': None,
-    'admin': None,
-}
+# MIGRATION_MODULES = {
+#     'auth': None,
+#     'admin': None,
+# }
 
 
 FRONTEND_URL = 'https://tarafirst.com/'
@@ -332,6 +327,8 @@ username = os.getenv('DATABASE_USERNAME')
 password = os.getenv('DATABASE_PASSWORD')
 database_name = os.getenv('DATABASE_NAME')
 
+CELERY_BROKER_URL = 'redis://redis:6379/0'
+CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
 
 DATABASES = {
     'default': {
@@ -367,8 +364,6 @@ TEMPLATES = [
 # settings.py
 
 # Celery settings
-CELERY_BROKER_URL = 'redis://localhost:6379/0'
-CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'

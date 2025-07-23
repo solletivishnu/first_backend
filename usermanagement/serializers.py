@@ -762,7 +762,7 @@ class BusinessWithGSTSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Business
-        fields = ['id', 'nameOfBusiness', 'entityType', 'registrationNumber', 'pan', 'mobile_number', 'trade_name',
+        fields = ['id', 'nameOfBusiness', 'entityType', 'registrationNumber', 'pan', 'mobile_number', 'legal_name',
                   'email', 'dob_or_incorp_date', 'gst_details', 'headOffice', 'headOffice', 'business_nature']
 
 

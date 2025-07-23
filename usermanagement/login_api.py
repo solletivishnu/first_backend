@@ -80,6 +80,7 @@ def login_user(request):
                 "created_at": context.created_at,
                 "is_active": context.id == user.active_context.id if user.active_context else False,
                 "business_id": context.business_id,
+                "legal_name": context.business.legal_name if context.business and context.business.legal_name else None,
                 "is_platform_context": context.is_platform_context,
                 "role": {
                     "id": ucr.role.id,
@@ -100,6 +101,8 @@ def login_user(request):
                 "profile_status": active_context.profile_status,
                 "created_at": active_context.created_at,
                 "business_id": active_context.business_id,
+                "legal_name": active_context.business.legal_name if active_context.business and
+                                                                    active_context.business.legal_name else None,
                 "is_platform_context": active_context.is_platform_context,
             }
 

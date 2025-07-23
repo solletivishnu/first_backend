@@ -460,28 +460,33 @@ class EmployeeManagementSerializer(serializers.ModelSerializer):
         associate_id = validated_data.get('associate_id')
         uan = validated_data.get('statutory_components', {}).get('employee_provident_fund', {}).get('uan')
 
-        # Build base queryset excluding the current instance (if update)
+        # Base queryset for the same payroll
         qs = EmployeeManagement.objects.filter(payroll_id=payroll_id)
         if instance:
             qs = qs.exclude(pk=instance.pk)
 
-        # Check conflicts
-        existing = qs.filter(
-            Q(work_email=work_email) |
-            Q(mobile_number=mobile_number) |
-            Q(associate_id=associate_id)
-        ).first()
+        # Build dynamic filter
+        conflict_filter = Q()
+        if work_email:
+            conflict_filter |= Q(work_email=work_email)
+        if mobile_number:
+            conflict_filter |= Q(mobile_number=mobile_number)
+        if associate_id:
+            conflict_filter |= Q(associate_id=associate_id)
+
+        existing = qs.filter(conflict_filter).first()
 
         if existing:
-            if existing.work_email == work_email:
+            if work_email and existing.work_email == work_email:
                 raise ValidationError("A record with this Work Email already exists.")
-            if existing.mobile_number == mobile_number:
+            if mobile_number and existing.mobile_number == mobile_number:
                 raise ValidationError("A record with this Mobile Number already exists.")
-            if existing.associate_id == associate_id:
+            if associate_id and existing.associate_id == associate_id:
                 raise ValidationError("A record with this Employee ID already exists.")
 
         if uan and qs.filter(statutory_components__employee_provident_fund__uan=uan).exists():
             raise ValidationError("A record with this UAN already exists.")
+
 
     def create(self, validated_data):
         self.validate_unique_fields(validated_data)
@@ -619,6 +624,17 @@ class EmployeeBankDetailsSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmployeeBankDetails
         fields = '__all__'
+
+    def validate_account_number(self, value):
+        # For create
+        if self.instance is None:
+            if EmployeeBankDetails.objects.filter(account_number=value).exists():
+                raise serializers.ValidationError("This account number is already in use.")
+        else:
+            # For update: allow if unchanged, block if duplicate
+            if EmployeeBankDetails.objects.exclude(id=self.instance.id).filter(account_number=value).exists():
+                raise serializers.ValidationError("This account number is already in use by another employee.")
+        return value
 
 
 class EmployeeDataSerializer(serializers.ModelSerializer):

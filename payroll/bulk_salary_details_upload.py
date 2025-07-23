@@ -36,6 +36,14 @@ def upload_employee_salary_excel(request):
     except Exception as e:
         return Response({"error": f"Failed to read file: {str(e)}"}, status=400)
 
+    if "Monthly (Fixed Allowance)" in df.columns:
+        error_rows = df[df["Monthly (Fixed Allowance)"] == "Error: Adjust earnings"]
+        if not error_rows.empty:
+            row_nums = list(error_rows.index + 2)  # +2 accounts for Excel header and 0-indexing
+            return Response({
+                "error": f"Adjust earnings in the sheet before uploading. Found errors in rows: {row_nums}"
+            }, status=400)
+
     def get(row, val, default=None):
         v = row.get(val, default)
         if pd.isna(v) or v == 'nan':

@@ -49,7 +49,7 @@ def generate_employee_upload_template(request, payroll_id):
     # Dropdown values
     genders = ['male', 'female', 'others']
     marital_status = ['single', 'married']
-    blood_groups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
+    blood_groups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Unknown']
     boolean_values = ['TRUE', 'FALSE']
     work_locations = [str(wl) for wl in WorkLocations.objects.filter(payroll=payroll)]
     departments = [str(dept) for dept in Departments.objects.filter(payroll=payroll)]
