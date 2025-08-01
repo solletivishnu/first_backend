@@ -29,68 +29,60 @@
         <!-- Header Section -->
         <div
           style="
-            padding-left: 1 rem;
-            padding-right: 1 rem;
-            padding-top: 1rem;
-            padding-bottom: 1rem;
+            padding: 1rem 1rem 1rem 1rem;
+            border-bottom: 2px solid #5c6ac4;
+            margin-bottom: 1.5rem;
           "
         >
           <table
             style="width: 100%; border-collapse: collapse; border-spacing: 0"
           >
             <tbody>
-              <tr>
+            <tr>
               {% if logo %}
-              <td style="width: 15%; vertical-align: top">
-                <div style="font-size: 1.25rem; line-height: 1.25rem">
+              <td style="width: 25%; vertical-align: middle; padding-right: 1.5rem">
+                <div style="text-align: left; padding-left: 0;">
                   <img
                     src="{{ logo }}"
                     alt="Company Logo"
-                    style="max-width: 220px;  max-height: 160px; height: 120px; width: 120px; object-fit: contain;"
+                    style="max-width: 220px; max-height: 220px; object-fit: contain; display: block; margin: 0; float: left;"
                   />
                 </div>
               </td>
-              <td style="width: 50%; vertical-align: center">
-                <div style="font-size: 0.800rem; line-height: 1.25rem">
-                  <h2
-                    style="margin: 0 0 5px 0; white-space: nowrap; color: #5c6ac4;"
-                  >
+              <td style="width: 45%; vertical-align: middle; padding-right: 1rem">
+                <div style="padding-top: 0.75rem;">
+                  <h1 style="margin: 0 0 0.75rem 0; color: #5c6ac4; font-size: 1.5rem; font-weight: 700; line-height: 1.2;">
                     {{ company_name }}
-                  </h2>
-                  <p style="margin: 0; color: #525252;">{{ address }}</p>
+                  </h1>
+                  <p style="margin: 0; color: #525252; font-size: 0.9rem; line-height: 1.4;">{{ address }}</p>
                 </div>
               </td>
               {% else %}
-              <td colspan="2" style="width: 70%; vertical-align: top">
-                <div style="font-size: 0.800rem; line-height: 1.25rem">
-                  <h2
-                    style="margin: 0 0 5px 0; white-space: nowrap; color: #5c6ac4; text-align: left;"
-                  >
+              <td style="width: 70%; vertical-align: top; padding-right: 1rem">
+                <div style="padding-top: 0.5rem;">
+                  <h1 style="margin: 0 0 0.75rem 0; color: #5c6ac4; font-size: 1.5rem; font-weight: 700; line-height: 1.2;">
                     {{ company_name }}
-                  </h2>
-                  <p style="margin: 0; color: #525252; text-align: left;">{{ address }}</p>
+                  </h1>
+                  <p style="margin: 0; color: #525252; font-size: 0.9rem; line-height: 1.4;">{{ address }}</p>
                 </div>
               </td>
               {% endif %}
-              <td style="width: 30%; vertical-align: center">
-                <div style="font-size: 0.800rem; line-height: 1.25rem">
-                  <p style="margin: 0; color: #525252; text-align: right;">
+              <td style="width: 30%; vertical-align: middle; text-align: right">
+                <div style="padding-top: 0.75rem;">
+                  <p style="margin: 0 0 0.5rem 0; color: #525252; font-size: 0.85rem; font-weight: 600;">
                     Payslip For the Month
                   </p>
-                  <h2 style="margin: 0 0 5px 0; white-space: nowrap; text-align: right; color: #5c6ac4;">
+                  <h2 style="margin: 0; color: #5c6ac4; font-size: 1.25rem; font-weight: 700; line-height: 1.2;">
                     {{ pay_period }}
                   </h2>
                 </div>
               </td>
             </tr>
-
-            </tbody>
+          </tbody>
           </table>
         </div>
-        <div style="border-bottom: 1px dotted #525252; margin-top: 0 px;margin-bottom: 10px">
-        </div>
-        <div style="border-bottom: 1px dotted #525252; margin-top: 0 px;margin-bottom: 10px">
-        <p style="font-weight: 700; margin: 0 0 0.75rem 0; color: #5c6ac4;">
+        <div style="margin-bottom: 1rem;">
+          <p style="font-weight: 700; margin: 0 0 0.75rem 0; color: #5c6ac4; font-size: 1rem;">
             EMPLOYEE DETAILS
           </p>
         </div>

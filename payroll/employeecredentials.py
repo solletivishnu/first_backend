@@ -2,8 +2,10 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from .models import EmployeeManagement, EmployeeCredentials
-from .serializers import EmployeeManagementSerializer, EmployeeCredentialsSerializer
+from .models import (EmployeeManagement, EmployeeCredentials, EmployeeEducationDetails, EmployeeFaceRecognition,
+                     EmployeePersonalDetails, EmployeeBankDetails)
+from .serializers import (EmployeeManagementSerializer, EmployeeCredentialsSerializer, EmployeePersonalDetailsSerializer,
+                          EmployeeEducationDetailsSerializer, EmployeeBankDetailsSerializer, EmployeeProfileSerializer)
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils import timezone
 
@@ -67,15 +69,38 @@ def employee_login(request):
             refresh['username'] = creds.username
             refresh['associate_id'] = creds.employee.associate_id
 
+            full_name = f"{creds.employee.first_name} "
+            if creds.employee.middle_name:
+                full_name += f"{creds.employee.middle_name} "
+            full_name += creds.employee.last_name
+
+            # Get employee image if exists
+            try:
+                employee_image = EmployeeFaceRecognition.objects.get(employee=creds,
+                                                                     direction="front").image_file.url
+            except EmployeeFaceRecognition.DoesNotExist:
+                employee_image = None
+
+            try:
+                personal = EmployeePersonalDetails.objects.get(employee=creds.employee)
+            except EmployeePersonalDetails.DoesNotExist:
+                personal = None
+
+            data = {
+                "profile": EmployeeProfileSerializer(EmployeeManagement.objects.get(id=creds.employee.id)).data,
+                "photo": employee_image,
+                "personal_details": EmployeePersonalDetailsSerializer(personal).data if personal else None,
+                "bank_details": EmployeeBankDetailsSerializer(
+                    EmployeeBankDetails.objects.get(employee=creds.employee)).data,
+                "education_details": EmployeeEducationDetailsSerializer(
+                    EmployeeEducationDetails.objects.filter(employee=creds), many=True).data,
+            }
+
             return Response({
                 "message": "Login successful",
                 "access_token": str(refresh.access_token),
                 "refresh_token": str(refresh),
-                "employee": {
-                    "id": creds.employee.id,
-                    "associate_id": creds.employee.associate_id,
-                    "full_name": creds.employee.first_name + ' ' + creds.employee.last_name,
-                },
+                "employee": data,
                 'id': creds.id,
             })
         else:

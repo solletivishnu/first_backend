@@ -7,6 +7,11 @@ from . import bulk_salary_details_upload
 from . import payroll_workflow
 from . import attendance_controller
 from . import employeecredentials
+from . import face_recognition
+from . import leavemanagement
+from . import employee_education
+from . import holidays
+from . import employee_salary_details
 
 urlpatterns = [
     # URL for listing and creating PayrollOrg instances
@@ -165,6 +170,9 @@ urlpatterns = [
     path('detail_employee_payroll_salary', views.detail_employee_monthly_salary,
          name='detail-employee-monthly-salary'),
 
+    path('monthly-salary-details-of-employees', views.monthly_salary_details_of_employees,
+         name='monthly-salary-details-of-employees'),
+
     path('employee-monthly-salary-template', views.employee_monthly_salary_template,
          name='employee-monthly-salary-template'),
 
@@ -204,10 +212,14 @@ urlpatterns = [
     path('payroll-workflows/<int:pk>/delete/', payroll_workflow.payroll_workflow_delete),
     path('payroll-workflows/detail-or-create/', payroll_workflow.payroll_workflow_detail_or_create),
 
-# Manual check-in/check-out
+    # Manual check-in/check-out
 
     path('manual-checkin/', attendance_controller.manual_check_in, name='manual-check-in'),
     path('manual-checkout/', attendance_controller.manual_check_out, name='manual-check-out'),
+
+    #Geo Location check-in/check-out
+    path('geo-location-check-in/', attendance_controller.geo_location_check_in, name='geo-location-check-in'),
+    path('geo-location-check-out/', attendance_controller.geo_location_check_out, name='geo-location-check-out'),
 
     # Face recognition check-in/check-out
     # path('face-checkin/', attendance_controller.face_checkin_checkout, name='face-checkin'),
@@ -216,12 +228,54 @@ urlpatterns = [
     path('today/', attendance_controller.today_attendance_status, name='today-attendance'),
 
     # Monthly report
-    path('report/', attendance_controller.truetime_monthly_view, name='monthly-report'),
+    path('monthly-report/', attendance_controller.truetime_monthly_view, name='monthly-report'),
+    path('weekly-report/', attendance_controller.truetime_weekly_view, name='weekly-report'),
+    path('date-wise-report/', attendance_controller.truetime_datewise_view, name='date-wise-report'),
+
 
     path("credentials/", employeecredentials.credentials_list_create, name="credentials-list-create"),
     path("credentials/<int:pk>/", employeecredentials.credentials_detail, name="credentials-detail"),
 
     # ───────────── Employee Login (JWT) ─────────────
     path("auth/employee-login/", employeecredentials.employee_login, name="employee-login"),
+
+    # Capture employee images
+    path("upload-employee-images/", face_recognition.upload_employee_images, name="upload-employee-image"),
+
+    # FaceRecognition Check-In
+    path("face-recognition-check-in/", face_recognition.face_recognition_check_in, name="face-recognition-check-in"),
+    path("face-recognition-check-out/", face_recognition.face_recognition_check_out, name="face-recognition-check-out"),
+    path("attendance-summary-view/", face_recognition.attendance_summary_view, name="attendance-summary-view"),
+    path('process-single-org/', views.process_single_payroll_org, name='process-single-payroll-org'),
+
+    # Leave Approval and Rejection In Employee Portal
+    path('apply/', leavemanagement.apply_leave, name='apply-leave'),
+    path('list/', leavemanagement.get_leave_applications, name='get-leaves'),
+    path('month/<int:year>/<int:month>/', leavemanagement.get_monthly_leaves, name='monthly-leaves'),
+    path('current-month/', leavemanagement.get_current_month_leaves, name='current-month-leaves'),
+    path('summary/', leavemanagement.get_leave_summary, name='yearly-summary'),
+    path('summary/<int:year>/', leavemanagement.get_leave_summary, name='yearly-summary'),
+    path('leave/action/<int:leave_id>/', leavemanagement.handle_leave_action, name='leave-action'),
+    path('reject/<int:pk>/', leavemanagement.reject_leave, name='reject-leave'),
+    path('cancel/<int:pk>/', leavemanagement.cancel_leave, name='cancel-leave'),
+    # Employee Leave Balance
+    path('my-leave-balances/', leavemanagement.get_my_leave_balances, name='my_leave_balances'),
+
+    # Employee Education Endpoints
+    path('employee-education/', employee_education.employee_education_list_create, name='employee-education-list-create'),
+    path('employee-education/<int:education_id>/', employee_education.employee_education_detail,
+         name='employee-education-detail'),
+    path('employee-profile/', employee_education.employee_profile_details, name='employee-profile'),
+
+    # Holiday Calendar Endpoints
+    path('monthly-holidays/', holidays.get_month_wise_holiday_calendar, name='monthly-holidays'),
+    path('holiday-calendar/', holidays.get_yearly_holiday_calendar, name='holiday-calendar'),
+
+    # Employee Salary Details Endpoints
+    path('employee-payslip/', employee_salary_details.employee_payslip_details, name='generate-payslip'),
+    path('employee-ytd-details/', employee_salary_details.get_month_and_ytd_salary_data, name='generate-ytd-payslip'),
+    path('employee-payslips-by-financial-year/', employee_salary_details.get_employee_financial_year_payslip_details,
+         name='employee-financial-year-payslip-details'),
+
 
 ]

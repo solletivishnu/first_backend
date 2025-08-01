@@ -429,3 +429,81 @@ def logo_upload_path(instance, filename):
     business_name = instance.business.nameOfBusiness.replace(' ', '_')
     # Construct the upload path
     return os.path.join(business_name, 'business_logos', filename)
+
+
+def is_valid_number(value):
+    try:
+        float(value)
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+def calculate_component_amounts(earnings, total_working_days, total_days_of_month):
+    """Calculate prorated component amounts"""
+
+    def prorate(value):
+        return (value * total_working_days) / total_days_of_month if value and total_days_of_month > 0 else 0
+
+    def get_component_amount(earnings_data, component_name):
+        for item in earnings_data:
+            if item["component_name"].lower() == component_name.lower().replace("_", " "):
+                return item.get("monthly", 0)
+        return 0
+
+    # Standard components (unchanged)
+    basic_components = [
+        'basic', 'hra', 'special_allowance', 'bonus',
+        'conveyance_allowance', 'travelling_allowance', 'commission',
+        'children_education_allowance', 'overtime_allowance', 'transport_allowance'
+    ]
+
+    component_amounts = {}
+    # Original exclude list (unchanged for breakdown)
+    exclude_earnings = {"basic", "hra", "special_allowance", "bonus", "conveyance_allowance",
+                        "travelling_allowance", "commission", "children_education_allowance",
+                        "overtime_allowance", "transport_allowance"}
+    other_earnings_breakdown = []
+
+    # Calculate standard components (unchanged)
+    for component in basic_components:
+        amount = get_component_amount(earnings, component)
+        component_amounts[component] = prorate(amount)
+
+    # NEW: Calculate other_earnings as sum of ALL except basic/hra/special_allowance/bonus
+    other_earnings = 0
+    other_components_to_exclude = {"basic", "hra", "special_allowance", "bonus"}
+
+    for earning in earnings:
+        name = earning.get("component_name", "").lower().replace(" ", "_")
+        monthly_amount = earning.get("monthly", 0)
+
+        # ORIGINAL LOGIC for breakdown (unchanged)
+        if name not in exclude_earnings and monthly_amount > 0:
+            prorated_amount = round(prorate(monthly_amount))
+            other_earnings_breakdown.append({name: prorated_amount})
+
+        # NEW LOGIC for other_earnings sum (only exclude 4 components)
+        if name not in other_components_to_exclude and monthly_amount > 0:
+            other_earnings += round(prorate(monthly_amount))
+
+    # Rest remains exactly the same
+    component_amounts['other_earnings'] = other_earnings
+    component_amounts['other_earnings_breakdown'] = other_earnings_breakdown
+    return component_amounts
+
+
+def employee_image_upload_path(instance, filename):
+    # Construct the upload path
+    return os.path.join('employees', str(instance.employee.id), str(instance.direction), filename)
+
+
+def leave_attachments(instance, filename):
+    # Construct the upload path
+    return os.path.join('employees', str(instance.employee.employee.id),  'leaveManagement', str(instance.direction), filename)
+
+
+def employee_education_certificate(instance, filename):
+    # Construct the upload path
+    return os.path.join('employees', str(instance.employee.employee.id), 'education_certificates',
+                        str(instance.qualification), filename)
