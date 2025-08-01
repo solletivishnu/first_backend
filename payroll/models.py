@@ -7,6 +7,7 @@ from usermanagement.models import *
 from datetime import date
 from collections import OrderedDict
 from django.db.models.signals import pre_save, post_save
+from django.utils.timezone import now
 from dateutil.relativedelta import relativedelta
 from datetime import date, datetime
 from django.contrib.auth.hashers import make_password, check_password
@@ -388,7 +389,7 @@ class HolidayManagement(models.Model):
     start_date = models.DateField()
     end_date = models.DateField()
     description = models.TextField(blank=True, null=True)  # Optional
-    applicable_for = models.CharField(max_length=60)
+    applicable_for = models.ManyToManyField('WorkLocations', related_name='applicable_holidays', blank=True)
 
     class Meta:
         verbose_name = "Holiday Management"
@@ -448,17 +449,19 @@ def allocate_pro_rated_leave(sender, instance, created, **kwargs):
             pro_rated_leave = total_leaves  # Default full allocation
 
             # Calculate remaining months in the financial year
-            if instance.doj > leave_period_start:
-                remaining_months = max(1, (leave_period_end.year - instance.doj.year) * 12 +
-                                       (leave_period_end.month - instance.doj.month))
+            if instance.doj < leave_period_start:
+                remaining_months = 12
+            else:
+                remaining_months = (leave_period_end.year - instance.doj.year) * 12 + (
+                            leave_period_end.month - instance.doj.month) + 1
 
-                if leave.employee_leave_period == "Monthly":
-                    # If leave is allocated monthly, multiply remaining months by number_of_leaves
-                    pro_rated_leave = total_leaves * remaining_months
+            if leave.employee_leave_period == "Monthly":
+                # If leave is allocated monthly, multiply remaining months by number_of_leaves
+                pro_rated_leave = total_leaves * remaining_months
 
-                elif leave.employee_leave_period == "Annually":
-                    # If leave is allocated annually, divide annual leave by remaining months
-                    pro_rated_leave = round((total_leaves / 12) * remaining_months)
+            elif leave.employee_leave_period == "Annually":
+                # If leave is allocated annually, divide annual leave by remaining months
+                pro_rated_leave = round((total_leaves / 12) * remaining_months)
 
             # Create Leave Balance Entry
             EmployeeLeaveBalance.objects.create(
@@ -973,6 +976,7 @@ class PayrollWorkflow(models.Model):
     exits = models.CharField(max_length=20, choices=STATUS_CHOICES, default='in progress')
     attendance = models.CharField(max_length=20, choices=STATUS_CHOICES, default='in progress')
     bonuses = models.CharField(max_length=20, choices=STATUS_CHOICES, default='in progress')
+    adhoc_bonuses = models.CharField(max_length=20, choices=STATUS_CHOICES, default='in progress')
     salary_revision = models.CharField(max_length=20, choices=STATUS_CHOICES, default='in progress')
     tds = models.CharField(max_length=20, choices=STATUS_CHOICES, default='in progress')
     loans_and_advances = models.CharField(max_length=20, choices=STATUS_CHOICES, default='in progress')
@@ -1007,6 +1011,16 @@ class EmployeeCredentials(models.Model):
         return True
 
 
+class EmployeeEducationDetails(models.Model):
+    employee = models.ForeignKey('EmployeeCredentials', on_delete=models.CASCADE, related_name='education_details')
+    qualification = models.CharField(max_length=120, null=False, blank=False)
+    year_of_passing = models.IntegerField(null=False, blank=False)
+    upload_certificate = models.FileField(upload_to=employee_education_certificate, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.employee.employee.associate_id} - {self.qualification} ({self.year_of_passing})"
+
+
 class AttendanceLog(models.Model):
     CHECKIN_TYPES = [
         ('manual', 'Manual'),
@@ -1030,47 +1044,114 @@ class AttendanceLog(models.Model):
         return f"{self.employee.associate_id} - {self.date} ({self.check_in_type})"
 
 
-# class LeaveApplication(models.Model):
-#     LEAVE_TYPE_CHOICES = [
-#         ('CL', 'Casual Leave'),
-#         ('SL', 'Sick Leave'),
-#         ('EL', 'Earned Leave'),
-#         ('LOP', 'Loss of Pay'),
-#     ]
-#
-#     STATUS_CHOICES = [
-#         ('pending', 'Pending'),
-#         ('approved', 'Approved'),
-#         ('rejected', 'Rejected'),
-#         ('cancelled', 'Cancelled'),
-#     ]
-#
-#     employee = models.ForeignKey(EmployeeCredentials, on_delete=models.CASCADE, related_name='leave_applications')
-#     leave_type = models.CharField(max_length=10, choices=LEAVE_TYPE_CHOICES)
-#     start_date = models.DateField()
-#     end_date = models.DateField()
-#     reason = models.TextField(blank=True)
-#
-#     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
-#     applied_on = models.DateTimeField(auto_now_add=True)
-#
-#     reviewer = models.ForeignKey(
-#         EmployeeCredentials,
-#         on_delete=models.SET_NULL,
-#         null=True,
-#         blank=True,
-#         related_name='reviewed_leaves'
-#     )
-#     reviewed_on = models.DateTimeField(null=True, blank=True)
-#     reviewer_comment = models.TextField(blank=True)
-#
-#     def __str__(self):
-#         return f"{self.employee} - {self.leave_type} - {self.start_date} to {self.end_date}"
+class AttendanceGeoTag(models.Model):
+    payroll = models.ForeignKey(
+        PayrollOrg,
+        on_delete=models.CASCADE,
+        related_name='geo_locations'  # Consider plural for reverse relation
+    )
+    branch = models.OneToOneField(WorkLocations, on_delete=models.CASCADE, related_name='branch_location')
+    latitude = models.CharField(max_length=255)
+    longitude = models.CharField(max_length=255)
+    radius = models.IntegerField(null=True, blank=True)
+
+    def __str__(self):
+        return f"GeoLocation for {self.payroll} at ({self.latitude}, {self.longitude}) with radius {self.radius}"
 
 
+class EmployeeFaceRecognition(models.Model):
+    DIRECTION_CHOICES = [
+        ('front', 'Front Face'),
+        ('left', 'Left Profile'),
+        ('right', 'Right Profile'),
+        ('upper_angle', 'Upper Angle'),
+        ('lower_angle', 'Lower Angle'),
+        ('back', 'back')
+    ]
+
+    employee = models.ForeignKey(EmployeeCredentials, on_delete=models.CASCADE, related_name='images')
+    direction = models.CharField(max_length=50, choices=DIRECTION_CHOICES)
+    image_file = models.FileField(upload_to=employee_image_upload_path)
+    labels = models.JSONField(default=list)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.employee.name} - {self.direction}"
 
 
+class LeaveApplication(models.Model):
+    LEAVE_TYPE_CHOICES = [
+        ('CL', 'Casual Leave'),
+        ('SL', 'Sick Leave'),
+        ('EL', 'Earned Leave'),
+        ('LOP', 'Loss of Pay'),
+    ]
 
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+        ('cancelled', 'Cancelled'),
+    ]
+
+    employee = models.ForeignKey(EmployeeCredentials, on_delete=models.CASCADE, related_name='leave_applications')
+    leave_type = models.ForeignKey(LeaveManagement, on_delete=models.CASCADE, related_name='payroll_leave_applications')
+    start_date = models.DateField()
+    end_date = models.DateField()
+    reason = models.TextField(blank=True)
+    contact_details = models.CharField(max_length=255, blank=True, null=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    applied_on = models.DateTimeField(auto_now_add=True)
+    reviewer = models.ForeignKey(
+        EmployeeCredentials,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_leaves'
+    )
+    cc_to = models.ManyToManyField(
+        EmployeeCredentials,
+        blank=True,
+        related_name='cc_leaves'
+    )
+    reviewed_on = models.DateTimeField(null=True, blank=True)
+    reviewer_comment = models.TextField(blank=True)
+    attach_file = models.FileField(upload_to=leave_attachments, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.employee} - {self.leave_type} - {self.start_date} to {self.end_date}"
+
+
+def current_financial_year():
+    today = date.today()
+    if today.month < 4:
+        return f"{today.year-1}-{today.year}"
+    return f"{today.year}-{today.year+1}"
+
+
+@receiver(post_save, sender=LeaveApplication)
+def update_leave_balance_on_approval(sender, instance, created, **kwargs):
+    if instance.status == 'approved':
+        leave_days = (instance.end_date - instance.start_date).days + 1
+
+        try:
+            leave_balance = EmployeeLeaveBalance.objects.get(
+                employee=instance.employee.employee,
+                leave_type=instance.leave_type,
+                financial_year=current_financial_year()
+            )
+        except EmployeeLeaveBalance.DoesNotExist:
+            return
+
+        if leave_balance.leave_remaining >= leave_days:
+            leave_balance.leave_used += leave_days
+            leave_balance.save()
+        else:
+            # Optionally handle rejection due to insufficient balance
+            pass
+
+        # Prevent recursive signal call by using update() instead of save()
+        LeaveApplication.objects.filter(id=instance.id).update(reviewed_on=now().date())
 
 
 

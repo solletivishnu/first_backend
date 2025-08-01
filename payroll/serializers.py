@@ -4,6 +4,7 @@ from datetime import date, datetime
 from calendar import monthrange
 from rest_framework.exceptions import ValidationError
 from django.db.models import Q, Sum
+from calendar import monthrange, month_name
 
 
 class PayrollOrgSerializer(serializers.ModelSerializer):
@@ -1017,3 +1018,118 @@ class AttendanceLogSerializer(serializers.ModelSerializer):
             'verified',
         ]
         read_only_fields = ['check_in', 'check_out', 'employee_id']
+
+
+class AttendanceGeoTagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AttendanceGeoTag
+        fields = "__all__"
+
+
+class EmployeeFaceRecognitionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EmployeeFaceRecognition
+        fields = "__all__"
+
+
+class LeaveApplicationSerializer(serializers.ModelSerializer):
+    cc_to = serializers.PrimaryKeyRelatedField(many=True, queryset=EmployeeCredentials.objects.all(), required=False)
+
+    class Meta:
+        model = LeaveApplication
+        fields = '__all__'
+        read_only_fields = ('applied_on', 'status', 'reviewed_on', 'reviewer_comment')
+
+    def validate(self, data):
+        # Validate date range
+        if data['start_date'] > data['end_date']:
+            raise serializers.ValidationError("End date must be after start date")
+
+        # Validate leave doesn't span more than allowed days based on type
+        leave_days = (data['end_date'] - data['start_date']).days + 1
+
+        if data['leave_type'] == 'CL' and leave_days > 3:
+            raise serializers.ValidationError("Casual leave cannot be more than 3 days")
+
+        if data['leave_type'] == 'SL' and leave_days > 15:
+            raise serializers.ValidationError("Sick leave cannot be more than 15 days")
+
+        # Validate LOP (Loss of Pay) specific rules
+        if data['leave_type'] == 'LOP':
+            if not data.get('reason'):
+                raise serializers.ValidationError("Reason is mandatory for LOP leaves")
+
+        # Validate future dates
+        if data['start_date'] < timezone.now().date():
+            raise serializers.ValidationError("Cannot apply for leave in the past")
+
+        # Check for overlapping leaves
+        overlapping_leaves = LeaveApplication.objects.filter(
+            employee=data['employee'],
+            start_date__lte=data['end_date'],
+            end_date__gte=data['start_date'],
+        ).exclude(status='rejected').exclude(status='cancelled')
+
+        if self.instance:  # For update
+            overlapping_leaves = overlapping_leaves.exclude(pk=self.instance.pk)
+
+        if overlapping_leaves.exists():
+            raise serializers.ValidationError("You already have a leave application for these dates")
+
+        return data
+
+
+class EmployeeEducationDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EmployeeEducationDetails
+        fields = '__all__'
+
+
+class EmployeeProfileSerializer(serializers.ModelSerializer):
+    work_location = serializers.CharField(source='work_location.location_name', read_only=True)
+    department = serializers.CharField(source='department.dept_name', read_only=True)
+    designation = serializers.CharField(source='designation.designation_name', read_only=True)
+
+    class Meta:
+        model = EmployeeManagement
+        fields = "__all__"
+
+
+class EmployeeLeaveBalanceSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source='employee.name', read_only=True)
+    leave_type_name = serializers.CharField(source='leave_type.name_of_leave', read_only=True)
+
+    class Meta:
+        model = EmployeeLeaveBalance
+        fields = [
+            'id', 'employee', 'employee_name', 'leave_type', 'leave_type_name',
+            'leave_entitled', 'leave_used', 'leave_remaining', 'financial_year'
+        ]
+
+
+class EmployeeFinancialYearPayslipSerializer(serializers.ModelSerializer):
+    deduction = serializers.SerializerMethodField()
+    month_year = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EmployeeSalaryHistory
+        fields = [
+            'id', 'employee', 'month_year', 'month', 'financial_year', 'gross_salary', 'deduction', 'tds', 'net_salary'
+        ]
+
+    def get_deduction(self, obj):
+        """Calculate total deductions for the payslip"""
+        deductions = obj.epf + obj.esi + obj.pt + obj.loan_emi + obj.other_deductions
+        return round(deductions, 2) if deductions else 0.0
+
+    def get_month_year(self, obj):
+        """Return the month name for the payslip"""
+        if obj.month and obj.financial_year:
+            try:
+                start_year, end_year = obj.financial_year.split('-')
+                year = end_year if obj.month <= 3 else start_year
+                return f"{month_name[obj.month]} {year}"
+            except (ValueError, IndexError):
+                pass  # Invalid format; fall through to return None
+        return None
+

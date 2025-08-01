@@ -19,115 +19,243 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Invoice</title>
     <style>
-     @page {
-  size: A4;
-  margin: 0;
-}
-body {
-  margin: 0;
-  position: relative;
-}
-.footer {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background-color: #f1f5f9;
-  color: #525252;
-  text-align: center;
-  font-size: 0.75rem;
-  line-height: 1rem;
-  padding: 0.75rem;
-}
-.content {
-  min-height: 100vh;
-  box-sizing: border-box;
-  padding-bottom: 60px; /* Space for footer */
-}
+        @page {
+          size: A4;
+          margin: 220px 0px 80px 0px;
+        }
 
-@media print {
-  body {
-    padding-bottom: 0;
-  }
-  .content {
-    padding-bottom: 0;
-    min-height: calc(100vh - 60px); /* Account for footer height */
-  }
-  .footer {
-    position: fixed;
-    bottom: 0;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-}
+        body {
+          margin: 0;
+          position: relative;
+          min-height: 100vh;
+          font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+            'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+        }
+
+        .header {
+          position: fixed;
+          top: -240px;
+          left: 0;
+          right: 0;
+          background-color: #ffffff;
+          border-bottom: 2px solid #e0e0e0;
+          margin-bottom: 1.5rem;
+          margin-left: 10px;
+          margin-right: 10px;
+          z-index: 1000;
+          height: 240px;
+          padding: 0.75rem;
+          box-sizing: border-box;
+        }
+
+        .footer {
+          position: fixed;
+          bottom: -40px;
+          left: 0;
+          right: 0;
+          background-color: #f1f5f9;
+          margin-left: 15px;
+          margin-right: 15px;
+          color: #525252;
+          text-align: center;
+          font-size: 0.75rem;
+          line-height: 1rem;
+          padding: 0.75rem;
+          height: 40px;
+          box-sizing: border-box;
+          z-index: 1000;
+        }
+
+        .content {
+          padding-top: 50px; /* Space for header */
+          padding-bottom: 60px; /* Space for footer */
+          margin: 0;
+          min-height: calc(100vh - 250px); /* 100vh - (header + footer) */
+          page-break-inside: avoid;
+        }
+
+        /* Ensure content starts fresh on each page */
+        .page-content {
+          page-break-after: always;
+          height: calc(100vh - 250px); /* Match the min-height of .content */
+          overflow: hidden;
+        }
+
+        /* Last page shouldn't have a page break after it */
+        .page-content:last-child {
+          page-break-after: auto;
+        }
+
+        /* Table styling */
+        .invoice-table {
+          width: 100%;
+          border-collapse: collapse;
+          border-spacing: 0;
+        }
+
+        /* Page break handling */
+        .invoice-table {
+          page-break-inside: auto;
+        }
+        .invoice-table tr {
+          page-break-inside: avoid;
+          page-break-after: auto;
+        }
+        .invoice-table thead {
+          margin-top: 1rem;
+          display: table-header-group;
+          page-break-inside: avoid;
+        }
+        .invoice-table tbody {
+          display: table-row-group;
+          page-break-inside: avoid;
+        }
+
+        /* Ensure table header appears on each page */
+        thead {
+          display: table-header-group;
+          page-break-inside: avoid;
+        }
+
+        /* Add spacing between pages */
+        .page-break {
+          page-break-before: always;
+          padding-top: 20px;
+        }
+
+        @media print {
+          body {
+            padding: 0;
+            margin: 0;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .header {
+            position: fixed;
+            top: -220px;
+            height: 220px;
+            margin-bottom: 1.5rem;
+            margin-left: 10px;
+            margin-right: 10px;
+            padding: 0.75rem;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .footer {
+            position: fixed;
+            bottom: -40px;
+            height: 40px;
+            margin-left: 15px;
+            margin-right: 15px;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .content {
+            padding-top: 5px;
+            padding-bottom: 60px;
+            margin: 0;
+            page-break-inside: avoid;
+            min-height: calc(100vh - 250px);
+            position: relative;
+          }
+
+          /* New page content styling */
+          .page-content {
+            height: calc(100vh - 250px);
+            page-break-after: always;
+            page-break-inside: avoid;
+          }
+
+          .page-content:last-child {
+            page-break-after: auto;
+            page-break-inside: avoid;
+          }
+
+          /* Prevent content from breaking in awkward places */
+          .avoid-break {
+            page-break-inside: avoid;
+          }
+
+          /* Force a page break before this element */
+          .force-break {
+            page-break-before: always;
+            page-break-inside: avoid;
+          }
+
+          /* Ensure tables break properly */
+          table {
+            page-break-inside: auto;
+            page-break-inside: avoid;
+          }
+          tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
+            page-break-inside: avoid;
+          }
+          td {
+            page-break-inside: avoid;
+            page-break-after: auto;
+            page-break-inside: avoid;
+          }
+        }
     </style>
   </head>
 
   <body>
-    <div class="content">
-      <div style="padding-top: 1rem; padding-bottom: 1rem">
-        <div
-          style="
-            padding-left: 3.5rem;
-            padding-right: 3.5rem;
-            padding-top: 1.5rem;
-            padding-bottom: 1.5rem;
-          "
-        >
-          <table
-            style="width: 100%; border-collapse: collapse; border-spacing: 0"
-          >
-            <tbody>
-              <tr>
-                <td style="width: 50%; vertical-align: top">
-                  <div style="font-size: 0.875rem; line-height: 1.25rem">
-                    <h2
-                      style="
-                        margin: 0 0 5px 0;
-                        white-space: nowrap;
-                        color: #5c6ac4;
-                      "
-                    >
+    <header class="header">
+      <div style="padding: 0.75rem; height: 100%; display: flex; align-items: center;">
+        <table style="width: 100%; border-collapse: collapse; border-spacing: 0;">
+          <tbody>
+            <tr>
+                 <td style="width: 35%; vertical-align: top;">
+
+                    <div style="font-size: 0.900rem; line-height: 1.2rem">
+                    <h2 style="margin: 0 0 3px 0; white-space: nowrap; color: #5c6ac4; font-size: 1.25rem;">
                       {{company_name}}
                     </h2>
-                    <p style="margin: 0">Telangana</p>
-                    {% if gstin != "NA" and gstin is not None %}
-                      <p style="margin: 0">{{gstin}}</p>
+                    <p style="margin: 0">{{company_address_line1}}</p>
+                    <p style="margin: 0">{{company_city}} - {{company_pincode}}</p>
+                    <p style="margin: 0">{{company_state}}</p>
+                    <p style="margin: 0">Mobile: {{company_mobile_number}}</p>
+                    <p style="margin: 0">Email: {{email}}</p>
+                    {% if gstin != "NA" and gstin is not None and gstin != '' and gst_registered %}
+                      <p style="margin: 0;">GSTIN: {{gstin}}</p>
                     {% endif %}
-                    <p style="margin: 0">{{email}}</p>
-                    <p style="margin: 0">Invoice No. : {{invoice_number}}</p>
-                    <p style="margin: 0">Invoice Date : {{invoice_date}}</p>
+                  </div>
+                </td>
+                <td style="width:30% vertical-align: middle"></td>
+              <td style="width: 35%; vertical-align: middle">
+                <div style="font-size: 0.900rem; line-height: 1.2rem; text-align: left">
+                  <h1 style="margin: 0 0 3px 0; white-space: nowrap; color: #5c6ac4; font-size: 1.5rem;">
+                    Tax Invoice
+                  </h1>
+
+                    <p style="margin: 0;">
+                    Invoice No. : {{invoice_number}}
+                  </p>
+                  <p style="margin: 0;">
+                    Date : {{invoice_date}}
+                  </p>
                     <p style="margin: 0">Terms : {{terms}}</p>
                     <p style="margin: 0">Due Date : {{due_date}}</p>
-                    <div>
-                      <img src="" style="height: 3rem; display: block" />
-                    </div>
-                  </div>
-                </td>
-
-                <td style="width: 50%; vertical-align: top">
-                  <div style="font-size: 0.875rem; line-height: 1.25rem">
-                    <h1
-                      style="
-                        margin: 0;
-                        white-space: nowrap;
-                        color: #5c6ac4;
-                        text-align: right;
-                      "
-                    >
-                      Tax Invoice
-                    </h1>
-                    <p style="white-space: nowrap; text-align: right">
+                    <p style="margin: 0;">
                       Place of supply : {{place_of_supply}}
                     </p>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="content-wrapper" style="padding-bottom: 3rem; margin-bottom: 80px;">
         <div
+          class="section-spacing"
           style="
+            margin-left: 1.5rem;
+            margin-right: 1.5rem;
             background-color: #f1f5f9;
             padding-left: 3.5rem;
             padding-right: 3.5rem;
@@ -151,13 +279,12 @@ body {
                     "
                   >
                     <p style="font-weight: 700; margin: 0">Bill to</p>
-                    <p style="margin: 0">{{ customer_name }}</p>
-                    <p style="margin: 0">{{ bill_to_address }}</p>
-                    <p style="margin: 0">{{ bill_to_state }}</p>
-                    <p style="margin: 0">{{ bill_to_country }} - {{ bill_to_pincode }}</p>
-                    <p style="margin: 0">GSTIN : {{ customer_gstin }}</p>
-                    <p style="margin: 0">PAN : {{customer_pan}}</p>
-                    <p style="margin: 0"></p>
+                    <p style="margin: 0; font-weight: 500; font-size: 0.800rem;">{{ customer_name }}</p>
+                    <p style="margin: 0; font-weight: 500; font-size: 0.800rem;">{{ bill_to_address }}</p>
+                    <p style="margin: 0; font-weight: 500; font-size: 0.800rem;">{{ bill_to_state }} - {{ bill_to_pincode }}</p>
+                    <p style="margin: 0; font-weight: 500; font-size: 0.800rem;">{{ bill_to_country }}</p>
+                    <p style="margin: 0; font-weight: 500; font-size: 0.800rem;">GSTIN : {{ customer_gstin }}</p>
+                    <p style="margin: 0; font-weight: 500; font-size: 0.800rem;">PAN : {{customer_pan}}</p>
                   </div>
                 </td>
                 {% if ship_to_address != "NA" and ship_to_address is not None %}
@@ -170,10 +297,9 @@ body {
                     "
                   >
                     <p style="font-weight: 700; margin: 0">Ship to</p>
-                    <p style="margin: 0">{{ ship_to_address }}</p>
-                    <p style="margin: 0">{{ ship_to_state }}</p>
-                    <p style="margin: 0">{{ ship_to_country }}</p>
-                    <p style="margin: 0">{{ ship_to_pincode }}</p>
+                    <p style="margin: 0; font-weight: 500; font-size: 0.800rem;">{{ ship_to_address }}</p>
+                    <p style="margin: 0; font-weight: 500; font-size: 0.800rem;">{{ ship_to_state }} - {{ ship_to_pincode }}</p>
+                    <p style="margin: 0; font-weight: 500; font-size: 0.800rem;">{{ ship_to_country }}</p>
                   </div>
                 </td>
                 {% endif %}
@@ -183,27 +309,31 @@ body {
         </div>
 
         <div
+          class="section-spacing"
           style="
-            padding-left: 3.5rem;
-            padding-right: 3.5rem;
+            padding-left: 1.3rem;
+            padding-right: 1.3rem;
             padding-top: 2rem;
-            padding-bottom: 2rem;
+            padding-bottom: 1rem;
             font-size: 0.875rem;
             line-height: 1rem;
             color: #404040;
           "
         >
           <table
+            class="invoice-table"
             style="width: 100%; border-collapse: collapse; border-spacing: 0"
           >
             <thead>
-              <tr style="border-bottom: 2px solid #5c6ac4">
+              <tr style="border-bottom: 2px solid #5c6ac4;">
                 <td
                   style="
+                    width: 5%;
                     border-bottom-width: 2px;
                     border-color: #5c6ac4;
                     padding-bottom: 0.75rem;
                     padding-left: 0.75rem;
+                    text-align: center;
                     font-weight: 700;
                     color: #5c6ac4;
                   "
@@ -212,10 +342,12 @@ body {
                 </td>
                 <td
                   style="
+                    width: 50%;
                     border-bottom-width: 2px;
                     border-color: #5c6ac4;
                     padding-bottom: 0.75rem;
                     padding-left: 0.5rem;
+                    text-align: center;
                     font-weight: 700;
                     color: #5c6ac4;
                   "
@@ -224,11 +356,12 @@ body {
                 </td>
                 <td
                   style="
+                    width: 6.5%;
                     border-bottom-width: 2px;
                     border-color: #5c6ac4;
                     padding-bottom: 0.75rem;
                     padding-left: 0.5rem;
-                    text-align: right;
+                    text-align: center;
                     font-weight: 700;
                     color: #5c6ac4;
                   "
@@ -237,24 +370,12 @@ body {
                 </td>
                 <td
                   style="
+                    width: 6.5%;
                     border-bottom-width: 2px;
                     border-color: #5c6ac4;
                     padding-bottom: 0.75rem;
                     padding-left: 0.5rem;
-                    text-align: right;
-                    font-weight: 700;
-                    color: #5c6ac4;
-                  "
-                >
-                  Units
-                </td>
-                <td
-                  style="
-                    border-bottom-width: 2px;
-                    border-color: #5c6ac4;
-                    padding-bottom: 0.75rem;
-                    padding-left: 0.5rem;
-                    text-align: right;
+                    text-align: center;
                     font-weight: 700;
                     color: #5c6ac4;
                   "
@@ -263,6 +384,7 @@ body {
                 </td>
                 <td
                   style="
+                    width: 6.5%;
                     border-bottom-width: 2px;
                     border-color: #5c6ac4;
                     padding-bottom: 0.75rem;
@@ -276,6 +398,7 @@ body {
                 </td>
                 <td
                   style="
+                    width: 6.5%;
                     border-bottom-width: 2px;
                     border-color: #5c6ac4;
                     padding-bottom: 0.75rem;
@@ -289,11 +412,12 @@ body {
                 </td>
                 <td
                   style="
+                    width: 6.5%;
                     border-bottom-width: 2px;
                     border-color: #5c6ac4;
                     padding-bottom: 0.75rem;
                     padding-left: 0.5rem;
-                    text-align: right;
+                    text-align: center;
                     font-weight: 700;
                     color: #5c6ac4;
                   "
@@ -302,24 +426,12 @@ body {
                 </td>
                 <td
                   style="
+                    width: 6.5%;
                     border-bottom-width: 2px;
                     border-color: #5c6ac4;
                     padding-bottom: 0.75rem;
                     padding-left: 0.5rem;
-                    text-align: right;
-                    font-weight: 700;
-                    color: #5c6ac4;
-                  "
-                >
-                  Tax
-                </td>
-                <td
-                  style="
-                    border-bottom-width: 2px;
-                    border-color: #5c6ac4;
-                    padding-bottom: 0.75rem;
-                    padding-left: 0.5rem;
-                    text-align: right;
+                    text-align: center;
                     font-weight: 700;
                     color: #5c6ac4;
                   "
@@ -328,12 +440,13 @@ body {
                 </td>
                 <td
                   style="
+                    width: 6.5%;
                     border-bottom-width: 2px;
                     border-color: #5c6ac4;
                     padding-bottom: 0.75rem;
                     padding-left: 0.5rem;
                     padding-right: 0.75rem;
-                    text-align: right;
+                    text-align: center;
                     font-weight: 700;
                     color: #5c6ac4;
                   "
@@ -348,6 +461,7 @@ body {
               <tr style="border-bottom: 2px solid #e2e2e2">
                 <td
                   style="
+                    width: 5%;
                     border-bottom-width: 1px;
                     padding: 0.75rem 0 0.75rem 0.75rem;
                   "
@@ -356,8 +470,9 @@ body {
                 </td>
                 <td
                   style="
+                    width: 50%;
                     border-bottom-width: 1px;
-                    padding: 0.75rem 0 0.75rem 0.5rem;
+                    padding: 0.5rem 0 0.75rem 0.5rem;
                   "
                 >
                   {{ item.item }}
@@ -367,6 +482,7 @@ body {
                 </td>
                 <td
                   style="
+                    width: 6.5%;
                     border-bottom-width: 1px;
                     padding: 0.75rem 0 0.75rem 0.5rem;
                     text-align: center;
@@ -376,19 +492,7 @@ body {
                 </td>
                 <td
                   style="
-                    border-bottom-width: 1px;
-                    padding: 0.75rem 0 0.75rem 0.5rem;
-                    text-align: center;
-                  "
-                >
-                  {% if item.units and item.units != "NA" %}
-                    {{ item.units }}
-                  {% else %}
-                      -
-                  {% endif %}
-                </td>
-                <td
-                  style="
+                    width: 6.5%;
                     border-bottom-width: 1px;
                     padding: 0.75rem 0 0.75rem 0.5rem;
                     text-align: center;
@@ -398,6 +502,7 @@ body {
                 </td>
                 <td
                   style="
+                    width: 6.5%;
                     border-bottom-width: 1px;
                     padding: 0.75rem 0 0.75rem 0.5rem;
                     text-align: center;
@@ -407,15 +512,21 @@ body {
                 </td>
                 <td
                   style="
+                    width: 6.5%;
                     border-bottom-width: 1px;
                     padding: 0.75rem 0 0.75rem 0.5rem;
                     text-align: center;
                   "
                 >
-                  {{ item.discount }}
+                  {% if item.discount != "0" and item.discount != "0.00" and item.discount != 0 %}
+                      {{ item.discount }} {{ item.discount_type }}
+                  {% else %}
+                      <span> - </span>
+                  {% endif %}
                 </td>
                 <td
                   style="
+                    width: 6.5%;
                     border-bottom-width: 1px;
                     padding: 0.75rem 0.75rem 0.75rem 0.5rem;
                     text-align: center;
@@ -425,24 +536,17 @@ body {
                 </td>
                 <td
                   style="
-                    border-bottom-width: 1px;
-                    padding: 0.75rem 0.75rem 0.75rem 0.5rem;
-                    text-align: left;
-                  "
-                >
-                  {{ item.tax }}
-                </td>
-                <td
-                  style="
+                    width: 6.5%;
                     border-bottom-width: 1px;
                     padding: 0.75rem 0.75rem 0.75rem 0.5rem;
                     text-align: center;
                   "
                 >
-                  {{ item.taxamount }}
+                  {{ item.taxamount }} ({{ item.tax }})
                 </td>
                 <td
                   style="
+                    width: 6.5%;
                     border-bottom-width: 1px;
                     padding: 0.75rem 0.75rem 0.75rem 0.5rem;
                     text-align: center;
@@ -452,265 +556,92 @@ body {
                 </td>
               </tr>
               {% endfor %}
-              <tr>
-                <td colspan="2">
-                  <h3 style="margin: 0">Total In Words :</h3>
-                  <br />{{total_in_words}}
-                  {% if terms_and_conditions and terms_and_conditions != "" and terms_and_conditions != "NA" %}
-                  <br /><br />
-                  <h3 style="margin: 0; color: #5c6ac4; font-weight: 700">Terms and Conditions:</h3>
-                  <p style="margin-top: 0.5rem; font-style: italic; color: #525252">{{terms_and_conditions}}</p>
-                  {% endif %}
-                  {% if note and note != "" and note != "NA" %}
-                  <br /><br />
-                  <h3 style="margin: 0; color: #5c6ac4; font-weight: 700">Customer Notes:</h3>
-                  <p style="margin-top: 0.5rem; font-style: italic; color: #525252">{{note}}</p>
-                  {% endif %}
-
-                </td>
-                <td colspan="9">
-                  <table
-                    style="
-                      width: 100%;
-                      border-collapse: collapse;
-                      border-spacing: 0;
-                    "
-                  >
-                    <tbody>
-                      <tr>
-                        <td style="width: 100%"></td>
-                        <td>
-                          <table
-                            style="
-                              width: 100%;
-                              border-collapse: collapse;
-                              border-spacing: 0;
-                            "
-                          >
-                            <tbody>
-                              <tr>
-                                <td
-                                  style="
-                                    border-bottom-width: 1px;
-                                    padding: 0.75rem;
-                                  "
-                                >
-                                  <div
-                                    style="white-space: nowrap; color: #94a3b8"
-                                  >
-                                    SUB TOTAL (%):
-                                  </div>
-                                </td>
-                                <td
-                                  style="
-                                    border-bottom-width: 1px;
-                                    padding: 0.75rem;
-                                    text-align: right;
-                                  "
-                                >
-                                  <div
-                                    style="
-                                      white-space: nowrap;
-                                      font-weight: 700;
-                                      color: #5c6ac4;
-                                    "
-                                  >
-                                    {{subtotal}}
-                                  </div>
-                                </td>
-                              </tr>
-                              {% if shipping != "0" and shipping != "0.00" and shipping != 0 %}
-                              <tr>
-                                <td
-                                  style="
-                                    border-bottom-width: 1px;
-                                    padding: 0.75rem;
-                                  "
-                                >
-                                  <div
-                                    style="white-space: nowrap; color: #94a3b8"
-                                  >
-                                    SHIPPING AMOUNT (%):
-                                  </div>
-                                </td>
-                                <td
-                                  style="
-                                    border-bottom-width: 1px;
-                                    padding: 0.75rem;
-                                    text-align: right;
-                                  "
-                                >
-                                  <div
-                                    style="
-                                      white-space: nowrap;
-                                      font-weight: 700;
-                                      color: #5c6ac4;
-                                    "
-                                  >
-                                    {{shipping}}
-                                  </div>
-                                </td>
-                              </tr>
-                              {% endif %}
-                              {% if shipping_tax != "0" and shipping_tax != "0.00" and shipping_tax != 0 %}
-                              <tr>
-                                <td
-                                  style="
-                                    border-bottom-width: 1px;
-                                    padding: 0.75rem;
-                                  "
-                                >
-                                  <div
-                                    style="white-space: nowrap; color: #94a3b8"
-                                  >
-                                    SHIPPING Tax:
-                                  </div>
-                                </td>
-                                <td
-                                  style="
-                                    border-bottom-width: 1px;
-                                    padding: 0.75rem;
-                                    text-align: right;
-                                  "
-                                >
-                                  <div
-                                    style="
-                                      white-space: nowrap;
-                                      font-weight: 700;
-                                      color: #5c6ac4;
-                                    "
-                                  >
-                                    {{shipping_tax}}
-                                  </div>
-                                </td>
-                              </tr>
-                              {% endif %}
-                              {% if cgst != "0" and cgst != "0.00" and cgst != 0 %}
-                              <tr>
-                                <td style="padding: 0.75rem">
-                                  <div
-                                    style="white-space: nowrap; color: #94a3b8"
-                                  >
-                                    CGST (%):
-                                  </div>
-                                </td>
-                                <td style="padding: 0.75rem; text-align: right">
-                                  <div
-                                    style="
-                                      white-space: nowrap;
-                                      font-weight: 700;
-                                      color: #5c6ac4;
-                                    "
-                                  >
-                                    {{cgst}}
-                                  </div>
-                                </td>
-                              </tr>
-                              {% endif %}
-                              {% if sgst != "0" and sgst != "0.00" and sgst != 0 %}
-                              <tr>
-                                <td style="padding: 0.75rem">
-                                  <div
-                                    style="white-space: nowrap; color: #94a3b8"
-                                  >
-                                    SGST (%):
-                                  </div>
-                                </td>
-                                <td style="padding: 0.75rem; text-align: right">
-                                  <div
-                                    style="
-                                      white-space: nowrap;
-                                      font-weight: 700;
-                                      color: #5c6ac4;
-                                    "
-                                  >
-                                    {{sgst}}
-                                  </div>
-                                </td>
-                              </tr>
-                              {% endif %}
-                              {% if igst_amt != "0" and igst_amt != "0.00" and igst_amt != 0 %}
-                              <tr>
-                                <td
-                                  style="
-                                    border-bottom-width: 1px;
-                                    padding: 0.75rem;
-                                  "
-                                >
-                                  <div
-                                    style="white-space: nowrap; color: #94a3b8"
-                                  >
-                                    IGST Amount (%):
-                                  </div>
-                                </td>
-                                <td
-                                  style="
-                                    border-bottom-width: 1px;
-                                    padding: 0.75rem;
-                                    text-align: right;
-                                  "
-                                >
-                                  <div
-                                    style="
-                                      white-space: nowrap;
-                                      font-weight: 700;
-                                      color: #5c6ac4;
-                                    "
-                                  >
-                                    {{ igst_amt }}
-                                  </div>
-                                </td>
-                              </tr>
-                              {% endif %}
-
-                              <tr>
-                                <td
-                                  style="
-                                    background-color: #5c6ac4;
-                                    padding: 0.75rem;
-                                  "
-                                >
-                                  <div
-                                    style="
-                                      white-space: nowrap;
-                                      font-weight: 700;
-                                      color: #fff;
-                                    "
-                                  >
-                                    Total:
-                                  </div>
-                                </td>
-                                <td
-                                  style="
-                                    background-color: #5c6ac4;
-                                    padding: 0.75rem;
-                                    text-align: right;
-                                  "
-                                >
-                                  <div
-                                    style="
-                                      white-space: nowrap;
-                                      font-weight: 700;
-                                      color: #fff;
-                                    "
-                                  >
-                                    Rs {{total}}
-                                  </div>
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </td>
-              </tr>
             </tbody>
+          </table>
+        </div>
+        <div
+          class="section-spacing"
+          style="
+            padding-left: 1.5rem;
+            padding-right: 1.5rem;
+            font-size: 0.875rem;
+            line-height: 1rem;
+            color: #404040;
+          "
+        >
+          <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+            <tr>
+              <!-- Left Column - Notes and Terms -->
+              <td style="width: 50%; vertical-align: top; padding: 0.75rem;">
+                <h3 style="margin: 0 0 10px 0; font-weight: 600;">Total In Words:</h3>
+                <p style="margin: 0 0 15px 0;">{{total_in_words}}</p>
+
+                {% if terms_and_conditions and terms_and_conditions != "" and terms_and_conditions != "NA" %}
+                <h3 style="margin: 15px 0 5px 0; color: #5c6ac4; font-weight: 700;">Terms and Conditions:</h3>
+                <p style="margin: 0; font-style: italic; color: #525252; font-weight: 500;">{{terms_and_conditions}}</p>
+                {% endif %}
+
+                {% if note and note != "" and note != "NA" %}
+                <h3 style="margin: 15px 0 5px 0; color: #5c6ac4; font-weight: 700;">Customer Notes:</h3>
+                <p style="margin: 0; font-style: italic; color: #525252; font-weight: 500;">{{note}}</p>
+                {% endif %}
+              </td>
+
+              <!-- Right Column - Totals -->
+              <td style="width: 50%; vertical-align: top; padding: 0.75rem 0;">
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 12px 12px; color: #94a3b8;">SUB TOTAL :</td>
+                    <td style="padding: 12px 12px; text-align: right; font-weight: 700; color: #5c6ac4;">{{subtotal}}</td>
+                  </tr>
+
+                  {% if shipping != "0" and shipping != "0.00" and shipping != 0 %}
+                  <tr>
+                    <td style="padding: 12px 12px; color: #94a3b8;">SHIPPING AMOUNT :</td>
+                    <td style="padding: 12px 12px; text-align: right; font-weight: 700; color: #5c6ac4;">{{shipping}}</td>
+                  </tr>
+                  {% endif %}
+
+                  {% if shipping_tax != "0" and shipping_tax != "0.00" and shipping_tax != 0 %}
+                  <tr>
+                    <td style="padding: 12px 12px; color: #94a3b8;">SHIPPING Tax:</td>
+                    <td style="padding: 12px 12px; text-align: right; font-weight: 700; color: #5c6ac4;">{{shipping_tax}}</td>
+                  </tr>
+                  {% endif %}
+
+                  {% if cgst != "0" and cgst != "0.00" and cgst != 0 %}
+                  <tr>
+                    <td style="padding: 12px 12px; color: #94a3b8;">CGST :</td>
+                    <td style="padding: 12px 12px; text-align: right; font-weight: 700; color: #5c6ac4;">{{cgst}}</td>
+                  </tr>
+                  {% endif %}
+
+                  {% if sgst != "0" and sgst != "0.00" and sgst != 0 %}
+                  <tr>
+                    <td style="padding: 12px 12px; color: #94a3b8;">SGST :</td>
+                    <td style="padding: 12px 12px; text-align: right; font-weight: 700; color: #5c6ac4;">{{sgst}}</td>
+                  </tr>
+                  {% endif %}
+
+                  {% if igst_amt != "0" and igst_amt != "0.00" and igst_amt != 0 %}
+                  <tr>
+                    <td style="padding: 12px 12px; color: #94a3b8;">IGST Amount :</td>
+                    <td style="padding: 12px 12px; text-align: right; font-weight: 700; color: #5c6ac4;">{{igst_amt}}</td>
+                  </tr>
+                  {% endif %}
+
+                  <tr>
+                    <td style="padding: 12px 12px; background-color: #5c6ac4; color: #fff; font-weight: 700; font-size:0.900rem">Total:</td>
+                    <td style="padding: 12px 12px; background-color: #5c6ac4; text-align: right; color: #fff; font-weight: 700;">Rs {{total}}</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
           </table>
         </div>
 
         <div
+          class="section-spacing"
           style="
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -723,7 +654,7 @@ body {
               padding-left: 3.5rem;
               padding-right: 3.5rem;
               font-size: 0.875rem;
-              line-height: 1rem;
+              line-height: 1.5rem;
               color: #404040;
             "
           >
@@ -732,6 +663,7 @@ body {
             <p style="margin: 0">Account Number: {{account_number}}</p>
             <p style="margin: 0">IFSC Code: {{ifsc_code}}</p>
             <p style="margin: 0">Swift Code: {{swift_code}}</p>
+            <p style="margin: 0">Pan: {{company_pan}}</p>
           </div>
 
           <div
@@ -745,11 +677,13 @@ body {
             "
           >
             {% if image_url %}
-            <img
-              src="{{ image_url }}"
-              alt="Placeholder image"
-              style="width: 150px; height: 100px;"
-            />
+              <img
+                src="{{ image_url }}"
+                alt="Placeholder image"
+                style="width: 150px; height: 100px;"
+              />
+            {% else %}
+              <div style="width: 150px; height: 100px;"></div>
             {% endif %}
             <p style="color: #5c6ac4; font-weight: 700">Authorized Signature</p>
           </div>
