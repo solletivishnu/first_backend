@@ -85,7 +85,16 @@ def get_month_and_ytd_salary_data(request):
     except ValueError:
         return Response({'error': 'Invalid month value'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Valid months in FY up to selected month
+    today = date.today()
+    current_month = today.month
+
+    if selected_month > current_month:
+        return Response({'error': 'You cannot access future months'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if selected_month == current_month and today.day < 26:
+        return Response({'error': 'You cannot access the current month before the 26th'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
     valid_months = get_valid_fy_months_upto(selected_month)
 
     salary_qs = EmployeeSalaryHistory.objects.filter(
@@ -97,67 +106,108 @@ def get_month_and_ytd_salary_data(request):
     if not salary_qs.exists():
         return Response({'message': 'No salary records found'}, status=status.HTTP_200_OK)
 
-    fields_to_sum = [
+    earnings_fields = [
         "basic_salary", "hra", "conveyance_allowance", "travelling_allowance",
         "commission", "children_education_allowance", "overtime_allowance",
-        "transport_allowance", "special_allowance", "bonus", "other_earnings",
-        "benefits_total", "epf", "esi", "pt", "tds", "loan_emi",
-        "other_deductions", "total_deductions", "net_salary"
+        "transport_allowance", "special_allowance", "bonus"
+    ]
+    deduction_fields = [
+        "epf", "esi", "pt", "tds", "loan_emi"
     ]
 
-    cumulative_totals = defaultdict(float)
-    cumulative_other_earnings = defaultdict(float)
-    cumulative_other_deductions = defaultdict(float)
+    month_earnings = defaultdict(float)
+    ytd_earnings = defaultdict(float)
+    month_deductions = defaultdict(float)
+    ytd_deductions = defaultdict(float)
 
-    month_data = None
+    total_net_salary_month = 0.0
+    total_net_salary_ytd = 0.0
+    total_gross_income_month = 0.0
+    total_gross_income_ytd = 0.0
+    total_deduction_month = 0.0
+    total_deduction_ytd = 0.0
 
     for record in salary_qs:
-        # Capture current month record
-        if record.month == selected_month:
-            month_data = {
-                "data_for": month_name[record.month],
-                "month": record.month,
-                "is_total": False,
-            }
-            for field in fields_to_sum:
-                month_data[field] = getattr(record, field, 0) or 0
+        is_selected_month = (record.month == selected_month)
 
-            month_data["other_earnings_breakdown"] = record.other_earnings_breakdown or []
-            month_data["other_deductions_breakdown"] = record.other_deductions_breakdown or []
-
-        # Add to YTD totals
-        for field in fields_to_sum:
-            cumulative_totals[field] += getattr(record, field, 0) or 0
+        # Earnings
+        for field in earnings_fields:
+            value = getattr(record, field, 0) or 0
+            ytd_earnings[field] += value
+            if is_selected_month:
+                month_earnings[field] = value
 
         for item in record.other_earnings_breakdown or []:
             for k, v in item.items():
-                cumulative_other_earnings[k] += v or 0
+                ytd_earnings[k] += v or 0
+                if is_selected_month:
+                    month_earnings[k] = v or 0
+
+        # Deductions
+        for field in deduction_fields:
+            value = getattr(record, field, 0) or 0
+            ytd_deductions[field] += value
+            if is_selected_month:
+                month_deductions[field] = value
 
         for item in record.other_deductions_breakdown or []:
             for k, v in item.items():
-                cumulative_other_deductions[k] += v or 0
+                ytd_deductions[k] += v or 0
+                if is_selected_month:
+                    month_deductions[k] = v or 0
 
-    ytd_data = {
-        "data_for": "Cumulative Total",
-        "month": None,
-        "is_total": True,
+        total_net_salary_ytd += record.net_salary or 0
+        total_gross_income_ytd += record.earned_salary or 0
+        total_deduction_ytd += record.total_deductions or 0
+
+        if is_selected_month:
+            total_net_salary_month = record.net_salary or 0
+            total_gross_income_month = record.earned_salary or 0
+            total_deduction_month = record.total_deductions or 0
+
+    # Format earnings in given order
+    earnings = []
+    for key in earnings_fields + [k for k in month_earnings.keys() if k not in earnings_fields]:
+        month_val = round(month_earnings.get(key, 0), 2)
+        ytd_val = round(ytd_earnings.get(key, 0), 2)
+        if month_val > 0 or ytd_val > 0:
+            earnings.append({
+                "component_name": key.replace("_", " ").title(),
+                "month_data": month_val,
+                "ytd": ytd_val
+            })
+
+    # Format deductions in given order
+    deductions = []
+    for key in deduction_fields + [k for k in month_deductions.keys() if k not in deduction_fields]:
+        month_val = round(month_deductions.get(key, 0), 2)
+        ytd_val = round(ytd_deductions.get(key, 0), 2)
+        if month_val > 0 or ytd_val > 0:
+            deductions.append({
+                "component_name": key.replace("_", " ").title(),
+                "month_data": month_val,
+                "ytd": ytd_val
+            })
+
+    # Final summary
+    response_data = {
+        "earnings": earnings,
+        "deductions": deductions,
+        "gross_income": {
+            "month_data": round(total_gross_income_month, 2),
+            "ytd": round(total_gross_income_ytd, 2)
+        },
+        "net_salary": {
+            "month_data": round(total_net_salary_month, 2),
+            "ytd": round(total_net_salary_ytd, 2)
+        },
+        "deduction_total": {
+            "month_data": round(total_deduction_month, 2),
+            "ytd": round(total_deduction_ytd, 2)
+        }
     }
 
-    for field in fields_to_sum:
-        ytd_data[field] = cumulative_totals[field]
-
-    ytd_data["other_earnings_breakdown"] = [
-        {k: cumulative_other_earnings[k]} for k in cumulative_other_earnings
-    ] if cumulative_other_earnings else []
-
-    ytd_data["other_deductions_breakdown"] = [
-        {k: cumulative_other_deductions[k]} for k in cumulative_other_deductions
-    ] if cumulative_other_deductions else []
-
-    return Response({
-        "month_data": month_data,
-        "ytd_data": ytd_data
-    }, status=status.HTTP_200_OK)
+    return Response(response_data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -183,4 +233,79 @@ def get_employee_financial_year_payslip_details(request):
     serializer = EmployeeFinancialYearPayslipSerializer(salary_history, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
+
+
+@api_view(['GET'])
+@authentication_classes([EmployeeJWTAuthentication])
+def get_pf_breakdown(request):
+    employee = request.user
+
+    if not isinstance(employee, EmployeeCredentials):
+        return Response({'error': 'Invalid employee credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    financial_year = request.query_params.get('financial_year')
+    selected_month = request.query_params.get('month')
+
+    if not financial_year or not selected_month:
+        return Response({'error': 'financial_year and month are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        selected_month = int(selected_month)
+    except ValueError:
+        return Response({'error': 'Invalid month value'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # 🔐 Restriction: Disallow access to future months and current month if today is before the 26th
+    today = date.today()
+    current_month = today.month
+
+    if selected_month > current_month:
+        return Response({'error': 'You cannot access future months'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if selected_month == current_month and today.day < 26:
+        return Response({'error': 'You cannot access the current month before the 26th'}, status=status.HTTP_400_BAD_REQUEST)
+
+    valid_months = get_valid_fy_months_upto(selected_month)
+
+    salary_qs = EmployeeSalaryHistory.objects.filter(
+        employee=employee.employee,
+        financial_year=financial_year,
+        month__in=valid_months
+    ).order_by('month')
+
+    if not salary_qs.exists():
+        return Response({'message': 'No salary records found'}, status=status.HTTP_200_OK)
+
+    employee_pf_month = 0.0
+    employee_pf_ytd = 0.0
+    employer_pf_month = 0.0
+    employer_pf_ytd = 0.0
+
+    for record in salary_qs:
+        is_selected_month = (record.month == selected_month)
+
+        # Employee PF
+        epf = record.epf or 0
+        employee_pf_ytd += epf
+        if is_selected_month:
+            employee_pf_month = epf
+            employer_pf_month = min(((record.gross_salary or 0) * 0.5) * 0.12, 1800)
+
+    employer_pf_ytd = employer_pf_month * len(valid_months)
+
+    pf_breakdown = {
+        "employee_pf": {
+            "month_data": round(employee_pf_month, 2),
+            "ytd": round(employee_pf_ytd, 2)
+        },
+        "employer_pf": {
+            "month_data": round(employer_pf_month, 2),
+            "ytd": round(employer_pf_ytd, 2)
+        },
+        "total_pf": {
+            "month_data": round(employee_pf_month + employer_pf_month, 2),
+            "ytd": round(employee_pf_ytd + employer_pf_ytd, 2)
+        }
+    }
+
+    return Response(pf_breakdown, status=status.HTTP_200_OK)
 

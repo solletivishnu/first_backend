@@ -412,533 +412,750 @@
             padding: 8mm;
           "
         >
-          <table
-            style="width: 100%; border-collapse: collapse; border-spacing: 0"
+          <table style="width: 100%; border-collapse: collapse; border-spacing: 0">
+  <tbody>
+    <tr>
+      <td style="width: 50%; vertical-align: top; padding-right: 1rem">
+        <!-- Earnings Table -->
+        <div style="margin-bottom: 0.75rem;">
+          <p
+            style="
+              font-size: 0.875rem;
+              font-weight: 700;
+              color: #5c6ac4;
+              margin: 0;
+            "
           >
-            <tbody>
-              <tr>
-                <td style="width: 50%; vertical-align: top; padding-right: 1rem">
-                  <!-- Earnings Table -->
-                  <div style="margin-bottom: 0.75rem;">
-                    <p
-                      style="
-                        font-size: 0.875rem;
-                        font-weight: 700;
-                        color: #5c6ac4;
-                        margin: 0;
-                      "
-                    >
-                      EARNINGS
-                    </p>
-                  </div>
-                  <table
-                    style="
-                      width: 100%;
-                      border-collapse: collapse;
-                      border-spacing: 0;
-                    "
-                  >
-                    <thead>
-                      <tr style="border-bottom: 2px solid #5c6ac4">
-                        <td
-                          style="
-                            border-bottom-width: 2px;
-                            border-color: #5c6ac4;
-                            padding-bottom: 0.75rem;
-                            padding-left: 0.75rem;
-                            font-weight: 700;
-                            color: #5c6ac4;
-                          "
-                        >
-                          Component
-                        </td>
-                        <td
-                          style="
-                            border-bottom-width: 2px;
-                            border-color: #5c6ac4;
-                            padding-bottom: 0.75rem;
-                            padding-right: 0.75rem;
-                            text-align: right;
-                            font-weight: 700;
-                            color: #5c6ac4;
-                          "
-                        >
-                          Amount (₹)
-                        </td>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% if basic_format %}
-                      <tr style="border-bottom: 1px solid #e2e2e2">
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0 0.75rem 0.75rem;
-                          "
-                        >
-                          Basic
-                        </td>
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0.75rem 0.75rem 0;
-                            text-align: right;
-                          "
-                        >
-                          {{basic}}
-                        </td>
-                      </tr>
-                      {% endif %}
-                      {% if hra_allowance_format %}
-                      <tr style="border-bottom: 1px solid #e2e2e2">
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0 0.75rem 0.75rem;
-                          "
-                        >
-                          House Rent Allowance
-                        </td>
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0.75rem 0.75rem 0;
-                            text-align: right;
-                          "
-                        >
-                          {{hra_allowance}}
-                        </td>
-                      </tr>
-                      {% endif %}
-                      {% if conveyance_allowance_format %}
-                      <tr style="border-bottom: 1px solid #e2e2e2">
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0 0.75rem 0.75rem;
-                          "
-                        >
-                          Conveyance Allowance
-                        </td>
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0.75rem 0.75rem 0;
-                            text-align: right;
-                          "
-                        >
-                          {{conveyance_allowance}}
-                        </td>
-                      </tr>
-                      {% endif %}
-                      {% if travelling_allowance_format %}
-                      <tr style="border-bottom: 1px solid #e2e2e2">
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0 0.75rem 0.75rem;
-                          "
-                        >
-                          Travelling Allowance
-                        </td>
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0.75rem 0.75rem 0;
-                            text-align: right;
-                          "
-                        >
-                          {{travelling_allowance}}
-                        </td>
-                      </tr>
-                      {% endif %}
-                      {% if bonus_format %}
-                      <tr style="border-bottom: 1px solid #e2e2e2">
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0 0.75rem 0.75rem;
-                          "
-                        >
-                          Bonus
-                        </td>
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0.75rem 0.75rem 0;
-                            text-align: right;
-                          "
-                        >
-                          {{bonus}}
-                        </td>
-                      </tr>
-                      {% endif %}
-                      {% if commission_format %}
-                      <tr style="border-bottom: 1px solid #e2e2e2">
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0 0.75rem 0.75rem;
-                          "
-                        >
-                          Commission
-                        </td>
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0.75rem 0.75rem 0;
-                            text-align: right;
-                          "
-                        >
-                          {{commission}}
-                        </td>
-                      </tr>
-                      {% endif %}
-                      {% if children_education_allowance_format %}
-                      <tr style="border-bottom: 1px solid #e2e2e2">
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0 0.75rem 0.75rem;
-                          "
-                        >
-                          Children Education Allowance
-                        </td>
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0.75rem 0.75rem 0;
-                            text-align: right;
-                          "
-                        >
-                          {{children_education_allowance}}
-                        </td>
-                      </tr>
-                      {% endif %}
-                      {% if overtime_allowance_format %}
-                      <tr style="border-bottom: 1px solid #e2e2e2">
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0 0.75rem 0.75rem;
-                          "
-                        >
-                          Overtime Allowance
-                        </td>
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0.75rem 0.75rem 0;
-                            text-align: right;
-                          "
-                        >
-                          {{overtime_allowance}}
-                        </td>
-                      </tr>
-                      {% endif %}
-                      {% if transport_allowance_format %}
-                      <tr style="border-bottom: 1px solid #e2e2e2">
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0 0.75rem 0.75rem;
-                          "
-                        >
-                          Transport Allowances
-                        </td>
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0.75rem 0.75rem 0;
-                            text-align: right;
-                          "
-                        >
-                          {{transport_allowance}}
-                        </td>
-                      </tr>
-                      {% endif %}
-                      {% for item in other_earnings_breakdown %}
-                        {% for component, amount in item.items %}
-                          <tr style="border-bottom: 1px solid #e2e2e2">
-                            <td
-                              style="
-                                border-bottom-width: 1px;
-                                padding: 0.75rem 0 0.75rem 0.75rem;
-                              "
-                            >
-                              {{ component|title }}
-                            </td>
-                            <td
-                              style="
-                                border-bottom-width: 1px;
-                                padding: 0.75rem 0.75rem 0.75rem 0;
-                                text-align: right;
-                              "
-                            >
-                              {{ amount }}
-                            </td>
-                          </tr>
-                        {% endfor %}
-                      {% endfor %}
-                      <tr style="border-bottom: 1px solid #e2e2e2">
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0 0.75rem 0.75rem;
-                            font-weight: 700;
-                            color: #5c6ac4;
-                          "
-                        >
-                          Gross Earnings
-                        </td>
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0.75rem 0.75rem 0;
-                            text-align: right;
-                            font-weight: 700;
-                            color: #5c6ac4;
-                          "
-                        >
-                          {{gross_earnings}}
-                        </td>
-                      </tr>
-                      {% if total_benefits_format %}
-                      <tr style="border-bottom: 1px solid #e2e2e2">
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0 0.75rem 0.75rem;
-                            font-weight: 700;
-                            color: #5c6ac4;
-                          "
-                        >
-                          Bonus Incentive
-                        </td>
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0.75rem 0.75rem 0;
-                            text-align: right;
-                            font-weight: 700;
-                            color: #5c6ac4;
-                          "
-                        >
-                          {{bonus_incentive}}
-                        </td>
-                      </tr>
-                      {% endif %}
-                    </tbody>
-                  </table>
-                </td>
-                <td style="width: 50%; vertical-align: top; padding-left: 1rem">
-                  <!-- Deductions Table -->
-                  <div style="margin-bottom: 0.75rem;">
-                    <p
-                      style="
-                        font-size: 0.875rem;
-                        font-weight: 700;
-                        color: #5c6ac4;
-                        margin: 0;
-                      "
-                    >
-                      DEDUCTIONS
-                    </p>
-                  </div>
-                  <table
-                    style="
-                      width: 100%;
-                      border-collapse: collapse;
-                      border-spacing: 0;
-                    "
-                  >
-                    <thead>
-                      <tr style="border-bottom: 2px solid #5c6ac4">
-                        <td
-                          style="
-                            border-bottom-width: 2px;
-                            border-color: #5c6ac4;
-                            padding-bottom: 0.75rem;
-                            padding-left: 0.75rem;
-                            font-weight: 700;
-                            color: #5c6ac4;
-                          "
-                        >
-                          Component
-                        </td>
-                        <td
-                          style="
-                            border-bottom-width: 2px;
-                            border-color: #5c6ac4;
-                            padding-bottom: 0.75rem;
-                            padding-right: 0.75rem;
-                            text-align: right;
-                            font-weight: 700;
-                            color: #5c6ac4;
-                          "
-                        >
-                          Amount (₹)
-                        </td>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% if epf %}
-                      <tr style="border-bottom: 1px solid #e2e2e2">
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0 0.75rem 0.75rem;
-                          "
-                        >
-                          EPF Contribution
-                        </td>
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0.75rem 0.75rem 0;
-                            text-align: right;
-                          "
-                        >
-                          {{epf_contribution}}
-                        </td>
-                      </tr>
-                      {% endif %}
-                      {% if esi %}
-                      <tr style="border-bottom: 1px solid #e2e2e2">
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0 0.75rem 0.75rem;
-                          "
-                        >
-                          ESI Contribution
-                        </td>
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0.75rem 0.75rem 0;
-                            text-align: right;
-                          "
-                        >
-                          {{esi_employee_contribution}}
-                        </td>
-                      </tr>
-                      {% endif %}
-                      {% if pt %}
-                      <tr style="border-bottom: 1px solid #e2e2e2">
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0 0.75rem 0.75rem;
-                          "
-                        >
-                          Professional Tax
-                        </td>
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0.75rem 0.75rem 0;
-                            text-align: right;
-                          "
-                        >
-                          {{professional_tax}}
-                        </td>
-                      </tr>
-                      {% endif %}
-                      {% if it %}
-                      <tr style="border-bottom: 1px solid #e2e2e2">
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0 0.75rem 0.75rem;
-                          "
-                        >
-                          Income Tax
-                        </td>
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0.75rem 0.75rem 0;
-                            text-align: right;
-                          "
-                        >
-                          {{income_tax}}
-                        </td>
-                      </tr>
-                      {% endif %}
-                      {% if loan_emi != '0' %}
-                      <tr style="border-bottom: 1px solid #e2e2e2">
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0 0.75rem 0.75rem;
-                          "
-                        >
-                          Loan EMI
-                        </td>
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0.75rem 0.75rem 0;
-                            text-align: right;
-                          "
-                        >
-                          {{loan_emi}}
-                        </td>
-                      </tr>
-                      {% endif %}
-                      {% for item in other_deductions_breakdown %}
-                        {% for component, amount in item.items %}
-                          <tr style="border-bottom: 1px solid #e2e2e2">
-                            <td
-                              style="
-                                border-bottom-width: 1px;
-                                padding: 0.75rem 0 0.75rem 0.75rem;
-                              "
-                            >
-                              {{ component|title }}
-                            </td>
-                            <td
-                              style="
-                                border-bottom-width: 1px;
-                                padding: 0.75rem 0.75rem 0.75rem 0;
-                                text-align: right;
-                              "
-                            >
-                              {{ amount }}
-                            </td>
-                          </tr>
-                        {% endfor %}
-                      {% endfor %}
-                      <tr style="border-bottom: 1px solid #e2e2e2">
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0 0.75rem 0.75rem;
-                            font-weight: 700;
-                            color: #5c6ac4;
-                          "
-                        >
-                          Total Deductions
-                        </td>
-                        <td
-                          style="
-                            border-bottom-width: 1px;
-                            padding: 0.75rem 0.75rem 0.75rem 0;
-                            text-align: right;
-                            font-weight: 700;
-                            color: #5c6ac4;
-                          "
-                        >
-                          {{total_deduction}}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+            EARNINGS
+          </p>
+        </div>
+        <table style="width: 100%; border-collapse: collapse; border-spacing: 0">
+          <thead>
+            <tr style="border-bottom: 2px solid #5c6ac4">
+              <td
+                style="
+                  border-bottom-width: 2px;
+                  border-color: #5c6ac4;
+                  padding-bottom: 0.75rem;
+                  padding-left: 0.75rem;
+                  font-weight: 700;
+                  color: #5c6ac4;
+                "
+              >
+                Component
+              </td>
+              <td
+                style="
+                  border-bottom-width: 2px;
+                  border-color: #5c6ac4;
+                  padding-bottom: 0.75rem;
+                  padding-right: 0.75rem;
+                  text-align: right;
+                  font-weight: 700;
+                  color: #5c6ac4;
+                "
+              >
+                Amount (₹)
+              </td>
+            </tr>
+          </thead>
+          <tbody>
+            {% for component, amount in components.items %}
+            <tr style="border-bottom: 1px solid #e2e2e2">
+              <td
+                style="
+                  border-bottom-width: 1px;
+                  padding: 0.75rem 0 0.75rem 0.75rem;
+                "
+              >
+                {{ component }}
+              </td>
+              <td
+                style="
+                  border-bottom-width: 1px;
+                  padding: 0.75rem 0.75rem 0.75rem 0;
+                  text-align: right;
+                "
+              >
+                {{ amount }}
+              </td>
+            </tr>
+            {% endfor %}
+            <tr style="border-bottom: 1px solid #e2e2e2">
+              <td
+                style="
+                  border-bottom-width: 1px;
+                  padding: 0.75rem 0 0.75rem 0.75rem;
+                  font-weight: 700;
+                  color: #5c6ac4;
+                "
+              >
+                Gross Earnings
+              </td>
+              <td
+                style="
+                  border-bottom-width: 1px;
+                  padding: 0.75rem 0.75rem 0.75rem 0;
+                  text-align: right;
+                  font-weight: 700;
+                  color: #5c6ac4;
+                "
+              >
+                {{ gross_earnings }}
+              </td>
+            </tr>
+            {% if bonus_incentive_format %}
+           <tr style="border-bottom: 1px solid #e2e2e2">
+              <td
+                style="
+                  border-bottom-width: 1px;
+                  padding: 0.75rem 0 0.75rem 0.75rem;
+                  font-weight: 700;
+                  color: #5c6ac4;
+                "
+              >
+                Bonus Incentive
+              </td>
+              <td
+                style="
+                  border-bottom-width: 1px;
+                  padding: 0.75rem 0.75rem 0.75rem 0;
+                  text-align: right;
+                  font-weight: 700;
+                  color: #5c6ac4;
+                "
+              >
+                {{ bonus_incentive }}
+              </td>
+            </tr>
+          {% endif %}
+          </tbody>
+        </table>
+      </td>
+
+      <!-- Deductions Table -->
+      <td style="width: 50%; vertical-align: top; padding-left: 1rem">
+        <div style="margin-bottom: 0.75rem;">
+          <p
+            style="
+              font-size: 0.875rem;
+              font-weight: 700;
+              color: #5c6ac4;
+              margin: 0;
+            "
+          >
+            DEDUCTIONS
+          </p>
+        </div>
+        <table style="width: 100%; border-collapse: collapse; border-spacing: 0">
+          <thead>
+            <tr style="border-bottom: 2px solid #5c6ac4">
+              <td
+                style="
+                  border-bottom-width: 2px;
+                  border-color: #5c6ac4;
+                  padding-bottom: 0.75rem;
+                  padding-left: 0.75rem;
+                  font-weight: 700;
+                  color: #5c6ac4;
+                "
+              >
+                Component
+              </td>
+              <td
+                style="
+                  border-bottom-width: 2px;
+                  border-color: #5c6ac4;
+                  padding-bottom: 0.75rem;
+                  padding-right: 0.75rem;
+                  text-align: right;
+                  font-weight: 700;
+                  color: #5c6ac4;
+                "
+              >
+                Amount (₹)
+              </td>
+            </tr>
+          </thead>
+          <tbody>
+            {% for component, amount in deductions.items %}
+            <tr style="border-bottom: 1px solid #e2e2e2">
+              <td
+                style="
+                  border-bottom-width: 1px;
+                  padding: 0.75rem 0 0.75rem 0.75rem;
+                "
+              >
+                {{ component }}
+              </td>
+              <td
+                style="
+                  border-bottom-width: 1px;
+                  padding: 0.75rem 0.75rem 0.75rem 0;
+                  text-align: right;
+                "
+              >
+                {{ amount }}
+              </td>
+            </tr>
+            {% endfor %}
+            <tr style="border-bottom: 1px solid #e2e2e2">
+              <td
+                style="
+                  border-bottom-width: 1px;
+                  padding: 0.75rem 0 0.75rem 0.75rem;
+                  font-weight: 700;
+                  color: #5c6ac4;
+                "
+              >
+                Total Deductions
+              </td>
+              <td
+                style="
+                  border-bottom-width: 1px;
+                  padding: 0.75rem 0.75rem 0.75rem 0;
+                  text-align: right;
+                  font-weight: 700;
+                  color: #5c6ac4;
+                "
+              >
+                {{ total_deduction }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<!--          <table-->
+<!--            style="width: 100%; border-collapse: collapse; border-spacing: 0"-->
+<!--          >-->
+<!--            <tbody>-->
+<!--              <tr>-->
+<!--                <td style="width: 50%; vertical-align: top; padding-right: 1rem">-->
+<!--                  &lt;!&ndash; Earnings Table &ndash;&gt;-->
+<!--                  <div style="margin-bottom: 0.75rem;">-->
+<!--                    <p-->
+<!--                      style="-->
+<!--                        font-size: 0.875rem;-->
+<!--                        font-weight: 700;-->
+<!--                        color: #5c6ac4;-->
+<!--                        margin: 0;-->
+<!--                      "-->
+<!--                    >-->
+<!--                      EARNINGS-->
+<!--                    </p>-->
+<!--                  </div>-->
+<!--                  <table-->
+<!--                    style="-->
+<!--                      width: 100%;-->
+<!--                      border-collapse: collapse;-->
+<!--                      border-spacing: 0;-->
+<!--                    "-->
+<!--                  >-->
+<!--                    <thead>-->
+<!--                      <tr style="border-bottom: 2px solid #5c6ac4">-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 2px;-->
+<!--                            border-color: #5c6ac4;-->
+<!--                            padding-bottom: 0.75rem;-->
+<!--                            padding-left: 0.75rem;-->
+<!--                            font-weight: 700;-->
+<!--                            color: #5c6ac4;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          Component-->
+<!--                        </td>-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 2px;-->
+<!--                            border-color: #5c6ac4;-->
+<!--                            padding-bottom: 0.75rem;-->
+<!--                            padding-right: 0.75rem;-->
+<!--                            text-align: right;-->
+<!--                            font-weight: 700;-->
+<!--                            color: #5c6ac4;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          Amount (₹)-->
+<!--                        </td>-->
+<!--                      </tr>-->
+<!--                    </thead>-->
+<!--                    <tbody>-->
+<!--                      {% if basic_format %}-->
+<!--                      <tr style="border-bottom: 1px solid #e2e2e2">-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0 0.75rem 0.75rem;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          Basic-->
+<!--                        </td>-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0.75rem 0.75rem 0;-->
+<!--                            text-align: right;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          {{basic}}-->
+<!--                        </td>-->
+<!--                      </tr>-->
+<!--                      {% endif %}-->
+<!--                      {% if hra_allowance_format %}-->
+<!--                      <tr style="border-bottom: 1px solid #e2e2e2">-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0 0.75rem 0.75rem;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          House Rent Allowance-->
+<!--                        </td>-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0.75rem 0.75rem 0;-->
+<!--                            text-align: right;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          {{hra_allowance}}-->
+<!--                        </td>-->
+<!--                      </tr>-->
+<!--                      {% endif %}-->
+<!--                      {% if conveyance_allowance_format %}-->
+<!--                      <tr style="border-bottom: 1px solid #e2e2e2">-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0 0.75rem 0.75rem;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          Conveyance Allowance-->
+<!--                        </td>-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0.75rem 0.75rem 0;-->
+<!--                            text-align: right;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          {{conveyance_allowance}}-->
+<!--                        </td>-->
+<!--                      </tr>-->
+<!--                      {% endif %}-->
+<!--                      {% if travelling_allowance_format %}-->
+<!--                      <tr style="border-bottom: 1px solid #e2e2e2">-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0 0.75rem 0.75rem;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          Travelling Allowance-->
+<!--                        </td>-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0.75rem 0.75rem 0;-->
+<!--                            text-align: right;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          {{travelling_allowance}}-->
+<!--                        </td>-->
+<!--                      </tr>-->
+<!--                      {% endif %}-->
+<!--                      {% if bonus_format %}-->
+<!--                      <tr style="border-bottom: 1px solid #e2e2e2">-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0 0.75rem 0.75rem;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          Bonus-->
+<!--                        </td>-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0.75rem 0.75rem 0;-->
+<!--                            text-align: right;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          {{bonus}}-->
+<!--                        </td>-->
+<!--                      </tr>-->
+<!--                      {% endif %}-->
+<!--                      {% if commission_format %}-->
+<!--                      <tr style="border-bottom: 1px solid #e2e2e2">-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0 0.75rem 0.75rem;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          Commission-->
+<!--                        </td>-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0.75rem 0.75rem 0;-->
+<!--                            text-align: right;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          {{commission}}-->
+<!--                        </td>-->
+<!--                      </tr>-->
+<!--                      {% endif %}-->
+<!--                      {% if children_education_allowance_format %}-->
+<!--                      <tr style="border-bottom: 1px solid #e2e2e2">-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0 0.75rem 0.75rem;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          Children Education Allowance-->
+<!--                        </td>-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0.75rem 0.75rem 0;-->
+<!--                            text-align: right;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          {{children_education_allowance}}-->
+<!--                        </td>-->
+<!--                      </tr>-->
+<!--                      {% endif %}-->
+<!--                      {% if overtime_allowance_format %}-->
+<!--                      <tr style="border-bottom: 1px solid #e2e2e2">-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0 0.75rem 0.75rem;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          Overtime Allowance-->
+<!--                        </td>-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0.75rem 0.75rem 0;-->
+<!--                            text-align: right;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          {{overtime_allowance}}-->
+<!--                        </td>-->
+<!--                      </tr>-->
+<!--                      {% endif %}-->
+<!--                      {% if transport_allowance_format %}-->
+<!--                      <tr style="border-bottom: 1px solid #e2e2e2">-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0 0.75rem 0.75rem;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          Transport Allowances-->
+<!--                        </td>-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0.75rem 0.75rem 0;-->
+<!--                            text-align: right;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          {{transport_allowance}}-->
+<!--                        </td>-->
+<!--                      </tr>-->
+<!--                      {% endif %}-->
+<!--                      {% for item in other_earnings_breakdown %}-->
+<!--                        {% for component, amount in item.items %}-->
+<!--                          <tr style="border-bottom: 1px solid #e2e2e2">-->
+<!--                            <td-->
+<!--                              style="-->
+<!--                                border-bottom-width: 1px;-->
+<!--                                padding: 0.75rem 0 0.75rem 0.75rem;-->
+<!--                              "-->
+<!--                            >-->
+<!--                              {{ component|title }}-->
+<!--                            </td>-->
+<!--                            <td-->
+<!--                              style="-->
+<!--                                border-bottom-width: 1px;-->
+<!--                                padding: 0.75rem 0.75rem 0.75rem 0;-->
+<!--                                text-align: right;-->
+<!--                              "-->
+<!--                            >-->
+<!--                              {{ amount }}-->
+<!--                            </td>-->
+<!--                          </tr>-->
+<!--                        {% endfor %}-->
+<!--                      {% endfor %}-->
+<!--                      <tr style="border-bottom: 1px solid #e2e2e2">-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0 0.75rem 0.75rem;-->
+<!--                            font-weight: 700;-->
+<!--                            color: #5c6ac4;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          Gross Earnings-->
+<!--                        </td>-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0.75rem 0.75rem 0;-->
+<!--                            text-align: right;-->
+<!--                            font-weight: 700;-->
+<!--                            color: #5c6ac4;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          {{gross_earnings}}-->
+<!--                        </td>-->
+<!--                      </tr>-->
+<!--                      {% if total_benefits_format %}-->
+<!--                      <tr style="border-bottom: 1px solid #e2e2e2">-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0 0.75rem 0.75rem;-->
+<!--                            font-weight: 700;-->
+<!--                            color: #5c6ac4;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          Bonus Incentive-->
+<!--                        </td>-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0.75rem 0.75rem 0;-->
+<!--                            text-align: right;-->
+<!--                            font-weight: 700;-->
+<!--                            color: #5c6ac4;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          {{bonus_incentive}}-->
+<!--                        </td>-->
+<!--                      </tr>-->
+<!--                      {% endif %}-->
+<!--                    </tbody>-->
+<!--                  </table>-->
+<!--                </td>-->
+<!--                <td style="width: 50%; vertical-align: top; padding-left: 1rem">-->
+<!--                  &lt;!&ndash; Deductions Table &ndash;&gt;-->
+<!--                  <div style="margin-bottom: 0.75rem;">-->
+<!--                    <p-->
+<!--                      style="-->
+<!--                        font-size: 0.875rem;-->
+<!--                        font-weight: 700;-->
+<!--                        color: #5c6ac4;-->
+<!--                        margin: 0;-->
+<!--                      "-->
+<!--                    >-->
+<!--                      DEDUCTIONS-->
+<!--                    </p>-->
+<!--                  </div>-->
+<!--                  <table-->
+<!--                    style="-->
+<!--                      width: 100%;-->
+<!--                      border-collapse: collapse;-->
+<!--                      border-spacing: 0;-->
+<!--                    "-->
+<!--                  >-->
+<!--                    <thead>-->
+<!--                      <tr style="border-bottom: 2px solid #5c6ac4">-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 2px;-->
+<!--                            border-color: #5c6ac4;-->
+<!--                            padding-bottom: 0.75rem;-->
+<!--                            padding-left: 0.75rem;-->
+<!--                            font-weight: 700;-->
+<!--                            color: #5c6ac4;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          Component-->
+<!--                        </td>-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 2px;-->
+<!--                            border-color: #5c6ac4;-->
+<!--                            padding-bottom: 0.75rem;-->
+<!--                            padding-right: 0.75rem;-->
+<!--                            text-align: right;-->
+<!--                            font-weight: 700;-->
+<!--                            color: #5c6ac4;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          Amount (₹)-->
+<!--                        </td>-->
+<!--                      </tr>-->
+<!--                    </thead>-->
+<!--                    <tbody>-->
+<!--                      {% if epf %}-->
+<!--                      <tr style="border-bottom: 1px solid #e2e2e2">-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0 0.75rem 0.75rem;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          EPF Contribution-->
+<!--                        </td>-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0.75rem 0.75rem 0;-->
+<!--                            text-align: right;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          {{epf_contribution}}-->
+<!--                        </td>-->
+<!--                      </tr>-->
+<!--                      {% endif %}-->
+<!--                      {% if esi %}-->
+<!--                      <tr style="border-bottom: 1px solid #e2e2e2">-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0 0.75rem 0.75rem;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          ESI Contribution-->
+<!--                        </td>-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0.75rem 0.75rem 0;-->
+<!--                            text-align: right;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          {{esi_employee_contribution}}-->
+<!--                        </td>-->
+<!--                      </tr>-->
+<!--                      {% endif %}-->
+<!--                      {% if pt %}-->
+<!--                      <tr style="border-bottom: 1px solid #e2e2e2">-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0 0.75rem 0.75rem;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          Professional Tax-->
+<!--                        </td>-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0.75rem 0.75rem 0;-->
+<!--                            text-align: right;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          {{professional_tax}}-->
+<!--                        </td>-->
+<!--                      </tr>-->
+<!--                      {% endif %}-->
+<!--                      {% if it %}-->
+<!--                      <tr style="border-bottom: 1px solid #e2e2e2">-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0 0.75rem 0.75rem;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          Income Tax-->
+<!--                        </td>-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0.75rem 0.75rem 0;-->
+<!--                            text-align: right;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          {{income_tax}}-->
+<!--                        </td>-->
+<!--                      </tr>-->
+<!--                      {% endif %}-->
+<!--                      {% if loan_emi != '0' %}-->
+<!--                      <tr style="border-bottom: 1px solid #e2e2e2">-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0 0.75rem 0.75rem;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          Loan EMI-->
+<!--                        </td>-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0.75rem 0.75rem 0;-->
+<!--                            text-align: right;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          {{loan_emi}}-->
+<!--                        </td>-->
+<!--                      </tr>-->
+<!--                      {% endif %}-->
+<!--                      {% for item in other_deductions_breakdown %}-->
+<!--                        {% for component, amount in item.items %}-->
+<!--                          <tr style="border-bottom: 1px solid #e2e2e2">-->
+<!--                            <td-->
+<!--                              style="-->
+<!--                                border-bottom-width: 1px;-->
+<!--                                padding: 0.75rem 0 0.75rem 0.75rem;-->
+<!--                              "-->
+<!--                            >-->
+<!--                              {{ component|title }}-->
+<!--                            </td>-->
+<!--                            <td-->
+<!--                              style="-->
+<!--                                border-bottom-width: 1px;-->
+<!--                                padding: 0.75rem 0.75rem 0.75rem 0;-->
+<!--                                text-align: right;-->
+<!--                              "-->
+<!--                            >-->
+<!--                              {{ amount }}-->
+<!--                            </td>-->
+<!--                          </tr>-->
+<!--                        {% endfor %}-->
+<!--                      {% endfor %}-->
+<!--                      <tr style="border-bottom: 1px solid #e2e2e2">-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0 0.75rem 0.75rem;-->
+<!--                            font-weight: 700;-->
+<!--                            color: #5c6ac4;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          Total Deductions-->
+<!--                        </td>-->
+<!--                        <td-->
+<!--                          style="-->
+<!--                            border-bottom-width: 1px;-->
+<!--                            padding: 0.75rem 0.75rem 0.75rem 0;-->
+<!--                            text-align: right;-->
+<!--                            font-weight: 700;-->
+<!--                            color: #5c6ac4;-->
+<!--                          "-->
+<!--                        >-->
+<!--                          {{total_deduction}}-->
+<!--                        </td>-->
+<!--                      </tr>-->
+<!--                    </tbody>-->
+<!--                  </table>-->
+<!--                </td>-->
+<!--              </tr>-->
+<!--            </tbody>-->
+<!--          </table>-->
         </div>
 
         <!-- Total Net Payable -->

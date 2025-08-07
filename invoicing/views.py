@@ -904,6 +904,7 @@ def createDocument(request, id):
             'company_pincode': invoice.invoicing_profile.business.headOffice.get('pincode', ""),
             'company_state': invoice.invoicing_profile.business.headOffice.get('state', ""),
             'company_pan': invoice.invoicing_profile.business.pan,
+            'order_number': getattr(invoice, 'order_number', ''),
             "logo": getattr(getattr(invoice.invoicing_profile.business, 'logos', None), 'logo', None).url
             if getattr(getattr(invoice.invoicing_profile.business, 'logos', None), 'logo', None)
             else None

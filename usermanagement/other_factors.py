@@ -510,8 +510,10 @@ class ForgotPasswordView(APIView):
         except Users.DoesNotExist:
             logger.info(f"Attempt to reset password for non-existent email: {email}")
             # Send a generic response even if the email does not exist
-            return Response({"message": "If an account exists with this email, you will receive a reset link."},
-                            status=status.HTTP_200_OK)
+            return Response(
+                {"error": "No account exists with this email address."},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
         # Generate reset token and link
         token = default_token_generator.make_token(user)
