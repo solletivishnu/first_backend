@@ -12,6 +12,7 @@ from . import leavemanagement
 from . import employee_education
 from . import holidays
 from . import employee_salary_details
+# from . import employee_dashboard
 
 urlpatterns = [
     # URL for listing and creating PayrollOrg instances
@@ -172,6 +173,7 @@ urlpatterns = [
 
     path('monthly-salary-details-of-employees', views.monthly_salary_details_of_employees,
          name='monthly-salary-details-of-employees'),
+    path('download-salary-report', views.download_salary_report, name='download-salary-report'),
 
     path('employee-monthly-salary-template', views.employee_monthly_salary_template,
          name='employee-monthly-salary-template'),
@@ -274,8 +276,10 @@ urlpatterns = [
     # Employee Salary Details Endpoints
     path('employee-payslip/', employee_salary_details.employee_payslip_details, name='generate-payslip'),
     path('employee-ytd-details/', employee_salary_details.get_month_and_ytd_salary_data, name='generate-ytd-payslip'),
+    path('pf-breakdown/', employee_salary_details.get_pf_breakdown, name='pf-breakdown'),
     path('employee-payslips-by-financial-year/', employee_salary_details.get_employee_financial_year_payslip_details,
          name='employee-financial-year-payslip-details'),
 
 
+    # path('tds-summary/', employee_dashboard.tds_summary_view, name='tds-summary-view'),
 ]

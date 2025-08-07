@@ -664,29 +664,67 @@ def generate_salary_upload_template(request, payroll_id):
                 ws.cell(row=row_idx, column=annually_col).value = (
                     f"=IF(ISNUMBER({get_column_letter(monthly_col)}{row_idx}), {get_column_letter(monthly_col)}{row_idx}*12, \"\")"
                 )
+            benefit_ctc_flags = {
+                "EDLI Employer Contribution": payroll.epf_details.employer_edil_contribution_in_ctc,
+                "EPF Admin Charges": payroll.epf_details.admin_charge_in_ctc
+            }
+            if epf_enabled:
+                # BENEFITS FORMULAS
+                # 1. EPF Employer Contribution (12% of PF wage)
+                if payroll.epf_details.include_employer_contribution_in_ctc:
+                    epf_employer_monthly_col = col_index('Monthly (EPF Employer Contribution)')
+                    basic_col_letter = get_column_letter(col_index('Monthly (Basic)'))
+                    monthly_cell_ref = f"{basic_col_letter}{row_idx}"
 
-            # BENEFITS FORMULAS
-            # 1. EPF Employer Contribution (12% of PF wage)
-            epf_employer_monthly_col = col_index('Monthly (EPF Employer Contribution)')
-            ws.cell(row=row_idx, column=epf_employer_monthly_col).value = (
-                f"=IF(ISNUMBER({get_column_letter(col_index('Monthly (Basic)'))}{row_idx}), "
-                f"MIN({get_column_letter(col_index('Monthly (Basic)'))}{row_idx},15000)*0.12, \"\")"
-            )
-            ws.cell(row=row_idx, column=col_index('Annually (EPF Employer Contribution)')).value = (
-                f"=IF(ISNUMBER({get_column_letter(epf_employer_monthly_col)}{row_idx}), "
-                f"{get_column_letter(epf_employer_monthly_col)}{row_idx}*12, \"\")"
-            )
+                    if payroll.epf_details.employer_contribution_rate == "12% of Actual PF Wage":
+                        # Use full Basic * 12%
+                        ws.cell(row=row_idx, column=epf_employer_monthly_col).value = (
+                            f"=IF(ISNUMBER({monthly_cell_ref}), {monthly_cell_ref}*0.12, \"\")"
+                        )
+                    else:
+                        # Use MIN(Basic, 15000) * 12%
+                        ws.cell(row=row_idx, column=epf_employer_monthly_col).value = (
+                            f"=IF(ISNUMBER({monthly_cell_ref}), MIN({monthly_cell_ref},15000)*0.12, \"\")"
+                        )
 
-            # 2. EDLI and EPF Admin Charges (Fixed Amounts)
-            for benefit in default_benefits[1:3]:  # EDLI and EPF Admin
-                monthly_col = col_index(f'Monthly ({benefit["component_name"]})')
-                ws.cell(row=row_idx, column=monthly_col).value = (
-                    f"=IF(ISNUMBER({annual_ctc_cell}), {benefit['calculation_type']['value']}, \"\")"
-                )
-                ws.cell(row=row_idx, column=col_index(f'Annually ({benefit["component_name"]})')).value = (
-                    f"=IF(ISNUMBER({get_column_letter(monthly_col)}{row_idx}), "
-                    f"{get_column_letter(monthly_col)}{row_idx}*12, \"\")"
-                )
+                    # Annually = Monthly * 12
+                    ws.cell(row=row_idx, column=col_index('Annually (EPF Employer Contribution)')).value = (
+                        f"=IF(ISNUMBER({get_column_letter(epf_employer_monthly_col)}{row_idx}), "
+                        f"{get_column_letter(epf_employer_monthly_col)}{row_idx}*12, \"\")"
+                    )
+
+                else:
+                    ws.cell(row=row_idx, column=col_index('Monthly (EPF Employer Contribution)')).value = "-"
+                    ws.cell(row=row_idx, column=col_index('Annually (EPF Employer Contribution)')).value = "-"
+
+                # 2. EDLI and EPF Admin Charges (Fixed Amounts)
+                for benefit in default_benefits[1:3]:  # EDLI and EPF Admin
+
+                    component_name = benefit["component_name"]
+                    monthly_col = col_index(f'Monthly ({component_name})')
+                    annual_col = col_index(f'Annually ({component_name})')
+
+                    include_in_ctc = benefit_ctc_flags.get(component_name, False)
+                    if include_in_ctc:
+                        ws.cell(row=row_idx, column=monthly_col).value = (
+                                f"=IF(ISNUMBER({annual_ctc_cell}), {benefit['calculation_type']['value']}, \"\")"
+                            )
+                        ws.cell(row=row_idx, column=annual_col).value = (
+                            f"=IF(ISNUMBER({get_column_letter(monthly_col)}{row_idx}), "
+                            f"{get_column_letter(monthly_col)}{row_idx}*12, \"\")"
+                        )
+                    else:
+                        ws.cell(row=row_idx, column=monthly_col).value = "-"
+                        ws.cell(row=row_idx, column=annual_col).value = "-"
+
+            else:
+                # Place hyphens if EPF is not enabled
+                ws.cell(row=row_idx, column=col_index('Monthly (EPF Employer Contribution)')).value = "-"
+                ws.cell(row=row_idx, column=col_index('Annually (EPF Employer Contribution)')).value = "-"
+
+                for benefit in default_benefits[1:3]:  # EDLI and EPF Admin
+                    ws.cell(row=row_idx, column=col_index(f'Monthly ({benefit["component_name"]})')).value = "-"
+                    ws.cell(row=row_idx, column=col_index(f'Annually ({benefit["component_name"]})')).value = "-"
 
             # SUMMARY FORMULAS
             # Gross Salary (sum of all earnings)
@@ -724,14 +762,26 @@ def generate_salary_upload_template(request, payroll_id):
             # 1. EPF Employee Contribution (12% of PF wage)
             epf_employee_monthly_col = col_index('Monthly (EPF Employee Contribution)')
             if epf_enabled:
-                ws.cell(row=row_idx, column=epf_employee_monthly_col).value = (
-                    f"=IF(ISNUMBER({get_column_letter(col_index('Monthly (Basic)'))}{row_idx}), "
-                    f"MIN({get_column_letter(col_index('Monthly (Basic)'))}{row_idx},15000)*0.12, \"\")"
-                )
+                basic_col_letter = get_column_letter(col_index('Monthly (Basic)'))
+                monthly_cell_ref = f"{basic_col_letter}{row_idx}"
+
+                if payroll.epf_details.employee_contribution_rate == "12% of Actual PF Wage":
+                    # Use full Basic * 12%
+                    ws.cell(row=row_idx, column=epf_employee_monthly_col).value = (
+                        f"=IF(ISNUMBER({monthly_cell_ref}), {monthly_cell_ref}*0.12, \"\")"
+                    )
+                else:
+                    # Use MIN(Basic, 15000) * 12%
+                    ws.cell(row=row_idx, column=epf_employee_monthly_col).value = (
+                        f"=IF(ISNUMBER({monthly_cell_ref}), MIN({monthly_cell_ref},15000)*0.12, \"\")"
+                    )
+
+                # Annually = Monthly * 12
                 ws.cell(row=row_idx, column=col_index('Annually (EPF Employee Contribution)')).value = (
                     f"=IF(ISNUMBER({get_column_letter(epf_employee_monthly_col)}{row_idx}), "
                     f"{get_column_letter(epf_employee_monthly_col)}{row_idx}*12, \"\")"
                 )
+
             else:
                 ws.cell(row=row_idx, column=epf_employee_monthly_col).value = "-"
                 ws.cell(row=row_idx, column=col_index('Annually (EPF Employee Contribution)')).value = "-"

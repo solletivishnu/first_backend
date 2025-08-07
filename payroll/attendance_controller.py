@@ -53,7 +53,6 @@ def manual_check_in(request):
 
     # ✅ Send WebSocket notification
     channel_layer = get_channel_layer()
-    context_id = employee_credentials.business.id
     business = employee_credentials.employee.payroll.business
     context = business.contexts  # reverse OneToOneField from Business to Context
     context_id = context.id
