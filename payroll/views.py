@@ -1704,10 +1704,10 @@ def calculate_payroll(request):
         else:
             payroll = PayrollOrg.objects.get(id=data.get("payroll"))
             epf_enabled = (hasattr(payroll,
-                                   'epf_details') and payroll.epf_details and not
+                                   'epf_details') and payroll.epf_details and
                            payroll.epf_details.include_employer_contribution_in_ctc)
             esi_enabled = (hasattr(payroll,
-                                   'esi_details') and payroll.esi_details and not
+                                   'esi_details') and payroll.esi_details and
                            payroll.esi_details.include_employer_contribution_in_ctc)
             pt_enabled = PT.objects.filter(payroll=payroll).exists()
 
