@@ -1,7 +1,7 @@
 from rest_framework.decorators import api_view, authentication_classes
 from rest_framework.response import Response
 from rest_framework import status
-from .models import LeaveApplication, EmployeeLeaveBalance
+from .models import LeaveApplication, EmployeeLeaveBalance, EmployeeReportingManager, EmployeeCredentials
 from .serializers import LeaveApplicationSerializer, EmployeeLeaveBalanceSerializer
 from .authentication import EmployeeJWTAuthentication
 from django.utils import timezone
@@ -24,8 +24,31 @@ def apply_leave(request):
             status=status.HTTP_403_FORBIDDEN
         )
 
+    # Ensure employee field is set to the logged-in employee's ID
+    try:
+        reviewing_team = EmployeeReportingManager.objects.get(employee=employee)
+    except EmployeeReportingManager.DoesNotExist:
+        return Response(
+            {'error': 'Reviewing manager info not configured for this employee.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+        # Prepare serializer data
+    data = request.data.copy()
+    manager_creds = EmployeeCredentials.objects.get(employee=reviewing_team.reporting_manager)
+    data['reviewer'] = manager_creds.id  # Set reviewer to the manager's credentials ID
+
+    # Add HOD to cc_to if exists
+    cc_list = []
+    if reviewing_team.head_of_department:
+        try:
+            hod_creds = EmployeeCredentials.objects.get(employee=reviewing_team.head_of_department)
+            cc_list.append(hod_creds.id)
+        except EmployeeCredentials.DoesNotExist:
+            pass  # silently skip if no credentials for HOD
+    data.setlist('cc_to', cc_list)  # Must be a list if using ManyToMany
+
     serializer = LeaveApplicationSerializer(
-        data=request.data,
+        data=data,
         context={'request': request}
     )
 
@@ -76,6 +99,7 @@ def get_leave_applications(request):
 @authentication_classes([EmployeeJWTAuthentication])
 def handle_leave_action(request, leave_id):
     user = request.user
+    print(user)
 
     try:
         leave = LeaveApplication.objects.get(id=leave_id)
@@ -89,10 +113,10 @@ def handle_leave_action(request, leave_id):
         return Response({'error': 'Invalid action. Must be approve, reject, or cancel.'}, status=status.HTTP_400_BAD_REQUEST)
 
     # Validate credentials
-    if not hasattr(user, 'employeecredentials'):
+    if not hasattr(user, 'employee'):
         return Response({'error': 'Invalid employee credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
-    employee = user.employeecredentials
+    employee = user
 
     # Handle rejection or approval by reviewer or cc_to
     if action in ['approve', 'reject']:
@@ -161,11 +185,11 @@ def reject_leave(request, leave_id):
 @authentication_classes([EmployeeJWTAuthentication])
 def cancel_leave(request, pk):
     user = request.user
-    if not hasattr(user, 'employeecredentials'):
+    if not hasattr(user, 'employee'):
         return Response({'error': 'Invalid employee credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
     try:
-        leave = LeaveApplication.objects.get(pk=pk, employee=user.employeecredentials)
+        leave = LeaveApplication.objects.get(pk=pk, employee=user)
     except LeaveApplication.DoesNotExist:
         return Response({'error': 'Leave application not found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -184,7 +208,7 @@ def cancel_leave(request, pk):
 @authentication_classes([EmployeeJWTAuthentication])
 def get_monthly_leaves(request, year, month):
     """Get leaves for specific month (format: YYYY/MM)"""
-    if not hasattr(request.user, 'employeecredentials'):
+    if not hasattr(request.user, 'employee'):
         return Response({'error': 'Invalid employee credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
     try:
@@ -197,7 +221,7 @@ def get_monthly_leaves(request, year, month):
         return Response({'error': 'Invalid month/year'}, status=status.HTTP_400_BAD_REQUEST)
 
     leaves = LeaveApplication.objects.filter(
-        employee=request.user.employeecredentials,
+        employee=request.user,
         start_date__lte=month_end,
         end_date__gte=month_start
     ).order_by('start_date')
@@ -222,12 +246,12 @@ def get_current_month_leaves(request):
 @authentication_classes([EmployeeJWTAuthentication])
 def get_leave_summary(request, year=None):
     """Get monthly leave summary for a year"""
-    if not hasattr(request.user, 'employeecredentials'):
+    if not hasattr(request.user, 'employee'):
         return Response({'error': 'Invalid employee credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
     year = int(year or timezone.now().year)
     leaves = LeaveApplication.objects.filter(
-        employee=request.user.employeecredentials,
+        employee=request.user,
         start_date__year=year
     )
 

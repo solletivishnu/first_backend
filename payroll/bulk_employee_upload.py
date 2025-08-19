@@ -21,7 +21,7 @@ from datetime import datetime
 
 def parse_excel_date(date_str):
     try:
-        return datetime.strptime(date_str.strip(), "%m/%d/%Y").date()
+        return datetime.strptime(date_str.strip(), "%d-%m-%Y").date()
     except Exception:
         try:
             return datetime.strptime(date_str.strip(), "%d/%m/%Y").date()

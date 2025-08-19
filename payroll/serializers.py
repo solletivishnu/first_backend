@@ -638,10 +638,33 @@ class EmployeeBankDetailsSerializer(serializers.ModelSerializer):
         return value
 
 
+class EmployeeReportingManagerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EmployeeReportingManager
+        fields = '__all__'
+
+    def validate(self, data):
+        employee = data.get('employee')
+        reporting_manager = data.get('reporting_manager')
+        hod = data.get('head_of_department')
+
+        level = int(employee.employee_level)
+        allow_self = level in [0, 1]
+
+        if not allow_self:
+            if reporting_manager == employee:
+                raise serializers.ValidationError("Self cannot be reviewing manager for levels above 2.")
+            if hod == employee:
+                raise serializers.ValidationError("Self cannot be head of department for levels above 2.")
+
+        return data
+
+
 class EmployeeDataSerializer(serializers.ModelSerializer):
     employee_salary = EmployeeSalaryDetailsSerializer(read_only=True)
     employee_personal_details = EmployeePersonalDetailsSerializer(read_only=True)
     employee_bank_details = EmployeeBankDetailsSerializer(read_only=True)
+    employee_reporting_manager = EmployeeReportingManagerSerializer(read_only=True)
 
     designation_name = serializers.CharField(source='designation.designation_name', read_only=True)
     department_name = serializers.CharField(source='department.dept_name', read_only=True)
@@ -922,8 +945,11 @@ class EmployeeSalaryHistorySerializer(serializers.ModelSerializer):
     department = serializers.SerializerMethodField()
     designation = serializers.SerializerMethodField()
     regime = serializers.SerializerMethodField()
-    pan = serializers.SerializerMethodField()
+    pan_number = serializers.SerializerMethodField()
     associate_id = serializers.CharField(source='employee.associate_id', read_only=True)
+    date_of_joining = serializers.DateField(source='employee.doj', read_only=True, format='%d-%m-%Y')
+    bank_account_number = serializers.CharField(source='employee.employee_bank_details.account_number', read_only=True)
+    bank_ifsc_code = serializers.CharField(source='employee.employee_bank_details.ifsc_code', read_only=True)
 
     class Meta:
         model = EmployeeSalaryHistory
@@ -948,7 +974,7 @@ class EmployeeSalaryHistorySerializer(serializers.ModelSerializer):
         except AttributeError:
             return None
 
-    def get_pan(self, obj):
+    def get_pan_number(self, obj):
         """Fetch PAN from employee's personal details"""
         try:
             return obj.employee.employee_personal_details.pan
@@ -1133,3 +1159,16 @@ class EmployeeFinancialYearPayslipSerializer(serializers.ModelSerializer):
                 pass  # Invalid format; fall through to return None
         return None
 
+
+class ReportingHODChoiceSerializer(serializers.ModelSerializer):
+    name = serializers.SerializerMethodField()
+    class Meta:
+        model = EmployeeManagement
+        fields = ["id", "name"]
+
+    def get_name(self, obj):
+        names = [obj.first_name]
+        if obj.middle_name:
+            names.append(obj.middle_name)
+        names.append(obj.last_name)
+        return " ".join(names)

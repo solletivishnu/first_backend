@@ -324,7 +324,7 @@ def to_decimal_2places(value):
         return Decimal('0.00')
 
 
-def calculate_tds(regime_type, annual_salary, current_month, epf_value, ept_value, bonus_or_revisions=False):
+def calculate_tds(regime_type, annual_salary, current_month, epf_value, ept_value, nps_contribution=0, bonus_or_revisions=False):
 
     # Standard deductions
     standard_deduction_new = 75000
@@ -353,12 +353,13 @@ def calculate_tds(regime_type, annual_salary, current_month, epf_value, ept_valu
 
     epf_value = epf_value * month_left
     ept_value = ept_value * month_left
+    nps_contribution = nps_contribution * month_left
 
     # Apply standard deduction based on the regime
     if regime_type == "new":
-        prorated_deduction = standard_deduction_new + epf_value + ept_value
+        prorated_deduction = standard_deduction_new + nps_contribution
     else:
-        prorated_deduction = standard_deduction_old + epf_value + ept_value
+        prorated_deduction = standard_deduction_old + epf_value + ept_value + nps_contribution
 
     # Calculate taxable income
     taxable_income = salary_remaining - prorated_deduction

@@ -1,7 +1,7 @@
 import base64
 import numpy as np
 from datetime import datetime
-from django.utils.timezone import now, localtime
+from django.utils.timezone import now, localtime, localdate
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -17,6 +17,7 @@ from payroll.models import HolidayManagement
 from payroll.models import PaySchedule
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+from Tara.broadcast import broadcast_to_employee, broadcast_to_business
 
 
 @api_view(['POST'])
@@ -27,7 +28,7 @@ def manual_check_in(request):
     if not isinstance(employee_credentials, EmployeeCredentials):
         return Response({'error': 'Invalid employee credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
-    today = localtime(now()).date()
+    today = localdate()
     location = request.data.get('location', '')
     device_info = request.data.get('device_info', '')
 
@@ -52,23 +53,23 @@ def manual_check_in(request):
     )
 
     # ✅ Send WebSocket notification
-    channel_layer = get_channel_layer()
-    business = employee_credentials.employee.payroll.business
-    context = business.contexts  # reverse OneToOneField from Business to Context
-    context_id = context.id
-    group_name = f'business_{context_id}'  # Assuming FK: employee -> business
+    payload = {
+        "type": "attendance_update",
+        "action": "check_in",
+        "record": AttendanceLogSerializer(new_log).data,
+    }
 
-    async_to_sync(channel_layer.group_send)(
-        group_name,
-        {
-            'type': 'send_notification',
-            'message': f'{employee_credentials.employee.first_name} {employee_credentials.employee.last_name} '
-                       f'checked in at {new_log.check_in.strftime("%I:%M %p")}'
-        }
-    )
+    # Push to this employee's devices AND to team viewers
+    # 🔔 Broadcast to employee (all their devices)
+    # NOTE: If your WS group uses employee_id, pass emp.id; if it uses user_id, pass emp.user_id.
+    broadcast_to_employee(employee_credentials.id, payload)  # <-- if your consumer uses f"user_{employee_id}"
+    # broadcast_to_employee(emp.user_id)   # <-- use this instead if your group is f"user_{user_id}"
 
-    serializer = AttendanceLogSerializer(new_log)
-    return Response({'message': 'Check-in successful', 'data': serializer.data}, status=status.HTTP_200_OK)
+    # 📣 Broadcast to the whole business/team
+    # business_id = employee_credentials.employee.payroll.business_id
+    # broadcast_to_business(business_id, payload)
+
+    return Response({'message': 'Check-out successful', 'data': payload["record"]}, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
@@ -94,9 +95,15 @@ def manual_check_out(request):
     # Check out now
     attendance.check_out = localtime(now())
     attendance.save()
+    payload = {
+        "type": "attendance_update",
+        "action": "check_out",
+        "record": AttendanceLogSerializer(attendance).data,
+    }
 
-    serializer = AttendanceLogSerializer(attendance)
-    return Response({'message': 'Check-out successful', 'data': serializer.data}, status=status.HTTP_200_OK)
+    broadcast_to_employee(employee_credentials.id, payload)
+
+    return Response({'message': 'Check-out successful', 'data': payload["record"]}, status=200)
 
 
 @api_view(['GET'])

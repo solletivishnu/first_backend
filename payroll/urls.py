@@ -12,6 +12,7 @@ from . import leavemanagement
 from . import employee_education
 from . import holidays
 from . import employee_salary_details
+from . import epf_reports
 # from . import employee_dashboard
 
 urlpatterns = [
@@ -133,6 +134,13 @@ urlpatterns = [
 
     path('employee-personal-details', views.employee_personal_list, name='employee-personal-list'),
     path('employee-personal-details/<int:pk>', views.employee_personal_detail, name='employee-personal-detail'),
+
+    # Employee Reporting Manager Endpoints
+    path('employee-reporting-manager', views.employee_reporting_manager_list, name='employee-reporting-manager-list'),
+    path('create-employee-reporting-manager/', views.employee_reporting_manager_create,
+         name='employee-reporting-manager-create'),
+    path('employee-reporting-manager/<int:pk>/', views.employee_reporting_manager_detail,
+         name='employee-reporting-manager-detail'),
 
     path('employee-bank-details', views.employee_bank_list, name='employee-bank-list'),
     path('employee-bank-details/<int:pk>', views.employee_bank_detail, name='employee-bank-detail'),
@@ -282,4 +290,9 @@ urlpatterns = [
 
 
     # path('tds-summary/', employee_dashboard.tds_summary_view, name='tds-summary-view'),
+
+    path('epf/template/', epf_reports.download_epf_template, name='epf-template-download'),
+
+    # Convert Filled Excel to Text
+    path('epf/convert/', epf_reports.convert_epf_to_text, name='epf-excel-to-text'),
 ]

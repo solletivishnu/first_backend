@@ -95,7 +95,14 @@ class EmployeeSalaryProcessor:
                 value = component_amount_map.get(name, 0)
                 epf_eligible_total += (value * total_working_days) / attendance.total_days_of_month
 
-            epf_base = min(epf_eligible_total, 15000)
+            payroll = PayrollOrg.objects.get(id=self.payroll_org)
+            if employee.statutory_components.get("epf_enabled", False) and getattr(payroll, "epf_details", None):
+                if payroll.epf_details.employee_contribution_rate == "12% of Actual PF Wage":
+                    epf_base = epf_eligible_total
+                else:
+                    epf_base = min(epf_eligible_total, 15000)
+            else:
+                epf_base = 0
             pf = round(epf_base * 0.12, 2)
 
             # ESI
@@ -135,6 +142,7 @@ class EmployeeSalaryProcessor:
 
             epf_value = 0
             employee_deductions = 0
+            nps_contribution = 0
             other_deductions = 0
             pt_set = False
             other_deductions_breakdown = []
@@ -144,9 +152,14 @@ class EmployeeSalaryProcessor:
                 value = deduction.get("monthly", 0)
                 value = value if isinstance(value, (int, float)) else 0
 
-                if name == "epf_employee_contribution" and employee.statutory_components.get("epf_enabled"):
+                if (name == "epf_employee_contribution" and employee.statutory_components.get("epf_enabled")
+                        and getattr(payroll, "epf_details", None)):
                     full_month_basic = component_amounts['basic']
-                    epf_contribution = 1800 if full_month_basic > 15000 else round(full_month_basic * 0.12, 2)
+                    if (full_month_basic > 15000 and payroll.epf_details.employee_contribution_rate !=
+                            "12% of Actual PF Wage"):
+                        epf_contribution = 1800
+                    else:
+                        epf_contribution = round(full_month_basic * 0.12, 2)
                     employee_deductions += epf_contribution
                     epf_value = epf_contribution
 
@@ -161,6 +174,8 @@ class EmployeeSalaryProcessor:
                     prorated = prorate(value)
                     other_deductions += prorated
                     if prorated > 0:
+                        if name == "nps_contribution":
+                            nps_contribution = round(prorate(value))
                         other_deductions_breakdown.append({name: round(prorated, 2)})
 
             total_deductions = taxes + emi_deduction + employee_deductions + other_deductions + pt_amount + esi
@@ -208,6 +223,7 @@ class EmployeeSalaryProcessor:
                     current_month=current_month,
                     epf_value=epf_value,
                     ept_value=pt_amount,
+                    nps_contribution=nps_contribution,
                     bonus_or_revisions=recalculate_tds
                 )
                 if existing_record:
