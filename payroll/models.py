@@ -405,6 +405,16 @@ class EmployeeManagement(BaseModel):
         ('female', 'female'),
         ('others', 'others'),
     ]
+
+    level_choices = [
+        ('0', '0 - CEO / Director / Executive'),
+        ('1', '1 - Vice President / General Manager'),
+        ('2', '2 - HR Manager'),
+        ('3', '3 - Department Manager'),
+        ('4', '4 - Team Lead / Project Lead'),
+        ('5', '5 - Employee / Trainee / Intern'),
+    ]
+
     payroll = models.ForeignKey('PayrollOrg', on_delete=models.CASCADE, related_name='employee_managements')
     first_name = models.CharField(max_length=120, null=False, blank=False)
     middle_name = models.CharField(max_length=80, null=True, blank=True, default=None)
@@ -420,10 +430,49 @@ class EmployeeManagement(BaseModel):
     department = models.ForeignKey('Departments', on_delete=models.CASCADE, related_name='employee_department')
     enable_portal_access = models.BooleanField(default=False)
     statutory_components = models.JSONField()
+    employee_level = models.CharField(max_length=120, choices=level_choices, null=True, blank=True, default='5')
     employee_status = models.BooleanField(default=True)
 
     def __str__(self):
         return f"{self.associate_id} ({self.gender})"
+
+
+class EmployeeReportingManager(models.Model):
+    employee = models.OneToOneField(
+        'EmployeeManagement',
+        on_delete=models.CASCADE,
+        related_name='reviewing_team'
+    )
+    reporting_manager = models.ForeignKey(
+        'EmployeeManagement',
+        on_delete=models.CASCADE,
+        related_name='reported_by'
+    )
+    head_of_department = models.ForeignKey(
+        'EmployeeManagement',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='head_of_department'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def clean(self):
+        """Custom validation: allow self-reference for lower levels/departments."""
+        level = int(self.employee.level)
+        department = self.employee.department.lower()  # assuming CharField
+
+        allow_self = level in [0, 1]
+
+        if not allow_self:
+            if self.reporting_manager == self.employee:
+                raise ValidationError("Self cannot be the reviewing manager for levels above 2.")
+            if self.head_of_department == self.employee:
+                raise ValidationError("Self cannot be the head of department for levels above 2.")
+
+    def __str__(self):
+        return f"{self.employee.associate_id} - Reviewing Team"
 
 
 @receiver(post_save, sender=EmployeeManagement)
