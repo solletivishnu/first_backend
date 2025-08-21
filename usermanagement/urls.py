@@ -328,5 +328,7 @@ urlpatterns = [
 
     path("usage-summary/<int:context_id>/", views.get_usage_summary_by_context, name="usage-summary-by-context"),
 
+    #delete the Context
+    path('contexts/<uuid:context_id>/delete/', views.context_delete_drf, name='context-delete-api')
 
 ]
