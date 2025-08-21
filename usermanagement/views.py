@@ -12,6 +12,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
 
 # Local application imports
 from .email_otp_request_service import send_otp_email
@@ -25,7 +26,8 @@ from .models import (
     Users,
     SubscriptionCycle,
     ModuleUsageCycle,
-    ModuleSubscription
+    ModuleSubscription,
+    Context
 )
 from .serializers import (
     ModuleDetailSerializer,
@@ -511,4 +513,43 @@ def get_usage_summary_by_context(request, context_id):
             "error": "Failed to fetch usage summary.",
             "details": str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['DELETE'])  # This view only accepts DELETE requests
+def context_delete_drf(request, context_id):
+    """
+    Deletes a specific Context object.
+    """
+    try:
+        # 1. Get the object, ensuring it exists and the user has permission
+        context = get_object_or_404(Context, id=context_id, owner_user=request.user)
+        # The `owner_user=request.user` in the query is the permission check.
+
+        # 2. (Optional) You can add more complex checks here
+        # if context.status == 'active':
+        #     return Response({"error": "Cannot delete an active context."}, status=status.HTTP_409_CONFLICT)
+
+        # 3. Perform the deletion
+        # This will call your custom model's delete() method
+        context.delete()
+
+        # 4. Return a success response
+        return Response(
+            {
+                "success": True,
+                "message": f"Context '{context.name}' was successfully deleted."
+            },
+            status=status.HTTP_200_OK # or status.HTTP_204_NO_CONTENT
+        )
+
+    except Exception as e:
+        # Handle any unexpected errors
+        return Response(
+            {
+                "success": False,
+                "error": "Failed to delete context.",
+                "details": str(e)
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
