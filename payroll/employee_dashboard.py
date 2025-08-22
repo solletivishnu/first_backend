@@ -164,7 +164,7 @@ def forgot_password(request):
     email = creds.employee.work_email
     token = employee_token_generator.make_token(creds)
     uid = urlsafe_base64_encode(str(creds.pk).encode())
-    reset_link = f"{Reference_link}/employee-login/reset-password?uid={uid}&token={token}"
+    reset_link = f"{Reference_link}employee-login/reset-password?uid={uid}&token={token}"
 
 
     try:
