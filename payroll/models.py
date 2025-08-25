@@ -1213,6 +1213,60 @@ def update_leave_balance_on_approval(sender, instance, created, **kwargs):
         LeaveApplication.objects.filter(id=instance.id).update(reviewed_on=now().date())
 
 
+class EventManagement(models.Model):
+    """Model to manage events in the organization."""
+    payroll = models.ForeignKey('PayrollOrg', on_delete=models.CASCADE, related_name='events')
+    title = models.CharField(max_length=255, null=False, blank=False)
+    description = models.TextField(null=True, blank=True)
+    date = models.DateField(null=False, blank=False)
+    time = models.TimeField(null=True, blank=True)
+    applicable_to = models.ManyToManyField(WorkLocations, blank=True, related_name='events_applicable_to')
+    is_birthday = models.BooleanField(default=False)
+    employee = models.ForeignKey(EmployeeManagement, on_delete=models.CASCADE, null=True, blank=True,
+                                 related_name='employee_birthday')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+    def __str__(self):
+        return f"{self.title} on {self.date}"
+
+
+@receiver(post_save, sender=EmployeePersonalDetails)
+def create_or_update_birthday_event(sender, instance, **kwargs):
+    """Ensure a birthday event exists/updates when employee personal details are saved."""
+    first_name = instance.employee.first_name or ""
+    middle_name = instance.employee.middle_name or ""
+    last_name = instance.employee.last_name or ""
+
+    # Only include middle name if it's not empty
+    if middle_name.strip():
+        full_name = f"{first_name} {middle_name} {last_name}".strip()
+    else:
+        full_name = f"{first_name} {last_name}".strip()
+
+    # Common fields for create or update
+    defaults = {
+        "title": f"Birthday Wishes to {full_name}",
+        "description": (
+            f"🎉 Warmest birthday wishes to {full_name} on this special day, {instance.dob.strftime('%B %d')} 🎂✨. "
+            f"May the year ahead bring continued success, good health, and personal fulfillment 🌟. "
+            f"The entire team joins in extending our best regards and appreciation 🙌."
+        ),
+        "date": instance.dob,
+    }
+
+    # Create or update the event atomically
+    event, _ = EventManagement.objects.update_or_create(
+        payroll=instance.employee.payroll,
+        is_birthday=True,
+        employee=instance.employee,
+        defaults=defaults,
+    )
+
+    # Ensure applicable_to is always set to employee’s work_location
+    if instance.employee.work_location:
+        event.applicable_to.set([instance.employee.work_location])
+
 
 
 

@@ -14,6 +14,7 @@ from . import holidays
 from . import employee_salary_details
 from . import epf_reports
 from . import employee_dashboard
+from . import event_management
 
 urlpatterns = [
     # URL for listing and creating PayrollOrg instances
@@ -97,6 +98,13 @@ urlpatterns = [
 
     path('deductions/', views.deductions_list_create, name='deduction-list-create'),
     path('deductions/<int:id>/', views.deduction_detail, name='deduction-detail'),
+
+    #EventManagement Endpoints
+    path('events/', event_management.create_event, name='create-event'),
+    path('events/update/<int:event_id>/', event_management.update_event, name='update-event'),
+    path('events/delete/<int:event_id>/', event_management.delete_event, name='delete-event'),
+    path('events/list/<int:payroll_id>/', event_management.list_events_by_payroll_id, name='list-events'),
+    path('events/<int:event_id>/', event_management.get_event, name='get_event'),
 
     # Reimbursement Endpoints
     path('reimbursements/', views.reimbursement_list_create, name='reimbursement-list-create'),

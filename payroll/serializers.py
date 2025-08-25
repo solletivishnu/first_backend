@@ -1179,3 +1179,25 @@ class LeaveNotificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = LeaveNotification
         fields = '__all__'
+
+
+class EventManagementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EventManagement
+        fields = '__all__'
+
+    def create(self, validated_data):
+        # Pop M2M first, then create instance, then set M2M
+        applicable_to = validated_data.pop("applicable_to", [])
+        event = super().create(validated_data)
+        if applicable_to:
+            event.applicable_to.set(applicable_to)
+        return event
+
+    def update(self, instance, validated_data):
+        applicable_to = validated_data.pop("applicable_to", None)
+        event = super().update(instance, validated_data)
+        if applicable_to is not None:
+            event.applicable_to.set(applicable_to)
+        return event
+
