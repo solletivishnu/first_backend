@@ -279,6 +279,10 @@ urlpatterns = [
     # Employee Leave Balance
     path('my-leave-balances/', leavemanagement.get_my_leave_balances, name='my_leave_balances'),
 
+    # Employee Leave Notifications
+    path('leave-notifications/<int:notification_id>/', leavemanagement.get_leave_notification_details, name='leave-notification-details'),
+    path('unread-notifications-count/', leavemanagement.unread_leave_notification_count, name='unread_leave_notifications'),
+
     # Employee Education Endpoints
     path('employee-education/', employee_education.employee_education_list_create, name='employee-education-list-create'),
     path('employee-education/<int:education_id>/', employee_education.employee_education_detail,

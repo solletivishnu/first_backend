@@ -12,7 +12,86 @@ from Tara.broadcast import broadcast_leave_notification_to_employee
 from payroll.models import LeaveNotification
 from payroll.serializers import LeaveNotificationSerializer
 
+def format_time_style(created_at):
+    """
+    Format time like with separate date and time:
+    - Now: {"display": "Now"}
+    - Within day: {"display": "12:19 PM"}
+    - Within 48h: {"date": "Yesterday", "time": "12:19 PM"}
+    - Older: {"date": "21 August, 2025", "time": "12:19 PM"}
+    """
+    if not isinstance(created_at, datetime):
+        return {"date": created_at.strftime("%d %B, %Y")}
 
+    now = timezone.now()
+    created = timezone.localtime(created_at)
+    diff = now - created
+
+    # Within 1 minute - show "Now"
+    if diff.total_seconds() < 60:
+        return {
+            "display": "Now"
+        }
+
+    # Within same day - show only time
+    if diff.days == 0:
+        return {
+            "display": created.strftime("%I:%M %p")
+        }
+
+    # Within 48 hours - show Yesterday and time separately
+    elif diff.days == 1:
+        return {
+            "date": "Yesterday",
+            "time": created.strftime("%I:%M %p")
+        }
+
+    # More than 48 hours - show full date and time separately
+    else:
+        return {
+            "date": created.strftime("%d %B, %Y"),
+            "time": created.strftime("%I:%M %p")
+        }
+
+
+@api_view(['GET'])
+@authentication_classes([EmployeeJWTAuthentication])
+def get_leave_notification_details(request, notification_id):
+    try:
+        notification = LeaveNotification.objects.select_related(
+            'leave_application',
+            'leave_application__employee',
+            'leave_application__employee__employee',
+            'leave_application__employee__employee__designation',
+            'leave_application__employee__employee__department',
+            'leave_application__leave_type'
+        ).get(id=notification_id)
+
+        leave = notification.leave_application
+        employee = leave.employee.employee
+
+        # Format time with new structure
+        time_format = format_time_style(notification.created_at)
+        # Format read_at time using time style
+        read_at_format = format_time_style(notification.read_at) if notification.read_at else None
+
+        response_data = {
+            "type": "leave_notification",
+            "action": "view_leave",
+            "title": f"{employee.first_name} {employee.last_name} - {leave.leave_type.name_of_leave} Request",
+            "created_at": time_format,
+            "message": notification.message,
+            "is_read": notification.is_read,
+            "read_at": read_at_format
+        }
+
+        return Response(response_data)
+
+    except LeaveNotification.DoesNotExist:
+        return Response(
+            {"error": "Notification not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
 
 
 def get_unread_count_for_reviewer(reviewer):
@@ -95,13 +174,16 @@ def apply_leave(request):
             message=detailed_message
         )       
         unread_count = get_unread_count_for_reviewer(reviewer)
+        formatted_time = format_time_style(notification.created_at)
+
         payload = {
             "type": "leave_notification",
             "action": "new_leave",
             "title": f"{employee_name} - {leave.leave_type.name_of_leave} Request",
             "message": detailed_message,
             "notification_id": notification.id,
-            "unread_count": unread_count
+            "unread_count": unread_count,
+            "created_at": formatted_time
         }
 
         broadcast_leave_notification_to_employee(reviewer.id, payload)
