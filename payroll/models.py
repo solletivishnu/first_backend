@@ -1065,7 +1065,8 @@ class EmployeeEducationDetails(models.Model):
     employee = models.ForeignKey('EmployeeCredentials', on_delete=models.CASCADE, related_name='education_details')
     qualification = models.CharField(max_length=120, null=False, blank=False)
     year_of_passing = models.IntegerField(null=False, blank=False)
-    upload_certificate = models.FileField(upload_to=employee_education_certificate, null=True, blank=True)
+    upload_certificate = models.FileField(upload_to=employee_education_certificate, null=True, blank=True,
+                                                                                        storage=PrivateS3Storage())
 
     def __str__(self):
         return f"{self.employee.employee.associate_id} - {self.qualification} ({self.year_of_passing})"
@@ -1248,9 +1249,10 @@ def create_or_update_birthday_event(sender, instance, **kwargs):
     defaults = {
         "title": f"Birthday Wishes to {full_name}",
         "description": (
-            f"🎉 Warmest birthday wishes to {full_name} on this special day, {instance.dob.strftime('%B %d')} 🎂✨. "
-            f"May the year ahead bring continued success, good health, and personal fulfillment 🌟. "
-            f"The entire team joins in extending our best regards and appreciation 🙌."
+            f"🎉 Happy Birthday, {full_name}! 🎂 Like you, your special day is a celebration for us too. ✨ "
+            f"We’re sending you our warmest and most heartfelt wishes 💐🎈. "
+            f"Looking forward to celebrating many more of your special days in the future! 🎊🥳"
+
         ),
         "date": instance.dob,
     }

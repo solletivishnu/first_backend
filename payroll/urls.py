@@ -288,6 +288,8 @@ urlpatterns = [
     path('employee-education/<int:education_id>/', employee_education.employee_education_detail,
          name='employee-education-detail'),
     path('employee-profile/', employee_education.employee_profile_details, name='employee-profile'),
+    path('employee-profile-update/', employee_dashboard.update_employee_profile_and_personal_details,
+                                                                                        name='employee-profile-update'),
 
     # Holiday Calendar Endpoints
     path('monthly-holidays/', holidays.get_month_wise_holiday_calendar, name='monthly-holidays'),
