@@ -280,7 +280,7 @@ urlpatterns = [
     path('my-leave-balances/', leavemanagement.get_my_leave_balances, name='my_leave_balances'),
 
     # Employee Leave Notifications
-    path('leave-notifications/<int:notification_id>/', leavemanagement.get_leave_notification_details, name='leave-notification-details'),
+    path('leave-notifications/', leavemanagement.get_leave_notifications, name='leave-notification-details'),
     path('unread-notifications-count/', leavemanagement.unread_leave_notification_count, name='unread_leave_notifications'),
 
     # Employee Education Endpoints

@@ -11,86 +11,79 @@ from datetime import date
 from Tara.broadcast import broadcast_leave_notification_to_employee
 from payroll.models import LeaveNotification
 from payroll.serializers import LeaveNotificationSerializer
+from .utils import format_time_style
+from django.db import transaction
+import logging
 
-def format_time_style(created_at):
-    """
-    Format time like with separate date and time:
-    - Now: {"display": "Now"}
-    - Within day: {"display": "12:19 PM"}
-    - Within 48h: {"date": "Yesterday", "time": "12:19 PM"}
-    - Older: {"date": "21 August, 2025", "time": "12:19 PM"}
-    """
-    if not isinstance(created_at, datetime):
-        return {"date": created_at.strftime("%d %B, %Y")}
-
-    now = timezone.now()
-    created = timezone.localtime(created_at)
-    diff = now - created
-
-    # Within 1 minute - show "Now"
-    if diff.total_seconds() < 60:
-        return {
-            "display": "Now"
-        }
-
-    # Within same day - show only time
-    if diff.days == 0:
-        return {
-            "display": created.strftime("%I:%M %p")
-        }
-
-    # Within 48 hours - show Yesterday and time separately
-    elif diff.days == 1:
-        return {
-            "date": "Yesterday",
-            "time": created.strftime("%I:%M %p")
-        }
-
-    # More than 48 hours - show full date and time separately
-    else:
-        return {
-            "date": created.strftime("%d %B, %Y"),
-            "time": created.strftime("%I:%M %p")
-        }
 
 
 @api_view(['GET'])
 @authentication_classes([EmployeeJWTAuthentication])
-def get_leave_notification_details(request, notification_id):
+def get_leave_notifications(request):
+    """Get all leave notifications for the reviewer"""
     try:
-        notification = LeaveNotification.objects.select_related(
+        notifications = LeaveNotification.objects.select_related(
             'leave_application',
             'leave_application__employee',
             'leave_application__employee__employee',
             'leave_application__employee__employee__designation',
             'leave_application__employee__employee__department',
             'leave_application__leave_type'
-        ).get(id=notification_id)
+        ).filter(
+            reviewer=request.user
+        ).order_by('-created_at')
 
-        leave = notification.leave_application
-        employee = leave.employee.employee
+        response_data = []
+        for notification in notifications:
+            leave = notification.leave_application
+            employee = leave.employee.employee
 
-        # Format time with new structure
-        time_format = format_time_style(notification.created_at)
-        # Format read_at time using time style
-        read_at_format = format_time_style(notification.read_at) if notification.read_at else None
+            # Format time with new structure
+            time_format = format_time_style(notification.created_at)
+            read_at_format = format_time_style(notification.read_at) if notification.read_at else None
 
-        response_data = {
-            "type": "leave_notification",
-            "action": "view_leave",
-            "title": f"{employee.first_name} {employee.last_name} - {leave.leave_type.name_of_leave} Request",
-            "created_at": time_format,
-            "message": notification.message,
-            "is_read": notification.is_read,
-            "read_at": read_at_format
-        }
+            notification_data = {
+                "type": "leave_notification",
+                "action": "view_leave",
+                "notification_id": notification.id,
+                "title": f"{employee.first_name} {employee.last_name} - {leave.leave_type.name_of_leave} Request",
+                "data": {
+                    "employee": {
+                        "name": f"{employee.first_name} {employee.last_name}",
+                        "designation": employee.designation.designation_name if employee.designation else "N/A",
+                        "department": employee.department.dept_name if employee.department else "N/A"
+                    },
+                    "leave": {
+                        "id": leave.id,
+                        "type": leave.leave_type.name_of_leave,
+                        "days": (leave.end_date - leave.start_date).days + 1,
+                        "start_date": leave.start_date.strftime("%d %b %Y"),
+                        "end_date": leave.end_date.strftime("%d %b %Y"),
+                        "reason": leave.reason,
+                        "status": leave.status
+                    },
+                    "created_at": time_format
+                },
+                "message": notification.message,
+                "is_read": notification.is_read,
+                "read_at": read_at_format
+            }
+            response_data.append(notification_data)
 
-        return Response(response_data)
+        return Response({
+            "notifications": response_data,
+            "unread_count": sum(1 for n in notifications if not n.is_read)
+        })
 
-    except LeaveNotification.DoesNotExist:
+    except Exception as e:
+        print(f"Error fetching notifications: {str(e)}")  # Debug log
         return Response(
-            {"error": "Notification not found"},
-            status=status.HTTP_404_NOT_FOUND
+            {
+                "type": "error",
+                "message": "Failed to fetch notifications",
+                "detail": str(e)
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 
@@ -103,99 +96,174 @@ def unread_leave_notification_count(request):
     count = LeaveNotification.objects.filter(reviewer=request.user, is_read=False).count()
     return Response({"unread_count": count})
 
-@api_view(['POST'])
-@authentication_classes([EmployeeJWTAuthentication])
-def apply_leave(request):
-    employee_credentials = request.user  # Already EmployeeCredentials instance
-    employee = employee_credentials.employee  # Actual EmployeeManagement instance
 
-    # Check if employee in payload matches logged-in employee
-    payload_employee_id = request.data.get('employee')
-    if str(employee_credentials.id) != str(payload_employee_id):
-        return Response(
-            {'error': 'You are not allowed to apply leave for another employee.'},
-            status=status.HTTP_403_FORBIDDEN
-        )
 
-    # Ensure employee field is set to the logged-in employee's ID
-    try:
-        reviewing_team = EmployeeReportingManager.objects.get(employee=employee)
-    except EmployeeReportingManager.DoesNotExist:
-        return Response(
-            {'error': 'Reviewing manager info not configured for this employee.'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-        # Prepare serializer data
-    data = request.data.copy()
-    manager_creds = EmployeeCredentials.objects.get(employee=reviewing_team.reporting_manager)
-    data['reviewer'] = manager_creds.id  # Set reviewer to the manager's credentials ID
+logger = logging.getLogger(__name__)
 
-    # Add HOD to cc_to if exists
-    cc_list = []
-    if reviewing_team.head_of_department:
-        try:
-            hod_creds = EmployeeCredentials.objects.get(employee=reviewing_team.head_of_department)
-            cc_list.append(hod_creds.id)
-        except EmployeeCredentials.DoesNotExist:
-            pass  # silently skip if no credentials for HOD
-    data.setlist('cc_to', cc_list)  # Must be a list if using ManyToMany
+def create_notification_data(notif, recipient):
+    """Format notification data for a single notification"""
+    leave_app = notif.leave_application
+    emp = leave_app.employee.employee
+    is_reviewer = leave_app.reviewer == recipient
 
-    serializer = LeaveApplicationSerializer(
-        data=data,
-        context={'request': request}
+    return {
+        "type": "leave_notification",
+        "action": "new_leave",
+        "notification_id": notif.id,
+        "title": f"{emp.first_name} {emp.last_name} - {leave_app.leave_type.name_of_leave} Request",
+        "data": {
+            "employee": {
+                "name": f"{emp.first_name} {emp.last_name}",
+                "designation": emp.designation.designation_name if emp.designation else "N/A",
+                "department": emp.department.dept_name if emp.department else "N/A",
+                "role": "Reviewer" if is_reviewer else "CC"
+            },
+            "leave": {
+                "id": leave_app.id,
+                "type": leave_app.leave_type.name_of_leave,
+                "days": (leave_app.end_date - leave_app.start_date).days + 1,
+                "period": f"{leave_app.start_date.strftime('%d %b %Y')} to {leave_app.end_date.strftime('%d %b %Y')}",
+                "reason": leave_app.reason,
+                "status": leave_app.status
+            }
+        },
+        "message": notif.message,
+        "created_at": format_time_style(notif.created_at),
+        "is_read": notif.is_read,
+        "read_at": format_time_style(notif.read_at) if notif.read_at else None
+    }
+
+def get_notification_message(leave, employee_name, employee_designation, employee_department, days):
+    """Create notification message"""
+    return (
+        f"{employee_name}, {employee_designation} from the {employee_department} department, "
+        f"has requested {days} day{'s' if days > 1 else ''} of {leave.leave_type.name_of_leave}. "
+        f"The leave period is from {leave.start_date.strftime('%d %b %Y')} to {leave.end_date.strftime('%d %b %Y')}. "
+        f"Reason for leave: {leave.reason}"
     )
 
-    if serializer.is_valid():
-        leave = serializer.save(employee=employee_credentials)  # Save with actual employee instance
+@api_view(['POST'])
+@authentication_classes([EmployeeJWTAuthentication])
+@transaction.atomic  # Add atomic transaction
+def apply_leave(request):
+    try:
+        employee_credentials = request.user
+        employee = employee_credentials.employee
 
-        reviewer = leave.reviewer
-        print(leave.leave_type.name_of_leave)
-        # Format dates
-        start_date = leave.start_date.strftime("%d %b %Y")
-        end_date = leave.end_date.strftime("%d %b %Y")
-        days = (leave.end_date - leave.start_date).days + 1
+        # Validate employee
+        if str(employee_credentials.id) != str(request.data.get('employee')):
+            return Response(
+                {'error': 'You are not allowed to apply leave for another employee.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
-        # Get employee details - Removed employee_id since it doesn't exist
-        employee_name = f"{leave.employee.employee.first_name} {leave.employee.employee.last_name}"
-        employee_designation = leave.employee.employee.designation.designation_name if leave.employee.employee.designation else "N/A"
-        employee_department = leave.employee.employee.department.dept_name if leave.employee.employee.department else "N/A"
+        # Get reviewing team
+        try:
+            reviewing_team = EmployeeReportingManager.objects.select_related(
+                'reporting_manager',
+                'head_of_department'
+            ).get(employee=employee)
+        except EmployeeReportingManager.DoesNotExist:
+            return Response(
+                {'error': 'Reviewing manager info not configured for this employee.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        # Create matter-like notification
-        detailed_message = (
-            f"{employee_name}, {employee_designation} from the {employee_department} department, "
-            f"has requested {days} day{'s' if days > 1 else ''} of {leave.leave_type.name_of_leave}."
-            f"The leave period is from {start_date} to {end_date}."
-            f"Reason for leave: {leave.reason}"
-        )
+        # Prepare data with reviewer and CC
+        data = request.data.copy()
+        manager_creds = EmployeeCredentials.objects.get(employee=reviewing_team.reporting_manager)
+        data['reviewer'] = manager_creds.id
 
-        notification = LeaveNotification.objects.create(
-            leave_application=leave,
-            reviewer=reviewer,
-            message=detailed_message
-        )       
-        unread_count = get_unread_count_for_reviewer(reviewer)
-        formatted_time = format_time_style(notification.created_at)
+        cc_list = []
+        if reviewing_team.head_of_department:
+            try:
+                hod_creds = EmployeeCredentials.objects.get(employee=reviewing_team.head_of_department)
+                cc_list.append(hod_creds.id)
+            except EmployeeCredentials.DoesNotExist:
+                pass
+        data.setlist('cc_to', cc_list)
 
-        payload = {
-            "type": "leave_notification",
-            "action": "new_leave",
-            "title": f"{employee_name} - {leave.leave_type.name_of_leave} Request",
-            "message": detailed_message,
-            "notification_id": notification.id,
-            "unread_count": unread_count,
-            "created_at": formatted_time
-        }
+        # Validate and save leave application
+        serializer = LeaveApplicationSerializer(data=data, context={'request': request})
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        broadcast_leave_notification_to_employee(reviewer.id, payload)
+        with transaction.atomic():
+            leave = serializer.save(employee=employee_credentials)
+            reviewer = leave.reviewer
+            cc_recipients = leave.cc_to.all()
 
+            if not (reviewer or cc_recipients.exists()):
+                raise ValueError("No reviewer or CC recipients specified")
+
+            # Get employee details once
+            employee_name = f"{employee.first_name} {employee.last_name}"
+            employee_designation = employee.designation.designation_name if employee.designation else "N/A"
+            employee_department = employee.department.dept_name if employee.department else "N/A"
+            days = (leave.end_date - leave.start_date).days + 1
+
+            # Create notification message
+            detailed_message = get_notification_message(
+                leave, employee_name, employee_designation, employee_department, days
+            )
+
+            # Get unique recipients
+            recipients_to_notify = set(cc_recipients)
+            if reviewer:
+                recipients_to_notify.add(reviewer)
+
+            # Bulk create notifications
+            notifications = [
+                LeaveNotification(
+                    leave_application=leave,
+                    reviewer=recipient,
+                    message=detailed_message
+                )
+                for recipient in recipients_to_notify
+            ]
+            created_notifications = LeaveNotification.objects.bulk_create(notifications)
+
+            # Send notifications to all recipients
+            for recipient in recipients_to_notify:
+                # Get all notifications efficiently
+                all_notifications = LeaveNotification.objects.select_related(
+                    'leave_application',
+                    'leave_application__employee__employee',
+                    'leave_application__employee__employee__designation',
+                    'leave_application__employee__employee__department',
+                    'leave_application__leave_type'
+                ).filter(reviewer=recipient).order_by('-created_at')
+
+                notifications_data = [
+                    create_notification_data(notif, recipient)
+                    for notif in all_notifications
+                ]
+
+                unread_count = LeaveNotification.objects.filter(
+                    reviewer=recipient,
+                    is_read=False
+                ).count()
+
+                payload = {
+                    "type": "leave_notifications_update",
+                    "notifications": notifications_data,
+                    "unread_count": unread_count
+                }
+
+                broadcast_leave_notification_to_employee(recipient.id, payload)
+
+            return Response({
+                "data": LeaveNotificationSerializer(created_notifications[0]).data,
+                "id": leave.id,
+                "message": "Leave application submitted successfully.",
+                "status": leave.status
+            }, status=status.HTTP_201_CREATED)
+
+    except Exception as e:
+        logger.error(f"Error processing leave application: {str(e)}", exc_info=True)
         return Response({
-            "data": LeaveNotificationSerializer(notification).data,
-            'id': leave.id,
-            'message': 'Leave application submitted successfully.',
-            'status': leave.status
-        }, status=status.HTTP_201_CREATED)
-
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            "error": "Failed to process leave application"
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 def current_financial_year_range():
