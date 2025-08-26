@@ -1,0 +1,50 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Birthday Wishes</title>
+    <style>
+      /* Email-friendly: table layout, inline-safe CSS */
+      body { margin:0; padding:0; background: transparent; }
+      .outer { width:100%; }
+      .wrapper { width:100%; max-width:720px; margin:0 auto; }
+      .content { padding:28px 18px; }
+      .left-box { background: transparent; border-radius:12px; padding:22px; }
+      .title { font-family:'Brush Script MT','Lucida Handwriting','Segoe Script','Comic Sans MS',cursive; font-size:46px; color:#143d59; margin:0 0 8px; }
+      .desc { font-family:'Open Sans', Arial, Helvetica, sans-serif; font-size:18px; line-height:1.6; margin:0; }
+      .sig { font-family: Arial, Helvetica, sans-serif; font-size:14px; color:#51606b; margin-top:16px; color:#22313a; }
+      .brand { font-weight:700; color:#5c01fa; }
+      @media (max-width:640px){ .stack { display:block; width:100% !important; } }
+    </style>
+  </head>
+  <body>
+    <!-- Outer container -->
+    <table role="presentation" border="0" cellspacing="0" cellpadding="0" class="outer">
+      <tr>
+        <td align="center">
+          <!-- Card with background image. We set both attribute and style for broader support -->
+          <table role="presentation" border="0" cellspacing="0" cellpadding="0" class="wrapper" background="https://res.cloudinary.com/djqs7park/image/upload/v1756129347/How_to_Wish_Staff_Employees_a_Happy_Birthday-1_tdkdym.webp" style="background:url('https://res.cloudinary.com/djqs7park/image/upload/v1756129347/How_to_Wish_Staff_Employees_a_Happy_Birthday-1_tdkdym.webp') center/cover no-repeat #2b0e58; border-radius:16px; overflow:hidden;">
+            <tr>
+              <td class="content">
+                <!-- Two-column table: left text, right spacer -->
+                <table role="presentation" border="0" cellspacing="0" cellpadding="0" width="100%">
+                  <tr>
+                    <td class="stack" valign="top" width="58%">
+                      <div class="left-box">
+                        <div class="title">{{ "Happy Birthday" }}</div>
+                        <p class="desc">{{ "May this year bring all the success and fulfillment your heart desires." }}</p>
+                        <div class="sig">Best wishes, <span class="brand">{{ org_name|default:"TaraFirst" }}</span> Team</div>
+                      </div>
+                    </td>
+                    <td class="stack" valign="top" width="42%">&nbsp;</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+  </html>

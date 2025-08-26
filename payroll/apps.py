@@ -14,6 +14,16 @@ class PayrollConfig(AppConfig):
                 print("✅ Salary schedule synced in payroll app.")
             except Exception as e:
                 print(f"⚠️ Failed to sync salary schedule in payroll app: {e}")
+
+        if any(cmd in sys.argv[0] for cmd in ['gunicorn', 'celery']):
+            try:
+                from Tara.scheduler_scripts.birthday_wish_scheduling import birthday_wish_scheduling
+                birthday_wish_scheduling()
+                print("✅ Salary schedule synced in payroll app.")
+            except Exception as e:
+                print(f"⚠️ Failed to sync salary schedule in payroll app: {e}")
+
+
         # Import signals here so they are connected
         try:
             import payroll.signals

@@ -4,9 +4,8 @@ from django.utils.timezone import now, localtime
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.response import Response
-from .models import EmployeeCredentials, EmployeeSalaryHistory, EmployeeSalaryDetails
-from .serializers import (EmployeeCredentialsSerializer, EmployeeSalaryHistorySerializer, EmployeeSalaryDetailsSerializer,
-                          EmployeeFinancialYearPayslipSerializer)
+from .models import EmployeeCredentials, EmployeeSalaryHistory, EmployeePersonalDetails, EmployeeManagement
+from .serializers import (EmployeeCredentialsSerializer, EmployeeManagementSerializer, EmployeePersonalDetailsSerializer)
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from datetime import datetime, timedelta, date
 from calendar import monthrange, month_name
@@ -244,3 +243,83 @@ def reset_password(request):
 
     return Response({"message": "Invalid or expired token."}, status=status.HTTP_400_BAD_REQUEST)
 
+
+@api_view(['PUT'])
+@authentication_classes([EmployeeJWTAuthentication])
+def update_employee_profile_and_personal_details(request):
+    """
+    Update the authenticated employee's profile and/or personal details.
+
+    This endpoint supports partial updates for two independent sections:
+    - "profile": Fields belonging to `EmployeeManagement` (e.g., name, department, etc.)
+    - "personal_details": Fields belonging to `EmployeePersonalDetails` (e.g., dob, address, etc.)
+
+    Behavior:
+    - Requires a valid authenticated `EmployeeCredentials` user.
+    - At least one of "profile" or "personal_details" must be present in the payload.
+    - Each section is validated and saved independently; validation errors are returned per section.
+
+    Returns:
+    - 200 with a success message on successful update of any provided section
+    - 400 for validation errors or when no updatable data is provided
+    - 401 if the requester is not an authenticated `EmployeeCredentials`
+    - 404 if personal details record does not exist for the employee
+    """
+
+    # Authenticated user (expected to be an instance of EmployeeCredentials)
+    employee = request.user
+
+    if not isinstance(employee, EmployeeCredentials):
+        return Response({'error': 'Invalid employee credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    # Extract sections from request payload (both optional, but at least one must exist)
+    profile_data = request.data.get('profile')
+    personal_details_data = request.data.get('personal_details')
+
+    if not profile_data and not personal_details_data:
+        # 400 Bad Request: Neither "profile" nor "personal_details" was provided.
+        # The endpoint requires at least one updatable section to proceed.
+        # Client action: Include a "profile" or "personal_details" object in the request body.
+        return Response({'error': 'No data provided for update'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Process profile section (EmployeeManagement) if present
+    if profile_data:
+        # Load the specific `EmployeeManagement` instance and apply partial update
+        profile_details = EmployeeManagement.objects.get(id=profile_data.get('id'))
+        profile_serializer = EmployeeManagementSerializer(profile_details, data=profile_data, partial=True)
+        if profile_serializer.is_valid():
+            profile_serializer.save()
+        else:
+            # 400 Bad Request: Validation failed for the profile section (EmployeeManagement fields).
+            # Response body contains field-level errors returned by the serializer for client-side correction.
+            # Client action: Fix invalid fields (e.g., wrong data type, missing required fields) and retry.
+            return Response(profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # Process personal details section (EmployeePersonalDetails) if present
+    if personal_details_data:
+        try:
+            # Retrieve the existing personal details record linked to the employee
+            personal_details = employee.employee.employee_personal_details
+            personal_serializer = EmployeePersonalDetailsSerializer(
+                personal_details,
+                data=personal_details_data,
+                partial=True,
+            )
+        except EmployeePersonalDetails.DoesNotExist:
+            # 404 Not Found: The employee's personal details record doesn't exist in the database.
+            # This can happen for newly created employees where personal details are not yet set up.
+            # Client action: Create the personal details record first or contact support if unexpected.
+            return Response({'error': 'Personal details not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if personal_serializer.is_valid():
+            personal_serializer.save()
+        else:
+            # 400 Bad Request: Validation failed for the personal details section (EmployeePersonalDetails fields).
+            # Response body contains serializer-provided field errors for precise client-side fixes.
+            # Client action: Correct invalid values (e.g., malformed dates, missing required fields) and resend.
+            return Response(personal_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # 200 OK: At least one section was provided and successfully updated.
+    # This message confirms a successful partial update. If both sections were provided, both were validated and saved.
+    # Client action: Optionally refresh local state to reflect new profile/personal details.
+    return Response({'message': 'Profile and personal details updated successfully'}, status=status.HTTP_200_OK)
