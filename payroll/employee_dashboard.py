@@ -285,7 +285,7 @@ def update_employee_profile_and_personal_details(request):
     # Process profile section (EmployeeManagement) if present
     if profile_data:
         # Load the specific `EmployeeManagement` instance and apply partial update
-        profile_details = EmployeeManagement.objects.get(id=profile_data.get('id'))
+        profile_details = EmployeeManagement.objects.get(id=employee.employee.id)
         profile_serializer = EmployeeManagementSerializer(profile_details, data=profile_data, partial=True)
         if profile_serializer.is_valid():
             profile_serializer.save()
