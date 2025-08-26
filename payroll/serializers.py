@@ -640,9 +640,37 @@ class EmployeeBankDetailsSerializer(serializers.ModelSerializer):
 
 
 class EmployeeReportingManagerSerializer(serializers.ModelSerializer):
+    reporting_manager = serializers.SerializerMethodField()
+    head_of_department = serializers.SerializerMethodField()
+
     class Meta:
         model = EmployeeReportingManager
-        fields = '__all__'
+        fields = ['id', 'employee', 'reporting_manager', 'head_of_department']
+
+    def full_name(self, employee):
+        if not employee:
+            return None
+        parts = [employee.first_name]
+        if employee.middle_name and str(employee.middle_name).lower() != 'nan':
+            parts.append(employee.middle_name)
+        parts.append(employee.last_name)
+        return " ".join([p for p in parts if p]).strip()
+
+    def get_reporting_manager(self, obj):
+        if not obj.reporting_manager:
+            return None
+        return {
+            "id": obj.reporting_manager.id,
+            "name": self.full_name(obj.reporting_manager)
+        }
+
+    def get_head_of_department(self, obj):
+        if not obj.head_of_department:
+            return None
+        return {
+            "id": obj.head_of_department.id,
+            "name": self.full_name(obj.head_of_department)
+        }
 
     def validate(self, data):
         employee = data.get('employee')
@@ -665,7 +693,7 @@ class EmployeeDataSerializer(serializers.ModelSerializer):
     employee_salary = EmployeeSalaryDetailsSerializer(read_only=True)
     employee_personal_details = EmployeePersonalDetailsSerializer(read_only=True)
     employee_bank_details = EmployeeBankDetailsSerializer(read_only=True)
-    employee_reporting_manager = EmployeeReportingManagerSerializer(read_only=True)
+    employee_reporting_manager = EmployeeReportingManagerSerializer(source='reviewing_team', read_only=True)
 
     designation_name = serializers.CharField(source='designation.designation_name', read_only=True)
     department_name = serializers.CharField(source='department.dept_name', read_only=True)
