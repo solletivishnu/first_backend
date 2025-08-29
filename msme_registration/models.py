@@ -8,7 +8,7 @@ from servicetasks.models import ServiceTask
 from .helpers import upload_bank_statement_or_cancelled_cheque_path, upload_official_address_proof_path
 from docwallet.models import PrivateS3Storage
 
-#MSME_Registration = ["BusinessIdentity", "BusinessClassificationInputs", "TurnoverAndInvestmentDeclaration",
+#MSME= ["BusinessIdentity", "BusinessClassificationInputs", "TurnoverAndInvestmentDeclaration",
 # "RegisteredAddress", "MsmeReviewFilingCertificate"]
 
 
