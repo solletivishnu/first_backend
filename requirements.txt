@@ -4,6 +4,7 @@ jmespath==1.0.1
 setuptools==68.1.2
 
 redis>=4.0.0
+rich==13.7.1
 
 # Core Web Framework & ORM
 Django==5.0.4
