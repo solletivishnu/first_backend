@@ -1,7 +1,6 @@
 import os
 
 
-# Business Identity
 def upload_pan_path(instance, filename):
     service_request_id = str(instance.service_request.id)
     return os.path.join(
