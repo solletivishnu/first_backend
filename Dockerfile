@@ -19,10 +19,10 @@ ENV PATH="/opt/venv/bin:$PATH" \
 # Copy only requirements for caching
 COPY requirements.txt .
 
-# Use BuildKit cache for pip
+# Install Python dependencies using BuildKit cache
 RUN --mount=type=cache,target=/root/.cache/pip \
-    python -m pip install --upgrade pip && \
-    python -m pip install --cache-dir=/root/.cache/pip -r requirements.txt
+    pip install --upgrade pip && \
+    pip install --cache-dir=/root/.cache/pip -r requirements.txt
 
 # ---------- STAGE 2: Runtime ----------
 FROM python:3.12-slim
@@ -31,7 +31,7 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:/usr/local/bin:$PATH" \
-    PYTHONPATH=/app:/app/src
+    PYTHONPATH=/app
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
